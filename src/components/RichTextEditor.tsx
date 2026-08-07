@@ -33,9 +33,9 @@ export default function RichTextEditor({ content, onChange, editable = true }: R
   }
 
   return (
-    <div className="w-full border border-slate-250 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-900 focus-within:border-blue-500 dark:focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition duration-200">
+    <div className="w-full border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-900 focus-within:border-blue-500 dark:focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition duration-200">
       {editable && (
-        <div className="flex items-center gap-1 p-2 bg-slate-50 dark:bg-[#0e1424] border-b border-slate-250 dark:border-slate-800 flex-wrap">
+        <div className="flex items-center gap-1 p-2 bg-slate-50 dark:bg-[#0e1424] border-b border-slate-200 dark:border-slate-800 flex-wrap">
           <button
             type="button"
             onClick={() => editor.chain().focus().toggleBold().run()}

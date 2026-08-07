@@ -4,32 +4,32 @@ import React, { useState, useEffect, useRef } from 'react'
 import { 
   X, 
   Trash, 
-  Calendar, 
-  User, 
   MessageSquare, 
   Paperclip, 
-  CheckSquare, 
   Plus, 
   Clock, 
   Loader2, 
   Eye, 
   ExternalLink,
-  ChevronDown,
-  Sparkles,
   Link2
 } from 'lucide-react'
 import RichTextEditor from './RichTextEditor'
+import Avatar from './Avatar'
 
-import { Task, User as UserType } from '@/types'
+import { useData } from '@/context/DataContext'
+import { useUser } from '@/context/UserContext'
+
+import { Task } from '@/types'
 
 interface TaskModalProps {
   task: Task | null
   isOpen: boolean
   onClose: () => void
-  onUpdated: () => void
 }
 
-export default function TaskModal({ task, isOpen, onClose, onUpdated }: TaskModalProps) {
+export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
+  const { users, updateTask, moveToTrash, addComment, addCheckItem, toggleCheck, removeCheckItem, addFileAttachment, removeAttachment, uploadGeneral } = useData()
+  const { user } = useUser()
   const [localTask, setLocalTask] = useState<Task | null>(null)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -37,7 +37,6 @@ export default function TaskModal({ task, isOpen, onClose, onUpdated }: TaskModa
   const [status, setStatus] = useState('TODO')
   const [dueDate, setDueDate] = useState('')
   const [assigneeId, setAssigneeId] = useState('')
-  const [users, setUsers] = useState<UserType[]>([])
   
   // Sub-recursos
   const [newCheckItem, setNewCheckItem] = useState('')
@@ -47,12 +46,14 @@ export default function TaskModal({ task, isOpen, onClose, onUpdated }: TaskModa
   const [uploading, setUploading] = useState(false)
   const [savingDesc, setSavingDesc] = useState(false)
   const [isAddingLink, setIsAddingLink] = useState(false)
+  const [previewAttachment, setPreviewAttachment] = useState<{ name: string; url: string } | null>(null)
   
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Carregar dados da tarefa e usuários
   useEffect(() => {
     if (task && isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLocalTask(task)
       setTitle(task.title)
       setDescription(task.description)
@@ -60,12 +61,6 @@ export default function TaskModal({ task, isOpen, onClose, onUpdated }: TaskModa
       setStatus(task.status)
       setDueDate(task.dueDate ? task.dueDate.split('T')[0] : '')
       setAssigneeId(task.assigneeId || '')
-
-      fetch('/api/users')
-        .then(res => res.json())
-        .then(data => {
-          if (data.success) setUsers(data.users)
-        })
     }
   }, [task, isOpen])
 
@@ -73,41 +68,11 @@ export default function TaskModal({ task, isOpen, onClose, onUpdated }: TaskModa
 
   // Atualizar campo específico da tarefa (no banco de dados e localmente)
   const updateTaskField = async (fields: Partial<Task>) => {
+    setLocalTask((prev) => prev ? { ...prev, ...fields } : prev)
     try {
-      const res = await fetch(`/api/tasks/${localTask.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(fields)
-      })
-      const data = await res.json()
-      if (data.success) {
-        // Recarregar os detalhes da tarefa e notificar o componente pai
-        refreshTaskDetails()
-        onUpdated()
-      }
-    } catch (error) {
-      console.error('Error updating task field:', error)
-    }
-  }
-
-  const refreshTaskDetails = async () => {
-    try {
-      const res = await fetch(`/api/tasks?search=`) // Buscar tarefas atuais
-      const data = await res.json()
-      if (data.success) {
-        const found = data.tasks.find((t: Task) => t.id === localTask.id)
-        if (found) {
-          setLocalTask(found)
-          setTitle(found.title)
-          setDescription(found.description)
-          setPriority(found.priority)
-          setStatus(found.status)
-          setDueDate(found.dueDate ? found.dueDate.split('T')[0] : '')
-          setAssigneeId(found.assigneeId || '')
-        }
-      }
+      await updateTask(localTask.id, fields)
     } catch (err) {
-      console.error(err)
+      console.error('Error updating task field:', err)
     }
   }
 
@@ -116,61 +81,51 @@ export default function TaskModal({ task, isOpen, onClose, onUpdated }: TaskModa
     if (!confirm('Deseja realmente excluir esta tarefa?')) return
 
     try {
-      const res = await fetch(`/api/tasks/${localTask.id}`, {
-        method: 'DELETE'
-      })
-      const data = await res.json()
-      if (data.success) {
-        onUpdated()
-        onClose()
-      }
+      await moveToTrash(localTask.id)
+      onClose()
     } catch (err) {
-      console.error(err)
+      console.error('Error deleting task:', err)
     }
   }
 
   // Checklist Actions
   const handleToggleChecklist = async (itemId: string, isCompleted: boolean) => {
+    if (!localTask) return
+    // Atualiza otimisticamente para feedback imediato
+    setLocalTask((prev) => prev ? { ...prev, checklist: prev.checklist.map((it) => it.id === itemId ? { ...it, isCompleted } : it) } : prev)
     try {
-      await fetch(`/api/tasks/${localTask.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'TOGGLE_CHECKLIST', itemId, isCompleted })
-      })
-      refreshTaskDetails()
-      onUpdated()
+      await toggleCheck(localTask.id, itemId, isCompleted)
     } catch (err) {
-      console.error(err)
+      console.error('Error updating checklist:', err)
+      // Reverte em caso de erro
+      setLocalTask((prev) => prev ? { ...prev, checklist: prev.checklist.map((it) => it.id === itemId ? { ...it, isCompleted: !isCompleted } : it) } : prev)
     }
   }
 
   const handleAddChecklist = async () => {
-    if (!newCheckItem.trim()) return
+    if (!newCheckItem.trim() || !localTask) return
+    const title = newCheckItem.trim()
+    setNewCheckItem('')
+    const tempItem = { id: `temp_${Date.now()}`, title, isCompleted: false }
+    setLocalTask((prev) => prev ? { ...prev, checklist: [...prev.checklist, tempItem] } : prev)
     try {
-      await fetch(`/api/tasks/${localTask.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'ADD_CHECKLIST', title: newCheckItem.trim() })
-      })
-      setNewCheckItem('')
-      refreshTaskDetails()
-      onUpdated()
+      await addCheckItem(localTask.id, title)
     } catch (err) {
-      console.error(err)
+      console.error('Error adding checklist:', err)
+      setLocalTask((prev) => prev ? { ...prev, checklist: prev.checklist.filter((it) => it.id !== tempItem.id) } : prev)
+      setNewCheckItem(title)
     }
   }
 
   const handleDeleteChecklist = async (itemId: string) => {
+    if (!localTask) return
+    const removed = localTask.checklist.find((it) => it.id === itemId)
+    setLocalTask((prev) => prev ? { ...prev, checklist: prev.checklist.filter((it) => it.id !== itemId) } : prev)
     try {
-      await fetch(`/api/tasks/${localTask.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'DELETE_CHECKLIST', itemId })
-      })
-      refreshTaskDetails()
-      onUpdated()
+      await removeCheckItem(localTask.id, itemId)
     } catch (err) {
-      console.error(err)
+      console.error('Error deleting checklist item:', err)
+      if (removed) setLocalTask((prev) => prev ? { ...prev, checklist: [...prev.checklist, removed] } : prev)
     }
   }
 
@@ -179,94 +134,75 @@ export default function TaskModal({ task, isOpen, onClose, onUpdated }: TaskModa
     e.preventDefault()
     if (!newComment.trim()) return
 
+    const content = newComment.trim()
+    setNewComment('')
+    const tempComment = {
+      id: `temp_${Date.now()}`,
+      content,
+      user: user ? { id: user.id, name: user.name, avatarUrl: user.avatarUrl, role: user.role } : { id: '', name: 'Sistema', avatarUrl: '', role: '' },
+      createdAt: new Date().toISOString(),
+    }
+    setLocalTask((prev) => prev ? { ...prev, comments: [...prev.comments, tempComment] } : prev)
+
     try {
-      await fetch(`/api/tasks/${localTask.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'ADD_COMMENT', content: newComment.trim() })
-      })
-      setNewComment('')
-      refreshTaskDetails()
-      onUpdated()
+      await addComment(localTask.id, content)
     } catch (err) {
-      console.error(err)
+      console.error('Error adding comment:', err)
+      setLocalTask((prev) => prev ? { ...prev, comments: prev.comments.filter((c) => c.id !== tempComment.id) } : prev)
+      setNewComment(content)
     }
   }
 
   // Upload Actions (File)
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (!file) return
+    if (!file || !localTask) return
 
     setUploading(true)
-    const formData = new FormData()
-    formData.append('file', file)
-
     try {
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData
-      })
-      const data = await res.json()
-      if (data.success) {
-        // Criar anexo do tipo FILE na tarefa
-        await fetch(`/api/tasks/${localTask.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'ADD_ATTACHMENT',
-            name: data.name,
-            type: 'FILE',
-            url: data.url
-          })
-        })
-        refreshTaskDetails()
-        onUpdated()
-      }
+      const url = await uploadGeneral(file)
+      await addFileAttachment(localTask.id, file.name, 'FILE', url)
     } catch (err) {
       console.error('File upload error:', err)
+      alert(`Erro ao anexar arquivo: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }
 
   // Upload Actions (Link)
   const handleAddLink = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newLinkName.trim() || !newLinkUrl.trim()) return
+    if (!newLinkName.trim() || !newLinkUrl.trim() || !localTask) return
 
+    const name = newLinkName.trim()
+    const url = newLinkUrl.trim()
+    setNewLinkName('')
+    setNewLinkUrl('')
+    setIsAddingLink(false)
+    const tempAtt = { id: `temp_${Date.now()}`, name, type: 'LINK', url, createdAt: new Date().toISOString() }
+    setLocalTask((prev) => prev ? { ...prev, attachments: [...prev.attachments, tempAtt] } : prev)
     try {
-      await fetch(`/api/tasks/${localTask.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'ADD_ATTACHMENT',
-          name: newLinkName.trim(),
-          type: 'LINK',
-          url: newLinkUrl.trim()
-        })
-      })
-      setNewLinkName('')
-      setNewLinkUrl('')
-      setIsAddingLink(false)
-      refreshTaskDetails()
-      onUpdated()
+      await addFileAttachment(localTask.id, name, 'LINK', url)
     } catch (err) {
-      console.error(err)
+      console.error('Error adding link:', err)
+      setLocalTask((prev) => prev ? { ...prev, attachments: prev.attachments.filter((a) => a.id !== tempAtt.id) } : prev)
+      setNewLinkName(name)
+      setNewLinkUrl(url)
+      setIsAddingLink(true)
     }
   }
 
   const handleDeleteAttachment = async (attachmentId: string) => {
+    if (!localTask) return
+    const removed = localTask.attachments.find((a) => a.id === attachmentId)
+    setLocalTask((prev) => prev ? { ...prev, attachments: prev.attachments.filter((a) => a.id !== attachmentId) } : prev)
     try {
-      await fetch(`/api/tasks/${localTask.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'DELETE_ATTACHMENT', attachmentId })
-      })
-      refreshTaskDetails()
-      onUpdated()
+      await removeAttachment(localTask.id, attachmentId)
     } catch (err) {
-      console.error(err)
+      console.error('Error deleting attachment:', err)
+      if (removed) setLocalTask((prev) => prev ? { ...prev, attachments: [...prev.attachments, removed] } : prev)
     }
   }
 
@@ -276,17 +212,13 @@ export default function TaskModal({ task, isOpen, onClose, onUpdated }: TaskModa
     setSavingDesc(false)
   }
 
-  const getPriorityLabel = (prio: string) => {
-    switch (prio) {
-      case 'URGENT': return 'Urgente'
-      case 'HIGH': return 'Alta'
-      case 'MEDIUM': return 'Média'
-      default: return 'Baixa'
-    }
-  }
 
-  const formatLogDate = (dateStr: string) => {
-    const d = new Date(dateStr)
+
+  const formatLogDate = (dateStr: unknown) => {
+    if (!dateStr) return ''
+    const d = dateStr && typeof dateStr === 'object' && 'toDate' in dateStr && typeof (dateStr as { toDate: unknown }).toDate === 'function'
+      ? (dateStr as { toDate: () => Date }).toDate()
+      : new Date(dateStr as string)
     return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
   }
 
@@ -295,11 +227,10 @@ export default function TaskModal({ task, isOpen, onClose, onUpdated }: TaskModa
       <div className="relative w-full max-w-5xl bg-white dark:bg-[#111625] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl flex flex-col h-[90vh] overflow-hidden animate-scale-up">
         
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 shrink-0">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-slate-200 dark:border-slate-800 shrink-0">
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500 font-bold bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-md">ID: {localTask.id.substring(0, 8).toUpperCase()}</span>
-            <div className="w-px h-4 bg-slate-200 dark:bg-slate-850 mx-1" />
-            <span className="text-xs text-slate-400">Criado por: {localTask.creator?.name || 'Sistema'}</span>
+            <div className="w-px h-4 bg-slate-200 dark:bg-slate-800 mx-1" />
+            <span className="text-xs text-slate-400 hidden sm:inline">Criado por: {localTask.creator?.name || 'Sistema'}</span>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -319,10 +250,10 @@ export default function TaskModal({ task, isOpen, onClose, onUpdated }: TaskModa
         </div>
 
         {/* Main Columns Container */}
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
           
           {/* Left Column (Main Scrollable Workspace) */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
             
             {/* Title Inline Edit */}
             <div className="space-y-1.5">
@@ -335,7 +266,7 @@ export default function TaskModal({ task, isOpen, onClose, onUpdated }: TaskModa
                     updateTaskField({ title: title.trim() })
                   }
                 }}
-                className="w-full text-xl font-bold bg-transparent border-b border-transparent hover:border-slate-200 dark:hover:border-slate-850 focus:border-blue-500 outline-none text-slate-800 dark:text-slate-150 py-1 transition duration-150 focus:ring-0"
+                className="w-full text-xl font-bold bg-transparent border-b border-transparent hover:border-slate-200 dark:hover:border-slate-800 focus:border-blue-500 outline-none text-slate-800 dark:text-slate-100 py-1 transition duration-150 focus:ring-0"
               />
             </div>
 
@@ -368,7 +299,7 @@ export default function TaskModal({ task, isOpen, onClose, onUpdated }: TaskModa
                   value={newCheckItem}
                   onChange={(e) => setNewCheckItem(e.target.value)}
                   placeholder="Adicionar subpasta/item..."
-                  className="flex-1 px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-800 dark:text-slate-200"
+                  className="flex-1 px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-800 dark:text-slate-200"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault()
@@ -379,7 +310,7 @@ export default function TaskModal({ task, isOpen, onClose, onUpdated }: TaskModa
                 <button
                   type="button"
                   onClick={handleAddChecklist}
-                  className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-sm font-semibold flex items-center border border-slate-250 dark:border-slate-750 transition cursor-pointer"
+                  className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-sm font-semibold flex items-center border border-slate-200 dark:border-slate-700 transition cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
                 </button>
@@ -388,7 +319,7 @@ export default function TaskModal({ task, isOpen, onClose, onUpdated }: TaskModa
               {localTask.checklist.length > 0 && (
                 <div className="border border-slate-200 dark:border-slate-800 p-4 rounded-xl bg-slate-50/30 dark:bg-slate-900/10 space-y-2.5">
                   {localTask.checklist.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between gap-3 text-sm text-slate-700 dark:text-slate-350 group">
+                    <div key={item.id} className="flex items-center justify-between gap-3 text-sm text-slate-700 dark:text-slate-300 group">
                       <label className="flex items-center gap-3 cursor-pointer select-none min-w-0 flex-1">
                         <input
                           type="checkbox"
@@ -454,15 +385,15 @@ export default function TaskModal({ task, isOpen, onClose, onUpdated }: TaskModa
 
               {/* Form de Inclusão de Link Externo */}
               {isAddingLink && (
-                <form onSubmit={handleAddLink} className="p-4 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-55 dark:bg-slate-900/30 space-y-3 animate-fade-in">
-                  <div className="grid grid-cols-2 gap-3">
+                <form onSubmit={handleAddLink} className="p-4 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-900/30 space-y-3 animate-fade-in">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <input
                       type="text"
                       required
                       placeholder="Nome do link (ex: Figma Layouts)"
                       value={newLinkName}
                       onChange={(e) => setNewLinkName(e.target.value)}
-                      className="px-3.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-lg text-sm text-slate-800 dark:text-slate-200"
+                      className="px-3.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm text-slate-800 dark:text-slate-200"
                     />
                     <input
                       type="url"
@@ -470,7 +401,7 @@ export default function TaskModal({ task, isOpen, onClose, onUpdated }: TaskModa
                       placeholder="https://..."
                       value={newLinkUrl}
                       onChange={(e) => setNewLinkUrl(e.target.value)}
-                      className="px-3.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-lg text-sm text-slate-800 dark:text-slate-200"
+                      className="px-3.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm text-slate-800 dark:text-slate-200"
                     />
                   </div>
                   <div className="flex justify-end gap-2 text-xs">
@@ -507,10 +438,10 @@ export default function TaskModal({ task, isOpen, onClose, onUpdated }: TaskModa
                         )}
                         
                         <div className="min-w-0">
-                          <span className="text-xs font-semibold text-slate-800 dark:text-slate-250 truncate block max-w-[200px]" title={file.name}>
+                          <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate block max-w-[200px]" title={file.name}>
                             {file.name}
                           </span>
-                          <span className="text-[10px] text-slate-450 block uppercase tracking-wider font-semibold">
+                          <span className="text-[10px] text-slate-400 block uppercase tracking-wider font-semibold">
                             {file.type === 'LINK' ? 'Link Externo' : 'Arquivo'}
                           </span>
                         </div>
@@ -518,11 +449,17 @@ export default function TaskModal({ task, isOpen, onClose, onUpdated }: TaskModa
 
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition duration-150">
                         <a
-                          href={file.url}
+                          href={file.type === 'LINK' ? file.url : undefined}
                           target="_blank"
                           rel="noreferrer"
-                          title="Visualizar / Acessar"
-                          className="p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-550 dark:text-slate-400"
+                          title={file.type === 'LINK' ? 'Acessar Link' : 'Visualizar'}
+                          className="p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400"
+                          onClick={(e) => {
+                            if (file.type !== 'LINK') {
+                              e.preventDefault()
+                              setPreviewAttachment({ name: file.name, url: file.url })
+                            }
+                          }}
                         >
                           {file.type === 'LINK' ? <ExternalLink className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                         </a>
@@ -552,19 +489,15 @@ export default function TaskModal({ task, isOpen, onClose, onUpdated }: TaskModa
               {localTask.comments.length > 0 && (
                 <div className="space-y-4">
                   {localTask.comments.map((comment) => (
-                    <div key={comment.id} className="flex gap-3 bg-slate-50/50 dark:bg-slate-900/10 border border-slate-200 dark:border-slate-850 p-4 rounded-2xl">
-                      <img
-                        src={comment.user.avatarUrl}
-                        alt={comment.user.name}
-                        className="w-8 h-8 rounded-full object-cover shrink-0 bg-slate-100 border border-slate-200"
-                      />
+                    <div key={comment.id} className="flex gap-3 bg-slate-50/50 dark:bg-slate-900/10 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl">
+                      <Avatar name={comment.user.name} url={comment.user.avatarUrl} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1 flex-wrap">
                           <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{comment.user.name}</span>
-                          <span className="text-[10px] text-slate-500 dark:text-slate-450 font-medium">({comment.user.role === 'DESIGNER' ? 'Designer' : 'Tráfego'})</span>
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">({comment.user.role === 'DESIGNER' ? 'Designer' : 'Tráfego'})</span>
                           <span className="text-[10px] text-slate-400 ml-auto">{formatLogDate(comment.createdAt)}</span>
                         </div>
-                        <p className="text-sm text-slate-600 dark:text-slate-350 leading-relaxed whitespace-pre-wrap">
+                        <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
                           {comment.content}
                         </p>
                       </div>
@@ -575,10 +508,10 @@ export default function TaskModal({ task, isOpen, onClose, onUpdated }: TaskModa
 
               {/* Novo Comentário */}
               <form onSubmit={handleAddComment} className="flex gap-3">
-                <img
-                  src={users.find(u => u.id === assigneeId)?.avatarUrl || 'https://api.dicebear.com/7.x/avataaars/svg?seed=avatar'}
-                  alt="Avatar"
-                  className="w-8 h-8 rounded-full object-cover shrink-0 bg-slate-100 border border-slate-200 dark:border-slate-800 hidden sm:block"
+                <Avatar
+                  name={users.find(u => u.id === assigneeId)?.name || ''}
+                  url={users.find(u => u.id === assigneeId)?.avatarUrl}
+                  className="hidden sm:block"
                 />
                 <div className="flex-1 space-y-2">
                   <textarea
@@ -586,7 +519,7 @@ export default function TaskModal({ task, isOpen, onClose, onUpdated }: TaskModa
                     placeholder="Arte enviada para aprovação... Cliente solicitou alteração..."
                     value={newComment}
                     onChange={(e) => setNewComment(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-800 dark:text-slate-200 resize-none font-medium"
+                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-800 dark:text-slate-200 resize-none font-medium"
                   />
                   <div className="flex justify-end">
                     <button
@@ -604,20 +537,20 @@ export default function TaskModal({ task, isOpen, onClose, onUpdated }: TaskModa
           </div>
 
           {/* Right Column (Sidebar Configuration Details) */}
-          <div className="w-80 border-l border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0c1220] overflow-y-auto p-6 space-y-6">
+          <div className="w-full md:w-80 border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0c1220] overflow-y-auto p-4 md:p-6 space-y-6">
             
             {/* Status Select */}
             <div className="space-y-1.5">
-              <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Status</label>
+              <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider">Status</label>
               <select
                 value={status}
                 onChange={(e) => {
                   setStatus(e.target.value)
                   updateTaskField({ status: e.target.value })
                 }}
-                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-xs text-slate-700 dark:text-slate-350 font-bold"
+                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-xs text-slate-700 dark:text-slate-300 font-bold"
               >
-                <option value="BACKLOG">Backlog</option>
+                <option value="BACKLOG">Ideia</option>
                 <option value="TODO">A Fazer</option>
                 <option value="IN_PROGRESS">Em Andamento</option>
                 <option value="AWAITING_APPROVAL">Aguardando Aprovação</option>
@@ -627,14 +560,14 @@ export default function TaskModal({ task, isOpen, onClose, onUpdated }: TaskModa
 
             {/* Prioridade Select */}
             <div className="space-y-1.5">
-              <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Prioridade</label>
+              <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider">Prioridade</label>
               <select
                 value={priority}
                 onChange={(e) => {
                   setPriority(e.target.value)
                   updateTaskField({ priority: e.target.value })
                 }}
-                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-xs text-slate-700 dark:text-slate-350 font-bold"
+                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-xs text-slate-700 dark:text-slate-300 font-bold"
               >
                 <option value="LOW">Baixa</option>
                 <option value="MEDIUM">Média</option>
@@ -645,14 +578,14 @@ export default function TaskModal({ task, isOpen, onClose, onUpdated }: TaskModa
 
             {/* Responsável Select */}
             <div className="space-y-1.5">
-              <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Responsável</label>
+              <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider">Responsável</label>
               <select
                 value={assigneeId}
                 onChange={(e) => {
                   setAssigneeId(e.target.value)
                   updateTaskField({ assigneeId: e.target.value || null })
                 }}
-                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-xs text-slate-700 dark:text-slate-350 font-bold"
+                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-xs text-slate-700 dark:text-slate-300 font-bold"
               >
                 <option value="">Sem responsável</option>
                 {users.map(u => (
@@ -665,7 +598,7 @@ export default function TaskModal({ task, isOpen, onClose, onUpdated }: TaskModa
 
             {/* Vencimento Input */}
             <div className="space-y-1.5">
-              <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Data Limite de Entrega</label>
+              <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider">Data Limite de Entrega</label>
               <input
                 type="date"
                 value={dueDate}
@@ -673,13 +606,13 @@ export default function TaskModal({ task, isOpen, onClose, onUpdated }: TaskModa
                   setDueDate(e.target.value)
                   updateTaskField({ dueDate: e.target.value || null })
                 }}
-                className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-xs text-slate-700 dark:text-slate-350 font-bold"
+                className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-xs text-slate-700 dark:text-slate-300 font-bold dark:[color-scheme:dark]"
               />
             </div>
 
             {/* Activity History Logs */}
-            <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-850">
-              <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center gap-1">
+            <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-800">
+              <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
                 <Clock className="w-3.5 h-3.5" />
                 Histórico de Atividades
               </label>
@@ -694,7 +627,7 @@ export default function TaskModal({ task, isOpen, onClose, onUpdated }: TaskModa
                         {/* Indicador de Timeline */}
                         <div className="absolute -left-[16.5px] top-1 w-2.5 h-2.5 rounded-full bg-blue-500 border-2 border-slate-50 dark:border-[#0c1220]" />
                         
-                        <div className="font-semibold text-slate-750 dark:text-slate-300">
+                        <div className="font-semibold text-slate-700 dark:text-slate-300">
                           {log.action}
                         </div>
                         <div className="text-[9px] text-slate-400 dark:text-slate-500 mt-0.5">
@@ -712,6 +645,34 @@ export default function TaskModal({ task, isOpen, onClose, onUpdated }: TaskModa
         </div>
 
       </div>
+
+      {/* Preview Modal for file attachments */}
+      {previewAttachment && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm" onClick={() => setPreviewAttachment(null)}>
+          <div className="relative max-w-3xl w-full bg-white dark:bg-[#111625] rounded-2xl shadow-2xl overflow-hidden animate-scale-up" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 dark:border-slate-800">
+              <span className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">{previewAttachment.name}</span>
+              <button onClick={() => setPreviewAttachment(null)} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-4 flex items-center justify-center max-h-[70vh] overflow-auto">
+              {previewAttachment.url.startsWith('data:image/') ? (
+                <img src={previewAttachment.url} alt={previewAttachment.name} className="max-w-full max-h-[65vh] rounded-lg object-contain" />
+              ) : previewAttachment.url.startsWith('data:application/pdf') ? (
+                <iframe src={previewAttachment.url} className="w-full h-[65vh] rounded-lg border-0" title={previewAttachment.name} />
+              ) : (
+                <div className="text-center py-10 text-slate-400">
+                  <p className="text-sm font-medium mb-3">Pré-visualização não disponível</p>
+                  <a href={previewAttachment.url} download={previewAttachment.name} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold cursor-pointer">
+                    Baixar arquivo
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

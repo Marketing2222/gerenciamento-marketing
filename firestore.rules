@@ -1,0 +1,19 @@
+// Regras de segurança do Firestore.
+//
+// APLICAÇÃO: este sistema usa login próprio (PIN) e não o Firebase Auth.
+// Para manter o app funcionando entre os dois usuários, as regras abaixo
+// liberam leitura/escrita para qualquer visitante do site.
+//
+// ATENÇÃO: enquanto seu parceiro puder acessar o site, ele também pode
+// alterar dados. Se quiser mais segurança depois, crie um usuário do
+// Firebase Auth para cada membro e restrinja com request.auth.
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

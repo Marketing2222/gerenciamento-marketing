@@ -3,74 +3,38 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useUser } from '@/context/UserContext'
 import { useBrand } from '@/context/BrandContext'
-import { User, Shield, Camera, Loader2, Check, Sparkles, Globe, Upload, X } from 'lucide-react'
+import { useData } from '@/context/DataContext'
+import { useColumns, CardSummaryConfig } from '@/context/ColumnsContext'
+import { User, Shield, Camera, Loader2, Sparkles, Globe, Upload, X, Check, Columns3, Palette, Hash } from 'lucide-react'
+import Avatar from '@/components/Avatar'
 
-const AVATAR_CATEGORIES = {
-  'Marvel': [
-    { name: 'Homem-Aranha', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=SpiderMan&backgroundColor=b6e3f4' },
-    { name: 'Iron Man', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=IronMan&backgroundColor=ffdfbf' },
-    { name: 'Capitão América', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=CaptainAmerica&backgroundColor=c0aede' },
-    { name: 'Thor', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=Thor&backgroundColor=d1d4f9' },
-    { name: 'Hulk', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=Hulk&backgroundColor=b6e3f4' },
-    { name: 'Viúva Negra', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=BlackWidow&backgroundColor=ffd5dc' },
-    { name: 'Deadpool', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=Deadpool&backgroundColor=ffdfbf' },
-    { name: 'Wolverine', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=Wolverine&backgroundColor=c0aede' },
-    { name: 'Pantera Negra', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=BlackPanther&backgroundColor=d1d4f9' },
-    { name: 'Doutor Estranho', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=DoctorStrange&backgroundColor=b6e3f4' },
-    { name: 'Falcão', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=Falcon&backgroundColor=ffdfbf' },
-    { name: 'Visão', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=Vision&backgroundColor=c0aede' },
-  ],
-  'DC & Batman': [
-    { name: 'Batman', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=Batman&backgroundColor=d1d4f9' },
-    { name: 'Superman', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=Superman&backgroundColor=b6e3f4' },
-    { name: 'Mulher Maravilha', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=WonderWoman&backgroundColor=ffd5dc' },
-    { name: 'Flash', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=TheFlash&backgroundColor=ffdfbf' },
-    { name: 'Aquaman', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=Aquaman&backgroundColor=c0aede' },
-    { name: 'Coringa', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=Joker&backgroundColor=d1d4f9' },
-    { name: 'Lex Luthor', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=LexLuthor&backgroundColor=b6e3f4' },
-    { name: 'Harley Quinn', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=HarleyQuinn&backgroundColor=ffd5dc' },
-    { name: 'Green Lantern', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=GreenLantern&backgroundColor=ffdfbf' },
-    { name: 'Cyborg', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=Cyborg&backgroundColor=c0aede' },
-  ],
-  'Filmes & Séries': [
-    { name: 'Darth Vader', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=DarthVader&backgroundColor=d1d4f9' },
-    { name: 'Luke Skywalker', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=LukeSkywalker&backgroundColor=b6e3f4' },
-    { name: 'Yoda', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=Yoda&backgroundColor=ffdfbf' },
-    { name: 'Harry Potter', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=HarryPotter&backgroundColor=c0aede' },
-    { name: 'Hermione', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=Hermione&backgroundColor=ffd5dc' },
-    { name: 'Frodo', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=Frodo&backgroundColor=d1d4f9' },
-    { name: 'Gandalf', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=Gandalf&backgroundColor=b6e3f4' },
-    { name: 'Neo Matrix', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=NeoMatrix&backgroundColor=ffdfbf' },
-    { name: 'John Wick', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=JohnWick&backgroundColor=c0aede' },
-    { name: 'Indiana Jones', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=IndianaJones&backgroundColor=d1d4f9' },
-    { name: 'Jack Sparrow', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=JackSparrow&backgroundColor=b6e3f4' },
-    { name: 'Buzz Lightyear', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=BuzzLightyear&backgroundColor=ffdfbf' },
-  ],
-  'God of War': [
-    { name: 'Kratos', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=Kratos&backgroundColor=c0aede' },
-    { name: 'Atreus', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=Atreus&backgroundColor=d1d4f9' },
-    { name: 'Freya', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=Freya&backgroundColor=ffd5dc' },
-    { name: 'Mimir', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=Mimir&backgroundColor=b6e3f4' },
-    { name: 'Baldur', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=Baldur&backgroundColor=ffdfbf' },
-    { name: 'Thamur', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=Thamur&backgroundColor=c0aede' },
-    { name: 'Magni', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=Magni&backgroundColor=d1d4f9' },
-    { name: 'Modi', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=Modi&backgroundColor=b6e3f4' },
-  ],
-  'Games & Outros': [
-    { name: 'Mario', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=Mario&backgroundColor=ffdfbf' },
-    { name: 'Link Zelda', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=LinkZelda&backgroundColor=c0aede' },
-    { name: 'Master Chief', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=MasterChief&backgroundColor=d1d4f9' },
-    { name: 'Lara Croft', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=LaraCroft&backgroundColor=ffd5dc' },
-    { name: 'Geralt Rivia', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=Geralt&backgroundColor=b6e3f4' },
-    { name: 'Cloud Strife', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=CloudStrife&backgroundColor=ffdfbf' },
-    { name: 'Pikachu', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=Pikachu&backgroundColor=c0aede' },
-    { name: 'Sonic', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=Sonic&backgroundColor=d1d4f9' },
-  ],
-}
+const COLOR_PRESETS = [
+  { label: 'Cinza', hex: '#64748b' },
+  { label: 'Azul', hex: '#3b82f6' },
+  { label: 'Amarelo', hex: '#f59e0b' },
+  { label: 'Roxo', hex: '#a855f7' },
+  { label: 'Verde', hex: '#10b981' },
+  { label: 'Vermelho', hex: '#ef4444' },
+  { label: 'Rosa', hex: '#ec4899' },
+  { label: 'Ciano', hex: '#06b6d4' },
+  { label: 'Laranja', hex: '#f97316' },
+  { label: 'Índigo', hex: '#6366f1' },
+]
+
+const SUMMARY_OPTIONS: { key: keyof CardSummaryConfig; label: string }[] = [
+  { key: 'showPriority', label: 'Prioridade' },
+  { key: 'showDueDate', label: 'Data de entrega' },
+  { key: 'showAssignee', label: 'Responsável' },
+  { key: 'showChecklist', label: 'Checklist' },
+  { key: 'showComments', label: 'Comentários' },
+  { key: 'showAttachments', label: 'Anexos' },
+]
 
 export default function SettingsPage() {
   const { user, refreshUser } = useUser()
-  const { siteName, logoUrl, setSiteName, setLogoUrl } = useBrand()
+  const { siteName, logoUrl, applyBrand } = useBrand()
+  const { saveProfile, uploadAvatar, uploadLogo } = useData()
+  const { columns, summary, updateColumn, updateSummary } = useColumns()
   
   const [name, setName] = useState('')
   const [role, setRole] = useState('DESIGNER')
@@ -92,6 +56,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (user) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setName(user.name)
       setRole(user.role)
       setAvatarUrl(user.avatarUrl)
@@ -99,6 +64,7 @@ export default function SettingsPage() {
   }, [user])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setBrandName(siteName)
     setBrandLogo(logoUrl)
   }, [siteName, logoUrl])
@@ -112,25 +78,14 @@ export default function SettingsPage() {
     setUploading(true)
     setError('')
     setSuccess('')
-    
-    const formData = new FormData()
-    formData.append('file', file)
 
     try {
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData
-      })
-      const data = await res.json()
-      if (data.success) {
-        setAvatarUrl(data.url)
-        setSuccess('Foto carregada com sucesso! Clique em salvar perfil para aplicar.')
-      } else {
-        setError(data.error || 'Erro ao fazer upload da imagem.')
-      }
+      const url = await uploadAvatar(file)
+      setAvatarUrl(url)
+      setSuccess('Foto carregada com sucesso! Clique em salvar perfil para aplicar.')
     } catch (err) {
       console.error(err)
-      setError('Erro de rede no upload.')
+      setError(`Erro ao fazer upload da imagem: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setUploading(false)
     }
@@ -142,25 +97,14 @@ export default function SettingsPage() {
 
     setUploadingLogo(true)
     setError('')
-    
-    const formData = new FormData()
-    formData.append('file', file)
 
     try {
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData
-      })
-      const data = await res.json()
-      if (data.success) {
-        setBrandLogo(data.url)
-        setSuccess('Logo carregada! Clique em "Aplicar Aparência" para salvar.')
-      } else {
-        setError(data.error || 'Erro ao fazer upload da logo.')
-      }
+      const url = await uploadLogo(file)
+      setBrandLogo(url)
+      setSuccess('Logo carregada! Clique em "Aplicar Aparência" para salvar.')
     } catch (err) {
       console.error(err)
-      setError('Erro de rede no upload da logo.')
+      setError(`Erro ao fazer upload da logo: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setUploadingLogo(false)
     }
@@ -183,37 +127,26 @@ export default function SettingsPage() {
     setSuccess('')
 
     try {
-      const res = await fetch(`/api/users/${user.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: name.trim(),
-          role,
-          avatarUrl,
-          pin: pin ? pin : undefined
-        })
+      await saveProfile(user.id, {
+        name: name.trim(),
+        role,
+        avatarUrl,
+        pin: pin ? pin : undefined
       })
-
-      const data = await res.json()
-      if (data.success) {
-        setSuccess('Configurações atualizadas com sucesso!')
-        setPin('')
-        setConfirmPin('')
-        await refreshUser()
-      } else {
-        setError(data.error || 'Erro ao salvar alterações')
-      }
+      setSuccess('Configurações atualizadas com sucesso!')
+      setPin('')
+      setConfirmPin('')
+      refreshUser()
     } catch (err) {
       console.error(err)
-      setError('Erro de rede ao salvar configurações')
+      setError('Erro ao salvar alterações')
     } finally {
       setSaving(false)
     }
   }
 
   const handleSaveBrand = () => {
-    setSiteName(brandName || 'MktFlow')
-    setLogoUrl(brandLogo)
+    applyBrand(brandName, brandLogo)
     setSuccess('Aparência do site atualizada!')
   }
 
@@ -242,7 +175,7 @@ export default function SettingsPage() {
 
       {/* Aparência do Site */}
       <div className="bg-white dark:bg-[#151b2c] border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm space-y-4">
-        <h3 className="font-bold text-sm text-slate-800 dark:text-slate-200 flex items-center gap-2 pb-3 border-b border-slate-100 dark:border-slate-850">
+        <h3 className="font-bold text-sm text-slate-800 dark:text-slate-200 flex items-center gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
           <Globe className="w-4 h-4 text-blue-500" />
           Aparência do Site
         </h3>
@@ -255,7 +188,7 @@ export default function SettingsPage() {
               value={brandName}
               onChange={(e) => setBrandName(e.target.value)}
               placeholder="MktFlow"
-              className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-800 dark:text-slate-200 font-semibold"
+              className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-800 dark:text-slate-200 font-semibold"
             />
           </div>
 
@@ -268,7 +201,7 @@ export default function SettingsPage() {
                   value={brandLogo}
                   onChange={(e) => setBrandLogo(e.target.value)}
                   placeholder="URL da logo (ou use o upload)"
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-800 dark:text-slate-200 font-semibold pr-10"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-800 dark:text-slate-200 font-semibold pr-10"
                 />
                 {brandLogo && (
                   <button
@@ -285,7 +218,7 @@ export default function SettingsPage() {
                 onClick={() => logoInputRef.current?.click()}
                 disabled={uploadingLogo}
                 title="Enviar logo do computador"
-                className="px-3 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-250 dark:border-slate-800 rounded-xl text-slate-600 dark:text-slate-400 transition cursor-pointer shrink-0 flex items-center gap-1.5"
+                className="px-3 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-600 dark:text-slate-400 transition cursor-pointer shrink-0 flex items-center gap-1.5"
               >
                 {uploadingLogo ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -329,6 +262,67 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* Kanban Columns Config */}
+      <div className="bg-white dark:bg-[#151b2c] border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm space-y-5">
+        <div className="flex items-center gap-2">
+          <Columns3 className="w-5 h-5 text-violet-500" />
+          <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">Colunas do Kanban</h3>
+        </div>
+        <p className="text-xs text-slate-500 dark:text-slate-400">Edite o nome, cor e o que aparece nos cards de cada coluna.</p>
+
+        <div className="space-y-3">
+          {columns.map((col, idx) => (
+            <div key={col.id} className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <span className="text-[10px] font-bold text-slate-400 w-4 shrink-0">{idx + 1}</span>
+                <input
+                  type="text"
+                  value={col.title}
+                  onChange={(e) => updateColumn(col.id, { title: e.target.value })}
+                  className="flex-1 px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-semibold text-slate-800 dark:text-slate-200 outline-none focus:border-blue-500"
+                />
+              </div>
+
+              {/* Color picker */}
+              <div className="flex flex-wrap gap-1 shrink-0">
+                {COLOR_PRESETS.map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    title={preset.label}
+                    onClick={() => updateColumn(col.id, { customColor: preset.hex })}
+                    className={`w-5 h-5 rounded-full border-2 transition cursor-pointer ${
+                      col.customColor === preset.hex
+                        ? 'border-blue-500 scale-110'
+                        : 'border-transparent hover:border-slate-300'
+                    }`}
+                    style={{ backgroundColor: preset.hex }}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Card Summary */}
+        <div className="border-t border-slate-200 dark:border-slate-800 pt-4">
+          <p className="text-xs font-bold text-slate-600 dark:text-slate-300 mb-3">Resumo do Card (aparece em todas as colunas)</p>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+            {SUMMARY_OPTIONS.map((opt) => (
+              <label key={opt.key} className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-900/40 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={summary[opt.key]}
+                  onChange={(e) => updateSummary({ [opt.key]: e.target.checked })}
+                  className="w-3.5 h-3.5 rounded border-slate-300 dark:border-slate-700 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-xs font-medium text-slate-700 dark:text-slate-300">{opt.label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      </div>
+
       <form onSubmit={handleSave} className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
         {/* Avatar */}
@@ -336,10 +330,11 @@ export default function SettingsPage() {
           <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4">Sua Foto</label>
           
           <div className="relative group mb-6">
-            <img
-              src={avatarUrl || 'https://api.dicebear.com/9.x/adventurer/svg?seed=avatar'}
-              alt="Profile avatar"
-              className="w-28 h-28 rounded-full border-2 border-slate-200 dark:border-slate-800 object-cover bg-slate-100 dark:bg-slate-900"
+            <Avatar
+              name={name}
+              url={avatarUrl}
+              size="3xl"
+              className="border-2 border-slate-200 dark:border-slate-800"
             />
             
             <button
@@ -365,46 +360,15 @@ export default function SettingsPage() {
           />
 
           <p className="text-[10px] text-slate-400 mb-4">
-            Envie uma foto ou selecione um personagem abaixo.
+            Envie uma foto para usar como seu perfil.
           </p>
-
-          {/* Avatar Categories */}
-          <div className="w-full space-y-4 max-h-[500px] overflow-y-auto pr-1">
-            {Object.entries(AVATAR_CATEGORIES).map(([category, avatars]) => (
-              <div key={category}>
-                <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">
-                  {category}
-                </label>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {avatars.map((avatar, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      title={avatar.name}
-                      onClick={() => setAvatarUrl(avatar.url)}
-                      className={`w-full aspect-square rounded-full overflow-hidden border-2 bg-slate-50 hover:scale-110 transition cursor-pointer relative ${
-                        avatarUrl === avatar.url ? 'border-blue-500 scale-110' : 'border-slate-200 dark:border-slate-800'
-                      }`}
-                    >
-                      <img src={avatar.url} alt={avatar.name} className="w-full h-full object-cover" />
-                      {avatarUrl === avatar.url && (
-                        <div className="absolute inset-0 bg-blue-500/20 flex items-center justify-center text-white">
-                          <Check className="w-2.5 h-2.5 text-blue-600 dark:text-blue-400 font-bold bg-white dark:bg-slate-900 rounded-full p-0.5" />
-                        </div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
 
         {/* Form */}
         <div className="md:col-span-2 space-y-6">
           
           <div className="bg-white dark:bg-[#151b2c] border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm space-y-4">
-            <h3 className="font-bold text-sm text-slate-800 dark:text-slate-200 flex items-center gap-2 pb-3 border-b border-slate-100 dark:border-slate-850">
+            <h3 className="font-bold text-sm text-slate-800 dark:text-slate-200 flex items-center gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
               <User className="w-4 h-4 text-blue-500" />
               Informações do Cadastro
             </h3>
@@ -416,7 +380,7 @@ export default function SettingsPage() {
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-800 dark:text-slate-200 font-semibold"
+                className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-800 dark:text-slate-200 font-semibold"
               />
             </div>
 
@@ -425,7 +389,7 @@ export default function SettingsPage() {
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-700 dark:text-slate-300 font-semibold"
+                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-700 dark:text-slate-300 font-semibold"
               >
                 <option value="DESIGNER">Designer (Artes & Audiovisual)</option>
                 <option value="TRAFFIC_MANAGER">Gestor de Tráfego (Campanhas & Ads)</option>
@@ -434,7 +398,7 @@ export default function SettingsPage() {
           </div>
 
           <div className="bg-white dark:bg-[#151b2c] border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm space-y-4">
-            <h3 className="font-bold text-sm text-slate-800 dark:text-slate-200 flex items-center gap-2 pb-3 border-b border-slate-100 dark:border-slate-850">
+            <h3 className="font-bold text-sm text-slate-800 dark:text-slate-200 flex items-center gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
               <Shield className="w-4 h-4 text-blue-500" />
               Segurança e Acesso
             </h3>
@@ -448,7 +412,7 @@ export default function SettingsPage() {
                   value={pin}
                   onChange={(e) => setPin(e.target.value)}
                   placeholder="Defina um novo PIN de acesso"
-                  className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-800 dark:text-slate-250"
+                  className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-800 dark:text-slate-200"
                 />
               </div>
 
@@ -460,7 +424,7 @@ export default function SettingsPage() {
                   value={confirmPin}
                   onChange={(e) => setConfirmPin(e.target.value)}
                   placeholder="Repita o novo PIN"
-                  className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-800 dark:text-slate-250"
+                  className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-800 dark:text-slate-200"
                 />
               </div>
             </div>

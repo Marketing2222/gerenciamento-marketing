@@ -44,6 +44,8 @@ export interface Task {
   priority: string
   status: string
   dueDate: string | null
+  createdAt: string
+  deletedAt: string | null
   assigneeId: string | null
   creatorId: string | null
   assignee: User | null

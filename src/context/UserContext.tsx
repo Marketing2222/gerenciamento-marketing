@@ -1,7 +1,9 @@
 'use client'
 
-import React, { createContext, useContext, useEffect, useState } from 'react'
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
+import { db, isFirebaseConfigured } from '@/lib/firebaseClient'
+import { onSnapshot, getDoc, doc } from 'firebase/firestore'
 
 interface User {
   id: string
@@ -14,9 +16,11 @@ interface UserContextType {
   user: User | null
   loading: boolean
   login: (userId: string, pin: string) => Promise<{ success: boolean; error?: string }>
-  logout: () => Promise<void>
-  refreshUser: () => Promise<void>
+  logout: () => void
+  refreshUser: () => void
 }
+
+const USER_STORAGE_KEY = 'mktflow_current_user_id'
 
 const UserContext = createContext<UserContextType | undefined>(undefined)
 
@@ -26,60 +30,101 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
 
-  const refreshUser = async () => {
-    try {
-      const res = await fetch('/api/auth/me')
-      const data = await res.json()
-      if (data.success && data.user) {
-        setUser(data.user)
-      } else {
+  const refreshUser = useCallback(() => {
+    if (!isFirebaseConfigured()) {
+      setUser(null)
+      setLoading(false)
+      if (pathname !== '/login') {
+        router.push('/login')
+      }
+      return
+    }
+
+    const savedId = typeof window !== 'undefined' ? localStorage.getItem(USER_STORAGE_KEY) : null
+    if (!savedId) {
+      setUser(null)
+      setLoading(false)
+      if (pathname !== '/login') {
+        router.push('/login')
+      }
+      return
+    }
+
+    // Ouve o documento do usuário logado (tempo real p/ atualizações de perfil)
+    const unsub = onSnapshot(
+      doc(db(), 'users', savedId),
+      (snap) => {
+        if (snap.exists()) {
+          const d = snap.data()
+          const u: User = { id: snap.id, name: d.name || '', role: d.role || '', avatarUrl: d.avatarUrl || '' }
+          setUser(u)
+        } else {
+          localStorage.removeItem(USER_STORAGE_KEY)
+          setUser(null)
+          if (pathname !== '/login') {
+            router.push('/login')
+          }
+        }
+        setLoading(false)
+      },
+      () => {
         setUser(null)
-        // Redireciona para o login se não estiver autenticado e não estiver na rota de login
-        if (pathname !== '/login' && !pathname.startsWith('/api')) {
+        setLoading(false)
+        if (pathname !== '/login') {
           router.push('/login')
         }
       }
-    } catch (error) {
-      console.error('Error fetching current user:', error)
-      setUser(null)
-    } finally {
-      setLoading(false)
-    }
-  }
+    )
+    return unsub
+  }, [pathname, router])
 
   useEffect(() => {
-    refreshUser()
-  }, [])
+    return refreshUser()
+  }, [refreshUser])
 
-  const login = async (userId: string, pin: string) => {
-    try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, pin })
-      })
-      const data = await res.json()
-      if (data.success && data.user) {
-        setUser(data.user)
+  const login = useCallback(
+    async (userId: string, pin: string) => {
+      if (!isFirebaseConfigured()) {
+        return { success: false, error: 'Firebase não configurado. Preencha as variáveis de ambiente e recarregue.' }
+      }
+      try {
+        const snap = await getDoc(doc(db(), 'users', userId))
+        if (!snap.exists()) {
+          return { success: false, error: 'Usuário não encontrado' }
+        }
+        const data = snap.data()
+        const storedPin = data.pin || ''
+        if (storedPin && storedPin !== pin) {
+          return { success: false, error: 'PIN incorreto' }
+        }
+        localStorage.setItem(USER_STORAGE_KEY, userId)
+        // Dispara refresh para re-aparecer a sessão sem recarregar a página
+        const unsub = onSnapshot(doc(db(), 'users', userId), (s) => {
+          if (s.exists()) {
+            const d = s.data()
+            const u: User = { id: s.id, name: d.name || '', role: d.role || '', avatarUrl: d.avatarUrl || '' }
+            setUser(u)
+            setLoading(false)
+          }
+        })
+        setTimeout(() => unsub(), 1500)
         router.push('/')
         return { success: true }
+      } catch (err: unknown) {
+        console.error('Login error:', err)
+        return { success: false, error: 'Erro ao fazer login' }
       }
-      return { success: false, error: data.error || 'Erro ao fazer login' }
-    } catch (err: any) {
-      console.error('Login error:', err)
-      return { success: false, error: 'Erro de rede ou servidor' }
-    }
-  }
+    },
+    [router]
+  )
 
-  const logout = async () => {
-    try {
-      await fetch('/api/auth/logout', { method: 'POST' })
-      setUser(null)
-      router.push('/login')
-    } catch (err) {
-      console.error('Logout error:', err)
+  const logout = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(USER_STORAGE_KEY)
     }
-  }
+    setUser(null)
+    router.push('/login')
+  }, [router])
 
   return (
     <UserContext.Provider value={{ user, loading, login, logout, refreshUser }}>

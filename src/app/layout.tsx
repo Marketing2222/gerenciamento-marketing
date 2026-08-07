@@ -4,6 +4,8 @@ import "./globals.css";
 import { UserProvider } from "@/context/UserContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { BrandProvider } from "@/context/BrandContext";
+import { ColumnsProvider } from "@/context/ColumnsContext";
+import { DataProvider } from "@/context/DataContext";
 import AppLayout from "@/components/AppLayout";
 
 const geistSans = Geist({
@@ -42,9 +44,13 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
         <ThemeProvider>
           <BrandProvider>
-            <UserProvider>
-              <AppLayout>{children}</AppLayout>
-            </UserProvider>
+            <ColumnsProvider>
+              <UserProvider>
+                <DataProvider>
+                  <AppLayout>{children}</AppLayout>
+                </DataProvider>
+              </UserProvider>
+            </ColumnsProvider>
           </BrandProvider>
         </ThemeProvider>
       </body>

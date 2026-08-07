@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useMemo } from 'react'
 import { useUser } from '@/context/UserContext'
+import { useData } from '@/context/DataContext'
 import { 
   Kanban, 
   Play, 
@@ -16,53 +17,47 @@ import {
   Clock
 } from 'lucide-react'
 import Link from 'next/link'
-
-interface Task {
-  id: string
-  title: string
-  priority: string
-  status: string
-  dueDate: string | null
-  assignee: {
-    id: string
-    name: string
-    avatarUrl: string
-    role: string
-  } | null
-}
-
-interface Stats {
-  total: number
-  pending: number
-  inProgress: number
-  awaitingApproval: number
-  done: number
-  overdue: number
-}
+import Avatar from '@/components/Avatar'
 
 export default function DashboardPage() {
   const { user } = useUser()
-  const [stats, setStats] = useState<Stats | null>(null)
-  const [upcomingTasks, setUpcomingTasks] = useState<Task[]>([])
-  const [loading, setLoading] = useState(true)
+  const { tasks, loaded } = useData()
 
-  useEffect(() => {
-    async function loadDashboard() {
-      try {
-        const res = await fetch('/api/dashboard')
-        const data = await res.json()
-        if (data.success) {
-          setStats(data.stats)
-          setUpcomingTasks(data.upcomingTasks)
-        }
-      } catch (error) {
-        console.error('Error loading dashboard stats:', error)
-      } finally {
-        setLoading(false)
+  const visibleTasks = useMemo(() => tasks.filter((t) => !t.deletedAt), [tasks])
+
+  const stats = useMemo(() => {
+    const total = visibleTasks.length
+    let pending = 0
+    let inProgress = 0
+    let awaitingApproval = 0
+    let done = 0
+    let overdue = 0
+    const now = new Date()
+    visibleTasks.forEach((task) => {
+      if (task.status === 'BACKLOG' || task.status === 'TODO') {
+        pending++
+      } else if (task.status === 'IN_PROGRESS') {
+        inProgress++
+      } else if (task.status === 'AWAITING_APPROVAL') {
+        awaitingApproval++
+      } else if (task.status === 'DONE') {
+        done++
       }
-    }
-    loadDashboard()
-  }, [])
+      if (task.status !== 'DONE' && task.dueDate && new Date(task.dueDate) < now) {
+        overdue++
+      }
+    })
+    return { total, pending, inProgress, awaitingApproval, done, overdue }
+  }, [visibleTasks])
+
+  const upcomingTasks = useMemo(
+    () =>
+      visibleTasks
+        .filter((t) => t.status !== 'DONE' && t.dueDate)
+        .sort((a, b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime())
+        .slice(0, 5),
+    [visibleTasks]
+  )
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr)
@@ -82,7 +77,7 @@ export default function DashboardPage() {
     }
   }
 
-  if (loading || !stats) {
+  if (!loaded) {
     return (
       <div className="flex flex-col flex-1 h-full items-center justify-center py-20 text-slate-400">
         <Clock className="w-8 h-8 animate-spin text-blue-500 mb-2" />
@@ -155,11 +150,11 @@ export default function DashboardPage() {
       </div>
 
       {/* Main Grid: Upcoming deadines vs Quick Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
         {/* Left 2 Columns: Upcoming tasks */}
         <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="font-bold text-slate-800 dark:text-slate-250 flex items-center gap-2">
+            <h3 className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
               <Clock className="w-4 h-4 text-blue-500" />
               <span>Próximas Entregas</span>
             </h3>
@@ -178,7 +173,7 @@ export default function DashboardPage() {
                 {upcomingTasks.map((task) => {
                   const isOverdue = task.dueDate && new Date(task.dueDate) < new Date()
                   return (
-                    <div key={task.id} className="py-4 first:pt-0 last:pb-0 flex items-center justify-between gap-4 group">
+                    <div key={task.id} className="py-4 first:pt-0 last:pb-0 flex items-center justify-between gap-2 sm:gap-4 group">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                           {getPriorityBadge(task.priority)}
@@ -211,12 +206,7 @@ export default function DashboardPage() {
                         )}
 
                         {task.assignee && (
-                          <img
-                            src={task.assignee.avatarUrl}
-                            alt={task.assignee.name}
-                            title={`Responsável: ${task.assignee.name}`}
-                            className="w-8 h-8 rounded-full border border-slate-200 dark:border-slate-800 object-cover bg-slate-100"
-                          />
+                          <Avatar name={task.assignee.name} url={task.assignee.avatarUrl} />
                         )}
                       </div>
                     </div>
@@ -230,7 +220,7 @@ export default function DashboardPage() {
         {/* Right 1 Column: Quick Actions & Team Status */}
         <div className="space-y-6">
           <div className="space-y-3">
-            <h3 className="font-bold text-slate-800 dark:text-slate-250 flex items-center gap-2">
+            <h3 className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-blue-500" />
               <span>Links Rápidos</span>
             </h3>
@@ -238,22 +228,22 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 gap-3">
               <Link 
                 href="/kanban"
-                className="flex items-center justify-between p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b2c] hover:bg-slate-50 dark:hover:bg-slate-800/40 hover:border-slate-350 dark:hover:border-slate-700 transition group cursor-pointer"
+                className="flex items-center justify-between p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b2c] hover:bg-slate-50 dark:hover:bg-slate-800/40 hover:border-slate-300 dark:hover:border-slate-700 transition group cursor-pointer"
               >
                 <div>
                   <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">Painel Kanban</h4>
-                  <p className="text-slate-500 dark:text-slate-450 text-xs mt-0.5">Acompanhar e mover tarefas por colunas</p>
+                  <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5">Acompanhar e mover tarefas por colunas</p>
                 </div>
                 <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-blue-500 group-hover:translate-x-0.5 transition" />
               </Link>
 
               <Link 
                 href="/calendario"
-                className="flex items-center justify-between p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b2c] hover:bg-slate-50 dark:hover:bg-slate-800/40 hover:border-slate-350 dark:hover:border-slate-700 transition group cursor-pointer"
+                className="flex items-center justify-between p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b2c] hover:bg-slate-50 dark:hover:bg-slate-800/40 hover:border-slate-300 dark:hover:border-slate-700 transition group cursor-pointer"
               >
                 <div>
                   <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">Calendário de Entregas</h4>
-                  <p className="text-slate-500 dark:text-slate-450 text-xs mt-0.5">Visualizar prazos semanais e mensais</p>
+                  <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5">Visualizar prazos semanais e mensais</p>
                 </div>
                 <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-blue-500 group-hover:translate-x-0.5 transition" />
               </Link>
@@ -261,32 +251,24 @@ export default function DashboardPage() {
           </div>
 
           <div className="space-y-3">
-            <h3 className="font-bold text-slate-800 dark:text-slate-250 flex items-center gap-2">
+            <h3 className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-blue-500" />
               <span>Colaboradores</span>
             </h3>
             
             <div className="bg-white dark:bg-[#151b2c] border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm space-y-3">
               <div className="flex items-center gap-3">
-                <img
-                  src="https://api.dicebear.com/7.x/avataaars/svg?seed=Lucas"
-                  className="w-9 h-9 rounded-full object-cover bg-slate-100"
-                  alt="Lucas"
-                />
+                <Avatar name="Lucas Mendes" size="lg" />
                 <div>
                   <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">Lucas Mendes</h4>
-                  <span className="text-[10px] text-slate-550 dark:text-slate-400 font-semibold uppercase tracking-wider">Designer</span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">Designer</span>
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <img
-                  src="https://api.dicebear.com/7.x/avataaars/svg?seed=Thiago"
-                  className="w-9 h-9 rounded-full object-cover bg-slate-100"
-                  alt="Thiago"
-                />
+                <Avatar name="Thiago Silva" size="lg" />
                 <div>
                   <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">Thiago Silva</h4>
-                  <span className="text-[10px] text-slate-550 dark:text-slate-400 font-semibold uppercase tracking-wider">Gestor de Tráfego</span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">Gestor de Tráfego</span>
                 </div>
               </div>
             </div>

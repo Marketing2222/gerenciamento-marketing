@@ -1,8 +1,9 @@
 'use client'
 
 import React, { useState } from 'react'
-import { X, Plus, Trash, Sparkles, Loader2, Calendar, User, AlertCircle, PlusCircle } from 'lucide-react'
+import { X, Trash, Sparkles, Loader2, Calendar, User, AlertCircle, PlusCircle } from 'lucide-react'
 import RichTextEditor from './RichTextEditor'
+import { useData } from '@/context/DataContext'
 
 interface TaskCreateModalProps {
   isOpen: boolean
@@ -12,6 +13,7 @@ interface TaskCreateModalProps {
 }
 
 export default function TaskCreateModal({ isOpen, onClose, onCreated, initialStatus = 'TODO' }: TaskCreateModalProps) {
+  const { users, addTask } = useData()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [priority, setPriority] = useState('MEDIUM')
@@ -23,25 +25,10 @@ export default function TaskCreateModal({ isOpen, onClose, onCreated, initialSta
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  // Lista estática de usuários para o dropdown (Lucas Mendes e Thiago Silva)
-  // Seria ideal buscar dinamicamente, mas como são fixos, podemos obter ou hardcodar
-  // Para robustez, podemos usar IDs estáticos se soubermos, ou buscar na montagem.
-  // Vamos buscar na montagem para garantir que combinam com o banco!
-  const [users, setUsers] = useState<{ id: string; name: string; role: string }[]>([])
-  
-  React.useEffect(() => {
-    if (isOpen) {
-      fetch('/api/users')
-        .then(res => res.json())
-        .then(data => {
-          if (data.success) setUsers(data.users)
-        })
-    }
-  }, [isOpen])
-
   // Resetar estados
   React.useEffect(() => {
     if (!isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTitle('')
       setDescription('')
       setPriority('MEDIUM')
@@ -75,30 +62,22 @@ export default function TaskCreateModal({ isOpen, onClose, onCreated, initialSta
     setError('')
 
     try {
-      const res = await fetch('/api/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title,
-          description,
-          priority,
-          status,
-          dueDate: dueDate || null,
-          assigneeId: assigneeId || null,
-          checklist
-        })
+      const assignee = users.find((u) => u.id === assigneeId) || null
+      await addTask({
+        title,
+        description,
+        priority,
+        status,
+        dueDate: dueDate || null,
+        assigneeId: assigneeId || null,
+        assignee,
+        checklist
       })
-
-      const data = await res.json()
-      if (data.success) {
-        onCreated()
-        onClose()
-      } else {
-        setError(data.error || 'Erro ao criar tarefa')
-      }
-    } catch (err: any) {
+      onCreated()
+      onClose()
+    } catch (err: unknown) {
       console.error(err)
-      setError('Erro de rede ao criar tarefa')
+      setError('Erro ao criar tarefa')
     } finally {
       setLoading(false)
     }
@@ -115,7 +94,7 @@ export default function TaskCreateModal({ isOpen, onClose, onCreated, initialSta
             <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center shadow-md">
               <Sparkles className="w-4 h-4 text-white" />
             </div>
-            <h3 className="font-bold text-slate-850 dark:text-white text-base">Nova Tarefa</h3>
+            <h3 className="font-bold text-slate-800 dark:text-white text-base">Nova Tarefa</h3>
           </div>
           <button 
             onClick={onClose}
@@ -143,7 +122,7 @@ export default function TaskCreateModal({ isOpen, onClose, onCreated, initialSta
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Ex: Criar criativos para campanha Meta Ads"
-              className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-xl focus:border-blue-500 dark:focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-slate-800 dark:text-slate-200 font-semibold"
+              className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 dark:focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-slate-800 dark:text-slate-200 font-semibold"
             />
           </div>
 
@@ -157,7 +136,7 @@ export default function TaskCreateModal({ isOpen, onClose, onCreated, initialSta
               <select
                 value={assigneeId}
                 onChange={(e) => setAssigneeId(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-slate-700 dark:text-slate-300 font-medium"
+                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-slate-700 dark:text-slate-300 font-medium"
               >
                 <option value="">Sem responsável</option>
                 {users.map(u => (
@@ -177,7 +156,7 @@ export default function TaskCreateModal({ isOpen, onClose, onCreated, initialSta
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
-                className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-slate-700 dark:text-slate-300 font-medium h-[42px]"
+                className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-slate-700 dark:text-slate-300 font-medium h-[42px]"
               />
             </div>
 
@@ -187,7 +166,7 @@ export default function TaskCreateModal({ isOpen, onClose, onCreated, initialSta
               <select
                 value={priority}
                 onChange={(e) => setPriority(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-slate-700 dark:text-slate-300 font-medium"
+                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-slate-700 dark:text-slate-300 font-medium"
               >
                 <option value="LOW">Baixa</option>
                 <option value="MEDIUM">Média</option>
@@ -202,9 +181,9 @@ export default function TaskCreateModal({ isOpen, onClose, onCreated, initialSta
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-slate-700 dark:text-slate-300 font-medium"
+                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-slate-700 dark:text-slate-300 font-medium"
               >
-                <option value="BACKLOG">Backlog</option>
+                <option value="BACKLOG">Ideia</option>
                 <option value="TODO">A Fazer</option>
                 <option value="IN_PROGRESS">Em Andamento</option>
                 <option value="AWAITING_APPROVAL">Aguardando Aprovação</option>
@@ -229,7 +208,7 @@ export default function TaskCreateModal({ isOpen, onClose, onCreated, initialSta
                 value={newCheckItem}
                 onChange={(e) => setNewCheckItem(e.target.value)}
                 placeholder="Adicionar item..."
-                className="flex-1 px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-800 dark:text-slate-200"
+                className="flex-1 px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-800 dark:text-slate-200"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault()
@@ -240,7 +219,7 @@ export default function TaskCreateModal({ isOpen, onClose, onCreated, initialSta
               <button
                 type="button"
                 onClick={handleAddChecklist}
-                className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 px-4 rounded-xl text-sm font-semibold flex items-center gap-1.5 border border-slate-250 dark:border-slate-750 transition cursor-pointer"
+                className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 px-4 rounded-xl text-sm font-semibold flex items-center gap-1.5 border border-slate-200 dark:border-slate-700 transition cursor-pointer"
               >
                 <PlusCircle className="w-4 h-4" />
                 Adicionar
@@ -250,7 +229,7 @@ export default function TaskCreateModal({ isOpen, onClose, onCreated, initialSta
             {checklist.length > 0 && (
               <div className="space-y-2 max-h-40 overflow-y-auto border border-slate-200 dark:border-slate-800 p-3 rounded-xl bg-slate-50/50 dark:bg-[#0c1220]/50">
                 {checklist.map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between gap-3 text-sm text-slate-700 dark:text-slate-350">
+                  <div key={idx} className="flex items-center justify-between gap-3 text-sm text-slate-700 dark:text-slate-300">
                     <span className="truncate">{item.title}</span>
                     <button
                       type="button"
@@ -267,11 +246,11 @@ export default function TaskCreateModal({ isOpen, onClose, onCreated, initialSta
         </form>
 
         {/* Footer Actions */}
-        <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-3 bg-slate-50 dark:bg-[#0e1424] shrink-0">
+        <div className="px-4 sm:px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-end gap-3 bg-slate-50 dark:bg-[#0e1424] shrink-0">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 border border-slate-250 dark:border-slate-850 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-sm font-semibold transition cursor-pointer"
+            className="px-4 py-2 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-sm font-semibold transition cursor-pointer"
           >
             Cancelar
           </button>

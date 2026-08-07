@@ -1,65 +1,31 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useUser } from '@/context/UserContext'
+import { useData } from '@/context/DataContext'
 import { LogIn, Key, Loader2, Sparkles, Database } from 'lucide-react'
-
-interface User {
-  id: string
-  name: string
-  role: string
-  avatarUrl: string
-}
+import Avatar from '@/components/Avatar'
 
 export default function LoginPage() {
   const { login } = useUser()
-  const [users, setUsers] = useState<User[]>([])
-  const [selectedUser, setSelectedUser] = useState<User | null>(null)
+  const { users, loaded, seed } = useData()
+  const [selectedUser, setSelectedUser] = useState<(typeof users)[number] | null>(null)
   const [pin, setPin] = useState('')
   const [loading, setLoading] = useState(false)
-  const [fetchingUsers, setFetchingUsers] = useState(true)
   const [error, setError] = useState('')
   const [seeding, setSeeding] = useState(false)
   const [seedSuccess, setSeedSuccess] = useState('')
-
-  const loadUsers = async () => {
-    setFetchingUsers(true)
-    setError('')
-    try {
-      const res = await fetch('/api/users')
-      const data = await res.json()
-      if (data.success) {
-        setUsers(data.users)
-      } else {
-        setError('Erro ao carregar usuários do banco.')
-      }
-    } catch (err) {
-      console.error(err)
-      setError('Erro de rede ao carregar usuários.')
-    } finally {
-      setFetchingUsers(false)
-    }
-  }
-
-  useEffect(() => {
-    loadUsers()
-  }, [])
 
   const handleSeed = async () => {
     setSeeding(true)
     setSeedSuccess('')
     setError('')
     try {
-      const res = await fetch('/api/seed')
-      const data = await res.json()
-      if (data.success) {
-        setSeedSuccess('Banco de dados inicializado com sucesso!')
-        loadUsers()
-      } else {
-        setError('Erro ao rodar o seed: ' + data.error)
-      }
-    } catch (err: any) {
-      setError('Erro de rede: ' + err.message)
+      await seed()
+      setSeedSuccess('Banco de dados inicializado com sucesso!')
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err)
+      setError('Erro ao rodar o seed: ' + message)
     } finally {
       setSeeding(false)
     }
@@ -111,7 +77,7 @@ export default function LoginPage() {
           </div>
         )}
 
-        {fetchingUsers ? (
+        {!loaded ? (
           <div className="flex flex-col items-center justify-center py-8">
             <Loader2 className="w-8 h-8 text-blue-500 animate-spin mb-2" />
             <p className="text-slate-400 text-sm">Carregando usuários...</p>
@@ -119,12 +85,12 @@ export default function LoginPage() {
         ) : users.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <p className="text-slate-400 text-sm mb-4">
-              Nenhum usuário cadastrado no banco de dados.
+              Nenhum usuário cadastrado. Inicialize o banco de dados para começar.
             </p>
             <button
               onClick={handleSeed}
               disabled={seeding}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white px-4 py-2 rounded-lg text-sm font-semibold transition"
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white px-4 py-2 rounded-lg text-sm font-semibold transition cursor-pointer"
             >
               {seeding ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -143,11 +109,7 @@ export default function LoginPage() {
                 className="flex flex-col items-center p-4 rounded-xl border border-slate-800 bg-slate-900/40 hover:bg-slate-800/50 hover:border-slate-700 transition duration-300 text-center group cursor-pointer"
               >
                 <div className="relative mb-3">
-                  <img
-                    src={u.avatarUrl}
-                    alt={u.name}
-                    className="w-20 h-20 rounded-full border-2 border-slate-700 group-hover:border-blue-500 transition duration-300 object-cover bg-slate-800"
-                  />
+                  <Avatar name={u.name} url={u.avatarUrl} size="2xl" className="border-2 border-slate-700 group-hover:border-blue-500 transition duration-300" />
                   <div className="absolute inset-0 rounded-full bg-blue-500/10 opacity-0 group-hover:opacity-100 transition duration-300" />
                 </div>
                 <h3 className="font-semibold text-slate-200 text-sm group-hover:text-white line-clamp-1">
@@ -162,11 +124,7 @@ export default function LoginPage() {
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="flex items-center gap-3 p-3 bg-slate-800/40 border border-slate-800 rounded-xl mb-4">
-              <img
-                src={selectedUser.avatarUrl}
-                alt={selectedUser.name}
-                className="w-12 h-12 rounded-full object-cover bg-slate-800 border border-slate-700"
-              />
+              <Avatar name={selectedUser.name} url={selectedUser.avatarUrl} size="xl" className="border border-slate-700" />
               <div className="flex-1 min-w-0">
                 <h3 className="font-semibold text-slate-200 text-sm truncate">
                   {selectedUser.name}
@@ -226,7 +184,6 @@ export default function LoginPage() {
           </form>
         )}
       </div>
-
     </div>
   )
 }

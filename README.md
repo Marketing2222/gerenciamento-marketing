@@ -1,36 +1,66 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MktFlow — Gerência de Marketing (2 usuários)
 
-## Getting Started
+App estático (Next.js + Firebase) para você e seu parceiro gerenciarem tarefas de marketing de qualquer dispositivo, com sincronização em tempo real entre os dois.
 
-First, run the development server:
+Login por PIN (padrão `1234`) — sem Firebase Auth. Usuários iniciais: **Lucas Mendes** (DESIGNER) e **Thiago Silva** (TRAFFIC_MANAGER).
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Arquitetura
+
+- **Frontend**: Next.js (SSG, `output: "export"`) — 100% client-side.
+- **Banco de dados**: Firestore em tempo real (`onSnapshot`). Coleções planas: `users`, `tasks` (checklist/attachments/comments/activityLogs ficam como arrays dentro de cada tarefa) e `settings/brand`.
+- **Arquivos**: Firebase Storage (upload direto do navegador).
+- **Sessão**: `localStorage` (id do usuário logado).
+- **Hosting**: Netlify (`netlify.toml`, `publish = "out"`).
+
+Não existe servidor nem API própria — não use o app sem configurar o Firebase.
+
+## Setup do Firebase (uma única vez)
+
+1. Acesse o [Firebase Console](https://console.firebase.google.com) e abra o seu projeto.
+2. **Adicione um Web App** (Project settings → Geral → Seus apps → "Web"). Copie as credenciais.
+3. **Firestore Database**: Crie o banco (modo de produção ou teste; as regras abaixo liberam tudo).
+4. **Storage**: Habilite o Cloud Storage.
+5. Preencha o arquivo `.env.local` (crie a partir de `.env.example`) com as credenciais:
+
+```env
+NEXT_PUBLIC_FIREBASE_API_KEY=...
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=...
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=...
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=...
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=...
+NEXT_PUBLIC_FIREBASE_APP_ID=...
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+6. **Regras de segurança** — cole o conteúdo de `firestore.rules` na aba "Regras" do Firestore, e o de `storage.rules` na aba "Regras" do Storage, e publique.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+> ⚠️ As regras liberam leitura/escrita para qualquer visitante, porque o app não usa Firebase Auth. Isso é o esperado para um app privado de 2 usuários com senha em PIN, mas só divulgue o link para as pessoas certas.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+7. No primeiro acesso, a tela de login tem o botão **"Popular dados de exemplo"** (cria os 2 usuários e 3 tarefas iniciais).
 
-## Learn More
+## Rodando localmente
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm install
+npm run dev
+# http://localhost:3000
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Login: escolha um usuário, PIN `1234`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Deploy na Netlify
 
-## Deploy on Vercel
+1. Crie uma conta em [netlify.com](https://www.netlify.com) e "Add new site → Import an existing project".
+2. Conecte o repositório (ou faça upload da pasta `out` após `npm run build`).
+3. Em **Site settings → Environment variables**, adicione as mesmas 6 variáveis `NEXT_PUBLIC_FIREBASE_*` do `.env.local`.
+4. O `netlify.toml` já define `npm run build` e publica a pasta `out`. Deploy e pronto.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Após o deploy, tanto você quanto seu parceiro usam o mesmo link — as mudanças aparecem instantaneamente nos dois dispositivos.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Comandos
+
+| Comando | Descrição |
+| --- | --- |
+| `npm run dev` | Servidor de desenvolvimento |
+| `npm run build` | Gera o build estático em `out/` |
+| `npm run lint` | Verifica lint |
+| `npx serve out` | Serve o build estático localmente (teste de produção) |

@@ -1,12 +1,14 @@
 'use client'
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import { isFirebaseConfigured } from '@/lib/firebaseClient'
+import { doc, onSnapshot, setDoc } from 'firebase/firestore'
+import { db } from '@/lib/firebaseClient'
 
 interface BrandContextType {
   siteName: string
   logoUrl: string
-  setSiteName: (name: string) => void
-  setLogoUrl: (url: string) => void
+  applyBrand: (name: string, logo: string) => void
 }
 
 const BrandContext = createContext<BrandContextType | undefined>(undefined)
@@ -18,25 +20,53 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
   const [siteName, setSiteNameState] = useState(DEFAULT_NAME)
   const [logoUrl, setLogoUrlState] = useState(DEFAULT_LOGO)
 
-  useEffect(() => {
-    const savedName = localStorage.getItem('mktflow-site-name')
-    const savedLogo = localStorage.getItem('mktflow-logo-url')
-    if (savedName) setSiteNameState(savedName)
-    if (savedLogo) setLogoUrlState(savedLogo)
+  // Carrega e escuta o documento de marca no Firestore quando configurado.
+    useEffect(() => {
+    if (!isFirebaseConfigured()) {
+      // Fallback para localStorage (sem Firebase)
+      if (typeof window !== 'undefined') {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setSiteNameState(localStorage.getItem('mktflow-site-name') || DEFAULT_NAME)
+        setLogoUrlState(localStorage.getItem('mktflow-logo-url') || DEFAULT_LOGO)
+      }
+      return
+    }
+    const brandRef = doc(db(), 'settings', 'brand')
+    const unsub = onSnapshot(brandRef, (snap) => {
+      if (snap.exists()) {
+        const d = snap.data()
+        setSiteNameState(d.siteName || DEFAULT_NAME)
+        setLogoUrlState(d.logoUrl || DEFAULT_LOGO)
+      } else {
+        setSiteNameState(DEFAULT_NAME)
+        setLogoUrlState(DEFAULT_LOGO)
+      }
+    })
+    return () => unsub()
   }, [])
 
-  const setSiteName = useCallback((name: string) => {
-    setSiteNameState(name)
-    localStorage.setItem('mktflow-site-name', name)
+  const persist = useCallback((name: string, logo: string) => {
+    if (isFirebaseConfigured()) {
+      void setDoc(doc(db(), 'settings', 'brand'), { siteName: name, logoUrl: logo })
+    } else if (typeof window !== 'undefined') {
+      localStorage.setItem('mktflow-site-name', name)
+      localStorage.setItem('mktflow-logo-url', logo)
+    }
   }, [])
 
-  const setLogoUrl = useCallback((url: string) => {
-    setLogoUrlState(url)
-    localStorage.setItem('mktflow-logo-url', url)
-  }, [])
+  // Aplica nome e logo em uma única gravação atômica (evita corrida de escrita).
+  const applyBrand = useCallback(
+    (name: string, logo: string) => {
+      const finalName = name.trim() || DEFAULT_NAME
+      setSiteNameState(finalName)
+      setLogoUrlState(logo)
+      persist(finalName, logo)
+    },
+    [persist]
+  )
 
   return (
-    <BrandContext.Provider value={{ siteName, logoUrl, setSiteName, setLogoUrl }}>
+    <BrandContext.Provider value={{ siteName, logoUrl, applyBrand }}>
       {children}
     </BrandContext.Provider>
   )

@@ -1,10 +1,13 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useUser } from '@/context/UserContext'
 import { useTheme } from '@/context/ThemeContext'
 import { useBrand } from '@/context/BrandContext'
+import Avatar from '@/components/Avatar'
+import TrashModal from '@/components/TrashModal'
 import {
   LayoutDashboard,
   Kanban,
@@ -16,6 +19,9 @@ import {
   Sparkles,
   Sun,
   Moon,
+  Trash2,
+  Menu,
+  X,
 } from 'lucide-react'
 
 export default function Header() {
@@ -23,6 +29,8 @@ export default function Header() {
   const { user, logout } = useUser()
   const { theme, toggleTheme } = useTheme()
   const { siteName, logoUrl } = useBrand()
+  const [isTrashOpen, setIsTrashOpen] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const navItems = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -36,9 +44,9 @@ export default function Header() {
   if (!user) return null
 
   return (
-    <header className="h-14 w-full border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c1220] flex items-center px-4 gap-4 shrink-0 select-none z-50">
+    <header className="h-14 w-full border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c1220] flex items-center px-2 sm:px-4 gap-2 sm:gap-4 shrink-0 select-none z-50 overflow-hidden">
       {/* Brand */}
-      <Link href="/" className="flex items-center gap-2.5 shrink-0 mr-2">
+      <Link href="/" className="flex items-center gap-2 shrink-0">
         {logoUrl ? (
           <img src={logoUrl} alt={siteName} className="w-8 h-8 rounded-lg object-cover" />
         ) : (
@@ -51,8 +59,16 @@ export default function Header() {
         </span>
       </Link>
 
-      {/* Navigation */}
-      <nav className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto">
+      {/* Mobile hamburger */}
+      <button
+        onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+        className="md:hidden p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 transition cursor-pointer ml-auto"
+      >
+        {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+      </button>
+
+      {/* Desktop Navigation */}
+      <nav className="hidden md:flex items-center gap-1 flex-1 min-w-0">
         {navItems.map((item) => {
           const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))
           const Icon = item.icon
@@ -68,14 +84,40 @@ export default function Header() {
               }`}
             >
               <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : ''}`} />
-              <span className="hidden md:inline">{item.name}</span>
+              <span>{item.name}</span>
             </Link>
           )
         })}
       </nav>
 
-      {/* Right side: theme toggle + user */}
-      <div className="flex items-center gap-2 shrink-0">
+      {/* Mobile Navigation Dropdown */}
+      {mobileMenuOpen && (
+        <nav className="md:hidden absolute top-14 left-0 right-0 bg-white dark:bg-[#0c1220] border-b border-slate-200 dark:border-slate-800 flex flex-col p-2 z-50 shadow-lg">
+          {navItems.map((item) => {
+            const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))
+            const Icon = item.icon
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition duration-200 ${
+                  isActive
+                    ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+              >
+                <Icon className={`w-4 h-4 ${isActive ? 'text-white' : ''}`} />
+                <span>{item.name}</span>
+              </Link>
+            )
+          })}
+        </nav>
+      )}
+
+      {/* Right side: theme toggle + trash + user */}
+      <div className="hidden md:flex items-center gap-2 shrink-0">
         <button
           onClick={toggleTheme}
           title={theme === 'dark' ? 'Modo Claro' : 'Modo Escuro'}
@@ -84,15 +126,19 @@ export default function Header() {
           {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </button>
 
+        <button
+          onClick={() => setIsTrashOpen(true)}
+          title="Lixeira"
+          className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-red-500 dark:hover:text-red-400 transition cursor-pointer"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+
         <div className="w-px h-6 bg-slate-200 dark:bg-slate-800" />
 
         <div className="flex items-center gap-2.5">
           <div className="relative shrink-0">
-            <img
-              src={user.avatarUrl}
-              alt={user.name}
-              className="w-8 h-8 rounded-full border border-slate-200 dark:border-slate-800 object-cover bg-slate-100"
-            />
+            <Avatar name={user.name} url={user.avatarUrl} />
             <div className="absolute bottom-0 right-0 w-2 h-2 bg-emerald-500 rounded-full border-2 border-white dark:border-[#0c1220]" />
           </div>
           <div className="hidden lg:block min-w-0">
@@ -112,6 +158,23 @@ export default function Header() {
           </button>
         </div>
       </div>
+
+      {/* Mobile right side: compact */}
+      <div className="md:hidden flex items-center gap-1 shrink-0">
+        <button
+          onClick={toggleTheme}
+          title={theme === 'dark' ? 'Modo Claro' : 'Modo Escuro'}
+          className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 transition cursor-pointer"
+        >
+          {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+        </button>
+        <div className="relative shrink-0">
+          <Avatar name={user.name} url={user.avatarUrl} />
+          <div className="absolute bottom-0 right-0 w-2 h-2 bg-emerald-500 rounded-full border-2 border-white dark:border-[#0c1220]" />
+        </div>
+      </div>
+
+      <TrashModal isOpen={isTrashOpen} onClose={() => setIsTrashOpen(false)} />
     </header>
   )
 }

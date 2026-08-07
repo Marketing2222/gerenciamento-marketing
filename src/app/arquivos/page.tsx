@@ -1,8 +1,9 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
-import { FolderOpen, FileText, Link2, Search, ExternalLink, Download, Loader2, RefreshCw, Eye } from 'lucide-react'
+import React, { useMemo, useState } from 'react'
+import { FileText, Link2, Search, ExternalLink, Download, Loader2 } from 'lucide-react'
 import Link from 'next/link'
+import { useData } from '@/context/DataContext'
 
 interface Attachment {
   id: string
@@ -18,28 +19,26 @@ interface Attachment {
 }
 
 export default function FilesPage() {
-  const [attachments, setAttachments] = useState<Attachment[]>([])
-  const [loading, setLoading] = useState(true)
+  const { tasks, loaded } = useData()
   const [search, setSearch] = useState('')
 
-  const loadAttachments = async () => {
-    setLoading(true)
-    try {
-      const res = await fetch('/api/attachments')
-      const data = await res.json()
-      if (data.success) {
-        setAttachments(data.attachments)
-      }
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    loadAttachments()
-  }, [])
+  const attachments = useMemo(() => {
+    const result: Attachment[] = []
+    tasks.forEach((t) => {
+      if (t.deletedAt) return
+      t.attachments.forEach((a) => {
+        result.push({
+          id: a.id,
+          name: a.name,
+          type: a.type,
+          url: a.url,
+          createdAt: a.createdAt,
+          task: { id: t.id, title: t.title, status: t.status }
+        })
+      })
+    })
+    return result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  }, [tasks])
 
   // Filtrar
   const filteredAttachments = attachments.filter(att => 
@@ -51,6 +50,7 @@ export default function FilesPage() {
   const links = filteredAttachments.filter(att => att.type === 'LINK')
 
   const isImage = (url: string) => {
+    if (url.startsWith('data:image/')) return true
     const ext = url.split('.').pop()?.toLowerCase()
     return ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext || '')
   }
@@ -64,15 +64,7 @@ export default function FilesPage() {
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             Acesse de forma unificada todos os arquivos enviados e links externos cadastrados nas tarefas.
           </p>
-        </div>
-        
-        <button
-          onClick={loadAttachments}
-          title="Recarregar arquivos"
-          className="p-2 border border-slate-200 dark:border-slate-800 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-450 dark:text-slate-400 shrink-0 transition cursor-pointer self-start sm:self-auto"
-        >
-          <RefreshCw className="w-4 h-4" />
-        </button>
+      </div>
       </div>
 
       {/* Search Bar */}
@@ -83,12 +75,12 @@ export default function FilesPage() {
           placeholder="Pesquisar por nome do arquivo ou título da tarefa associada..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 font-semibold"
+          className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 font-semibold"
         />
       </div>
 
       {/* Grid: Files vs Links */}
-      {loading ? (
+      {!loaded ? (
         <div className="flex-1 flex flex-col items-center justify-center py-20 text-slate-400">
           <Loader2 className="w-8 h-8 animate-spin text-blue-500 mb-2" />
           <p className="text-sm font-medium">Carregando biblioteca...</p>
@@ -98,8 +90,8 @@ export default function FilesPage() {
           
           {/* Column 1: Files & Documents */}
           <div className="space-y-4 flex flex-col h-full min-h-0">
-            <h3 className="font-bold text-slate-800 dark:text-slate-250 flex items-center gap-2 shrink-0">
-              <FileText className="w-4 h-4 text-blue-550" />
+            <h3 className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 shrink-0">
+              <FileText className="w-4 h-4 text-blue-500" />
               <span>Documentos e Materiais ({files.length})</span>
             </h3>
 
@@ -112,7 +104,7 @@ export default function FilesPage() {
                 files.map((file) => (
                   <div 
                     key={file.id} 
-                    className="p-3 border border-slate-200 dark:border-slate-850 rounded-xl flex items-center justify-between gap-4 hover:border-slate-350 dark:hover:border-slate-700 transition duration-150 group"
+                    className="p-3 border border-slate-200 dark:border-slate-800 rounded-xl flex items-center justify-between gap-4 hover:border-slate-300 dark:hover:border-slate-700 transition duration-150 group"
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       {isImage(file.url) ? (
@@ -126,7 +118,7 @@ export default function FilesPage() {
                       )}
 
                       <div className="min-w-0">
-                        <h4 className="text-xs font-bold text-slate-850 dark:text-slate-200 truncate pr-2 max-w-[220px]" title={file.name}>
+                        <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate pr-2 max-w-[160px] sm:max-w-[220px]" title={file.name}>
                           {file.name}
                         </h4>
                         <Link 
@@ -143,7 +135,7 @@ export default function FilesPage() {
                       download
                       target="_blank"
                       rel="noreferrer"
-                      className="p-2 border border-slate-200 dark:border-slate-800 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-655 dark:text-slate-400 shadow-sm transition cursor-pointer flex items-center gap-1.5 text-xs font-bold"
+                      className="p-2 border border-slate-200 dark:border-slate-800 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 shadow-sm transition cursor-pointer flex items-center gap-1.5 text-xs font-bold"
                     >
                       <Download className="w-3.5 h-3.5" />
                       Baixar
@@ -156,8 +148,8 @@ export default function FilesPage() {
 
           {/* Column 2: External Links */}
           <div className="space-y-4 flex flex-col h-full min-h-0">
-            <h3 className="font-bold text-slate-800 dark:text-slate-250 flex items-center gap-2 shrink-0">
-              <Link2 className="w-4 h-4 text-blue-550" />
+            <h3 className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 shrink-0">
+              <Link2 className="w-4 h-4 text-blue-500" />
               <span>Links Rápidos e Entregáveis ({links.length})</span>
             </h3>
 
@@ -170,15 +162,15 @@ export default function FilesPage() {
                 links.map((link) => (
                   <div 
                     key={link.id} 
-                    className="p-3 border border-slate-200 dark:border-slate-850 rounded-xl flex items-center justify-between gap-4 hover:border-slate-350 dark:hover:border-slate-700 transition duration-150 group"
+                    className="p-3 border border-slate-200 dark:border-slate-800 rounded-xl flex items-center justify-between gap-4 hover:border-slate-300 dark:hover:border-slate-700 transition duration-150 group"
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-lg bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/30 flex items-center justify-center shrink-0 text-indigo-650 dark:text-indigo-400">
+                      <div className="w-10 h-10 rounded-lg bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/30 flex items-center justify-center shrink-0 text-indigo-600 dark:text-indigo-400">
                         <Link2 className="w-5 h-5" />
                       </div>
 
                       <div className="min-w-0">
-                        <h4 className="text-xs font-bold text-slate-850 dark:text-slate-200 truncate pr-2 max-w-[220px]" title={link.name}>
+                        <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate pr-2 max-w-[160px] sm:max-w-[220px]" title={link.name}>
                           {link.name}
                         </h4>
                         <Link 
@@ -194,7 +186,7 @@ export default function FilesPage() {
                       href={link.url}
                       target="_blank"
                       rel="noreferrer"
-                      className="p-2 border border-slate-200 dark:border-slate-800 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-655 dark:text-slate-400 shadow-sm transition cursor-pointer flex items-center gap-1.5 text-xs font-bold"
+                      className="p-2 border border-slate-200 dark:border-slate-800 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 shadow-sm transition cursor-pointer flex items-center gap-1.5 text-xs font-bold"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
                       Acessar

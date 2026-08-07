@@ -4,6 +4,8 @@ import { Draggable } from '@hello-pangea/dnd'
 import { Calendar, MessageSquare, Paperclip, CheckSquare, Clock } from 'lucide-react'
 
 import { Task } from '@/types'
+import Avatar from '@/components/Avatar'
+import { useColumns } from '@/context/ColumnsContext'
 
 interface TaskCardProps {
   task: Task
@@ -12,6 +14,7 @@ interface TaskCardProps {
 }
 
 export default function TaskCard({ task, index, onClick }: TaskCardProps) {
+  const { summary } = useColumns()
   // Calcular checklist
   const totalChecklist = task.checklist.length
   const completedChecklist = task.checklist.filter(item => item.isCompleted).length
@@ -30,7 +33,7 @@ export default function TaskCard({ task, index, onClick }: TaskCardProps) {
       case 'URGENT':
         return 'bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/20'
       case 'HIGH':
-        return 'bg-amber-500/10 text-amber-755 dark:text-amber-400 border border-amber-500/20'
+        return 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20'
       case 'MEDIUM':
         return 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20'
       default:
@@ -55,15 +58,17 @@ export default function TaskCard({ task, index, onClick }: TaskCardProps) {
           {...provided.draggableProps}
           {...provided.dragHandleProps}
           onClick={() => onClick(task)}
-          className={`p-4 rounded-xl bg-white dark:bg-[#151b2c] border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-slate-350 dark:hover:border-slate-750 transition-all duration-200 group cursor-grab active:cursor-grabbing select-none mb-3 ${
+          className={`p-4 rounded-xl bg-white dark:bg-[#151b2c] border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700 transition-all duration-200 group cursor-grab active:cursor-grabbing select-none mb-3 ${
             snapshot.isDragging ? 'dragging-card' : ''
           } ${isOverdue ? 'border-l-4 border-l-red-500' : ''} ${isClose ? 'border-l-4 border-l-amber-500' : ''}`}
         >
           {/* Tag de Prioridade */}
           <div className="flex items-center justify-between gap-2 mb-2">
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${getPriorityColors(task.priority)}`}>
-              {getPriorityLabel(task.priority)}
-            </span>
+            {summary.showPriority && (
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${getPriorityColors(task.priority)}`}>
+                {getPriorityLabel(task.priority)}
+              </span>
+            )}
 
             {isOverdue && (
               <span className="flex items-center gap-0.5 text-[9px] text-red-500 dark:text-red-400 font-extrabold uppercase tracking-wider">
@@ -88,7 +93,7 @@ export default function TaskCard({ task, index, onClick }: TaskCardProps) {
           <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800 text-slate-400 text-xs">
             {/* Indicadores: Checklist, Comentários, Anexos */}
             <div className="flex items-center gap-3">
-              {totalChecklist > 0 && (
+              {summary.showChecklist && totalChecklist > 0 && (
                 <div 
                   className={`flex items-center gap-1 font-semibold ${
                     completedChecklist === totalChecklist 
@@ -102,14 +107,14 @@ export default function TaskCard({ task, index, onClick }: TaskCardProps) {
                 </div>
               )}
 
-              {task.attachments.length > 0 && (
+              {summary.showAttachments && task.attachments.length > 0 && (
                 <div className="flex items-center gap-1" title="Anexos">
                   <Paperclip className="w-3.5 h-3.5" />
                   <span className="text-[10px]">{task.attachments.length}</span>
                 </div>
               )}
 
-              {task.comments.length > 0 && (
+              {summary.showComments && task.comments.length > 0 && (
                 <div className="flex items-center gap-1" title="Comentários">
                   <MessageSquare className="w-3.5 h-3.5" />
                   <span className="text-[10px]">{task.comments.length}</span>
@@ -119,7 +124,7 @@ export default function TaskCard({ task, index, onClick }: TaskCardProps) {
 
             {/* Responsável e Data de Vencimento */}
             <div className="flex items-center gap-2">
-              {task.dueDate && (
+              {summary.showDueDate && task.dueDate && (
                 <span 
                   className={`text-[10px] font-bold flex items-center gap-0.5 ${
                     isOverdue 
@@ -135,20 +140,22 @@ export default function TaskCard({ task, index, onClick }: TaskCardProps) {
                 </span>
               )}
 
-              {task.assignee ? (
-                <img
-                  src={task.assignee.avatarUrl}
-                  alt={task.assignee.name}
-                  title={`Responsável: ${task.assignee.name}`}
-                  className="w-6 h-6 rounded-full object-cover bg-slate-100 border border-slate-200 dark:border-slate-800"
-                />
-              ) : (
-                <div 
-                  className="w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 border border-dashed border-slate-300 dark:border-slate-700 flex items-center justify-center text-[8px] font-bold text-slate-400"
-                  title="Sem responsável"
-                >
-                  —
-                </div>
+              {summary.showAssignee && (
+                task.assignee ? (
+                  <Avatar
+                    name={task.assignee.name}
+                    url={task.assignee.avatarUrl}
+                    size="md"
+                    className="border border-slate-200 dark:border-slate-800"
+                  />
+                ) : (
+                  <div 
+                    className="w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 border border-dashed border-slate-300 dark:border-slate-700 flex items-center justify-center text-[8px] font-bold text-slate-400"
+                    title="Sem responsável"
+                  >
+                    —
+                  </div>
+                )
               )}
             </div>
           </div>
