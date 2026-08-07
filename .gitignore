@@ -26,6 +26,9 @@
 
 # opencode
 .opencode/
+.agents/
+.claude/
+.windsurf/
 
 # debug
 npm-debug.log*
