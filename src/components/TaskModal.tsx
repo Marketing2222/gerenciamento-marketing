@@ -47,6 +47,7 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
   const [savingDesc, setSavingDesc] = useState(false)
   const [isAddingLink, setIsAddingLink] = useState(false)
   const [previewAttachment, setPreviewAttachment] = useState<{ name: string; url: string } | null>(null)
+  const [showSidebar, setShowSidebar] = useState(false)
   
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -233,6 +234,13 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
             <span className="text-xs text-slate-400 hidden sm:inline">Criado por: {localTask.creator?.name || 'Sistema'}</span>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowSidebar(!showSidebar)}
+              className="md:hidden p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer text-xs font-bold"
+              title="Configurações"
+            >
+              {showSidebar ? '✕' : '⚙'}
+            </button>
             <button
               onClick={handleDeleteTask}
               title="Excluir Tarefa"
@@ -537,7 +545,13 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
           </div>
 
           {/* Right Column (Sidebar Configuration Details) */}
-          <div className="w-full md:w-80 max-h-[40vh] md:max-h-none border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0c1220] overflow-y-auto p-4 md:p-6 space-y-6 shrink-0 md:shrink">
+          <div className={`${showSidebar ? 'fixed inset-0 z-[60] bg-white dark:bg-[#111625] overflow-y-auto p-4 space-y-6' : 'hidden'} md:relative md:block md:w-80 md:border-l md:border-slate-200 md:dark:border-slate-800 md:bg-slate-50 md:dark:bg-[#0c1220] md:overflow-y-auto md:p-6 md:space-y-6 md:shrink`}>
+            <div className="flex items-center justify-between mb-4 md:hidden">
+              <span className="text-sm font-bold text-slate-800 dark:text-slate-200">Configurações</span>
+              <button onClick={() => setShowSidebar(false)} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
             
             {/* Status Select */}
             <div className="space-y-1.5">
