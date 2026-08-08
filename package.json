@@ -9,9 +9,6 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@fullcalendar/daygrid": "^7.0.2",
-    "@fullcalendar/react": "^7.0.2",
-    "@fullcalendar/timegrid": "^7.0.2",
     "@hello-pangea/dnd": "^18.0.1",
     "@tiptap/react": "^3.29.2",
     "@tiptap/starter-kit": "^3.29.2",
