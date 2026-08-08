@@ -18,6 +18,8 @@ import {
   addAttachment,
   deleteAttachment,
   updateUser,
+  createUser,
+  deleteUser as firestoreDeleteUser,
   seedDatabase,
 } from '@/lib/firestore'
 import { isFirebaseConfigured } from '@/lib/firebaseClient'
@@ -59,6 +61,8 @@ interface DataContextType {
   removeAttachment: (id: string, attachmentId: string) => Promise<void>
   // Usuários / uploads / seed
   saveProfile: (id: string, patch: { name?: string; role?: string; avatarUrl?: string; pin?: string }) => Promise<void>
+  addUser: (input: { name: string; role: string; avatarUrl?: string; pin?: string }) => Promise<void>
+  removeUser: (id: string) => Promise<void>
   uploadAvatar: (file: File) => Promise<string>
   uploadGeneral: (file: File) => Promise<string>
   uploadLogo: (file: File) => Promise<string>
@@ -178,6 +182,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
     await updateUser(id, patch)
   }, [])
 
+  const addUser = useCallback(async (input: { name: string; role: string; avatarUrl?: string; pin?: string }) => {
+    await createUser(input)
+  }, [])
+
+  const removeUser = useCallback(async (id: string) => {
+    await firestoreDeleteUser(id)
+  }, [])
+
   const seed = useCallback(async () => {
     await seedDatabase(users, tasks)
   }, [users, tasks])
@@ -199,6 +211,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     addFileAttachment: addAttachmentToTask,
     removeAttachment: removeAttachmentFromTask,
     saveProfile,
+    addUser,
+    removeUser,
     uploadAvatar: (f) => uploadAvatar(f),
     uploadGeneral: (f) => uploadFile(f),
     uploadLogo: (f) => uploadLogo(f),

@@ -147,6 +147,10 @@ export async function updateUser(
   await updateDoc(doc(usersCol(), id), partial)
 }
 
+export async function deleteUser(id: string): Promise<void> {
+  await deleteDoc(doc(usersCol(), id))
+}
+
 // ===== Tarefas =====
 
 export async function createTask(input: {

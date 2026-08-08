@@ -13,6 +13,9 @@ export interface KanbanColumn {
   darkBg: string
   darkText: string
   customColor?: string
+  bgColor?: string
+  labelColor?: string
+  borderColor?: string
 }
 
 export interface CardSummaryConfig {
@@ -25,6 +28,18 @@ export interface CardSummaryConfig {
 }
 
 export function getColumnBadgeStyle(column: KanbanColumn): { className: string; style?: React.CSSProperties } {
+  if (column.bgColor || column.labelColor) {
+    const bg = column.bgColor || column.customColor || '#3b82f6'
+    const fg = column.labelColor || column.textColor || '#ffffff'
+    return {
+      className: 'text-[11px] font-bold px-2 py-0.5 rounded-md border transition-colors',
+      style: {
+        backgroundColor: bg,
+        color: fg,
+        borderColor: column.borderColor || `${bg}44`
+      }
+    }
+  }
   if (column.customColor) {
     const hex = column.customColor
     return {
@@ -51,11 +66,11 @@ interface ColumnsContextType {
 const ColumnsContext = createContext<ColumnsContextType | undefined>(undefined)
 
 const DEFAULT_COLUMNS: KanbanColumn[] = [
-  { id: 'BACKLOG', title: 'Ideia', color: 'bg-slate-100', textColor: 'text-slate-700', darkBg: 'dark:bg-slate-800/40', darkText: 'dark:text-slate-300', customColor: '#64748b' },
-  { id: 'TODO', title: 'A Fazer', color: 'bg-blue-50', textColor: 'text-blue-700', darkBg: 'dark:bg-blue-950/20', darkText: 'dark:text-blue-400', customColor: '#3b82f6' },
-  { id: 'IN_PROGRESS', title: 'Em Andamento', color: 'bg-amber-50', textColor: 'text-amber-700', darkBg: 'dark:bg-amber-950/20', darkText: 'dark:text-amber-400', customColor: '#f59e0b' },
-  { id: 'AWAITING_APPROVAL', title: 'Aguardando Aprovação', color: 'bg-purple-50', textColor: 'text-purple-700', darkBg: 'dark:bg-purple-950/20', darkText: 'dark:text-purple-400', customColor: '#a855f7' },
-  { id: 'DONE', title: 'Concluído', color: 'bg-emerald-50', textColor: 'text-emerald-700', darkBg: 'dark:bg-emerald-950/20', darkText: 'dark:text-emerald-400', customColor: '#10b981' },
+  { id: 'BACKLOG', title: 'Ideia', color: 'bg-slate-100', textColor: 'text-slate-700', darkBg: 'dark:bg-slate-800/40', darkText: 'dark:text-slate-300', customColor: '#64748b', bgColor: '#64748b', labelColor: '#ffffff', borderColor: '#64748b' },
+  { id: 'TODO', title: 'A Fazer', color: 'bg-blue-50', textColor: 'text-blue-700', darkBg: 'dark:bg-blue-950/20', darkText: 'dark:text-blue-400', customColor: '#3b82f6', bgColor: '#3b82f6', labelColor: '#ffffff', borderColor: '#3b82f6' },
+  { id: 'IN_PROGRESS', title: 'Em Andamento', color: 'bg-amber-50', textColor: 'text-amber-700', darkBg: 'dark:bg-amber-950/20', darkText: 'dark:text-amber-400', customColor: '#f59e0b', bgColor: '#f59e0b', labelColor: '#ffffff', borderColor: '#f59e0b' },
+  { id: 'AWAITING_APPROVAL', title: 'Aguardando Aprovação', color: 'bg-purple-50', textColor: 'text-purple-700', darkBg: 'dark:bg-purple-950/20', darkText: 'dark:text-purple-400', customColor: '#a855f7', bgColor: '#a855f7', labelColor: '#ffffff', borderColor: '#a855f7' },
+  { id: 'DONE', title: 'Concluído', color: 'bg-emerald-50', textColor: 'text-emerald-700', darkBg: 'dark:bg-emerald-950/20', darkText: 'dark:text-emerald-400', customColor: '#10b981', bgColor: '#10b981', labelColor: '#ffffff', borderColor: '#10b981' },
 ]
 
 const DEFAULT_SUMMARY: CardSummaryConfig = {
@@ -111,7 +126,7 @@ export function ColumnsProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const updateColumn = useCallback(
-    (id: string, patch: Partial<Pick<KanbanColumn, 'title' | 'color' | 'textColor' | 'darkBg' | 'darkText' | 'customColor'>>) => {
+    (id: string, patch: Partial<Pick<KanbanColumn, 'title' | 'color' | 'textColor' | 'darkBg' | 'darkText' | 'customColor' | 'bgColor' | 'labelColor' | 'borderColor'>>) => {
       setColumns((prev) => {
         const next = prev.map((c) => (c.id === id ? { ...c, ...patch } : c))
         persist(next, summary)
