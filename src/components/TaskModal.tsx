@@ -261,7 +261,7 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
         <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
           
           {/* Left Column (Main Scrollable Workspace) */}
-          <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 min-h-0">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 space-y-6 min-h-0">
             
             {/* Title Inline Edit */}
             <div className="space-y-1.5">

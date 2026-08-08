@@ -59,7 +59,7 @@ export default function Header() {
   if (!user) return null
 
   return (
-    <header className="h-[60px] w-full border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c1220] flex items-center px-3 sm:px-4 gap-3 sm:gap-4 shrink-0 select-none z-50 overflow-hidden">
+    <header className="h-[60px] w-full border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c1220] flex items-center px-3 sm:px-4 gap-3 sm:gap-4 shrink-0 select-none z-[60]">
       {/* Mobile: Burger on the left */}
       <button
         onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -107,7 +107,7 @@ export default function Header() {
 
       {/* Mobile Navigation Dropdown */}
       {mobileMenuOpen && (
-        <nav className="md:hidden absolute top-[60px] left-0 right-0 bg-white dark:bg-[#0c1220] border-b border-slate-200 dark:border-slate-800 flex flex-col p-2 z-50 shadow-lg">
+        <nav className="md:hidden absolute top-[60px] left-0 right-0 bg-white dark:bg-[#0c1220] border-b border-slate-200 dark:border-slate-800 flex flex-col p-2 z-[70] shadow-lg">
           {navItems.map((item) => {
             const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))
             const Icon = item.icon
@@ -172,7 +172,7 @@ export default function Header() {
           </button>
 
           {profileDropdownOpen && (
-            <div className="absolute right-0 top-full mt-2 w-56 bg-white dark:bg-[#111625] border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl z-50 py-2 overflow-hidden">
+            <div className="absolute right-0 top-full mt-2 w-56 bg-white dark:bg-[#111625] border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl z-[70] py-2 overflow-hidden">
               <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800">
                 <p className="font-semibold text-slate-800 dark:text-slate-200 text-sm">{user.name}</p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -227,7 +227,7 @@ export default function Header() {
           </button>
 
           {profileDropdownOpen && (
-            <div className="absolute right-0 top-full mt-2 w-52 bg-white dark:bg-[#111625] border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl z-50 py-2 overflow-hidden">
+            <div className="absolute right-0 top-full mt-2 w-52 bg-white dark:bg-[#111625] border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl z-[70] py-2 overflow-hidden">
               <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800">
                 <p className="font-semibold text-slate-800 dark:text-slate-200 text-sm">{user.name}</p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">

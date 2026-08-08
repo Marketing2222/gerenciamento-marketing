@@ -33,7 +33,7 @@ export default function RichTextEditor({ content, onChange, editable = true }: R
   }
 
   return (
-    <div className="w-full border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-900 focus-within:border-blue-500 dark:focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition duration-200">
+    <div className="w-full border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-900 focus-within:border-blue-500 dark:focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition duration-200 max-w-full">
       {editable && (
         <div className="flex items-center gap-1 p-2 bg-slate-50 dark:bg-[#0e1424] border-b border-slate-200 dark:border-slate-800 flex-wrap">
           <button
@@ -108,7 +108,7 @@ export default function RichTextEditor({ content, onChange, editable = true }: R
         </div>
       )}
       
-      <div className={`p-4 bg-white dark:bg-[#0c1220] ${editable ? 'min-h-[140px]' : ''}`}>
+      <div className={`p-4 bg-white dark:bg-[#0c1220] overflow-hidden ${editable ? 'min-h-[140px]' : ''}`}>
         <EditorContent editor={editor} />
       </div>
     </div>

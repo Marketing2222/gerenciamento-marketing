@@ -105,7 +105,7 @@ export default function TaskCreateModal({ isOpen, onClose, onCreated, initialSta
         </div>
 
         {/* Content Form */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto overflow-x-hidden p-6 space-y-6">
           {error && (
             <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/40 text-red-700 dark:text-red-400 p-3 rounded-xl text-sm flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
