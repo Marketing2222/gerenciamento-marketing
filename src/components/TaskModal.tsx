@@ -250,10 +250,10 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
         </div>
 
         {/* Main Columns Container */}
-        <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+        <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
           
           {/* Left Column (Main Scrollable Workspace) */}
-          <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 min-h-0">
             
             {/* Title Inline Edit */}
             <div className="space-y-1.5">
@@ -537,7 +537,7 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
           </div>
 
           {/* Right Column (Sidebar Configuration Details) */}
-          <div className="w-full md:w-80 border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0c1220] overflow-y-auto p-4 md:p-6 space-y-6">
+          <div className="w-full md:w-80 max-h-[40vh] md:max-h-none border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0c1220] overflow-y-auto p-4 md:p-6 space-y-6 shrink-0 md:shrink">
             
             {/* Status Select */}
             <div className="space-y-1.5">
