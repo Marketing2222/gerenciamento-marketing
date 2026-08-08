@@ -17,7 +17,7 @@ export default function KanbanPage() {
 
   const { tasks, users, loaded, updateTask } = useData()
   const { columns } = useColumns()
-  const { searchOpen, registerAddTask, openAddTask } = useMobileUI()
+  const { searchOpen, registerAddTask } = useMobileUI()
 
   const [search, setSearch] = React.useState('')
   const [assigneeFilter, setAssigneeFilter] = React.useState('')
@@ -243,16 +243,6 @@ export default function KanbanPage() {
             </div>
           </DragDropContext>
         )}
-      </div>
-
-      {/* Mobile: Fixed footer with + button */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 h-14 bg-white dark:bg-[#0c1220] border-t border-slate-200 dark:border-slate-800 flex items-center justify-center z-40 shrink-0">
-        <button
-          onClick={openAddTask}
-          className="w-11 h-11 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-lg shadow-blue-500/30 transition cursor-pointer"
-        >
-          <Plus className="w-5 h-5" />
-        </button>
       </div>
 
       <TaskCreateModal 

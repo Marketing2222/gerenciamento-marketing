@@ -1,12 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useUser } from '@/context/UserContext'
 import { useTheme } from '@/context/ThemeContext'
 import { useBrand } from '@/context/BrandContext'
-import { useMobileUI } from '@/context/MobileUIContext'
 import Avatar from '@/components/Avatar'
 import TrashModal from '@/components/TrashModal'
 import {
@@ -23,17 +22,20 @@ import {
   Trash2,
   Menu,
   X,
-  Search,
+  User,
+  RefreshCw,
 } from 'lucide-react'
 
 export default function Header() {
   const pathname = usePathname()
+  const router = useRouter()
   const { user, logout } = useUser()
   const { theme, toggleTheme } = useTheme()
   const { siteName, logoUrl } = useBrand()
-  const { toggleSearch, searchOpen } = useMobileUI()
   const [isTrashOpen, setIsTrashOpen] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   const navItems = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -44,10 +46,20 @@ export default function Header() {
     { name: 'Configurações', href: '/configuracoes', icon: Settings },
   ]
 
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setProfileDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
   if (!user) return null
 
   return (
-    <header className="h-14 w-full border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c1220] flex items-center px-2 sm:px-4 gap-2 sm:gap-4 shrink-0 select-none z-50 overflow-hidden">
+    <header className="h-[60px] w-full border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c1220] flex items-center px-3 sm:px-4 gap-3 sm:gap-4 shrink-0 select-none z-50 overflow-hidden">
       {/* Mobile: Burger on the left */}
       <button
         onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -95,7 +107,7 @@ export default function Header() {
 
       {/* Mobile Navigation Dropdown */}
       {mobileMenuOpen && (
-        <nav className="md:hidden absolute top-14 left-0 right-0 bg-white dark:bg-[#0c1220] border-b border-slate-200 dark:border-slate-800 flex flex-col p-2 z-50 shadow-lg">
+        <nav className="md:hidden absolute top-[60px] left-0 right-0 bg-white dark:bg-[#0c1220] border-b border-slate-200 dark:border-slate-800 flex flex-col p-2 z-50 shadow-lg">
           {navItems.map((item) => {
             const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))
             const Icon = item.icon
@@ -119,7 +131,7 @@ export default function Header() {
         </nav>
       )}
 
-      {/* Desktop Right side: theme + trash + user */}
+      {/* Desktop Right side: theme + trash + user dropdown */}
       <div className="hidden md:flex items-center gap-2 shrink-0">
         <button
           onClick={toggleTheme}
@@ -139,42 +151,61 @@ export default function Header() {
 
         <div className="w-px h-6 bg-slate-200 dark:bg-slate-800" />
 
-        <div className="flex items-center gap-2.5">
-          <div className="relative shrink-0">
-            <Avatar name={user.name} url={user.avatarUrl} />
-            <div className="absolute bottom-0 right-0 w-2 h-2 bg-emerald-500 rounded-full border-2 border-white dark:border-[#0c1220]" />
-          </div>
-          <div className="hidden lg:block min-w-0">
-            <h4 className="font-semibold text-slate-800 dark:text-slate-200 text-xs truncate leading-tight">
-              {user.name}
-            </h4>
-            <span className="text-[10px] text-slate-500 dark:text-slate-400 block truncate font-medium">
-              {user.role === 'DESIGNER' ? 'Designer' : 'Gestor de Tráfego'}
-            </span>
-          </div>
+        {/* Profile dropdown */}
+        <div className="relative" ref={dropdownRef}>
           <button
-            onClick={logout}
-            title="Sair / Trocar Perfil"
-            className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition cursor-pointer"
+            onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+            className="flex items-center gap-2 cursor-pointer rounded-lg p-1 hover:bg-slate-100 dark:hover:bg-slate-800/50 transition"
           >
-            <LogOut className="w-4 h-4" />
+            <div className="relative shrink-0">
+              <Avatar name={user.name} url={user.avatarUrl} size="lg" />
+              <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white dark:border-[#0c1220]" />
+            </div>
+            <div className="hidden lg:block min-w-0">
+              <h4 className="font-semibold text-slate-800 dark:text-slate-200 text-xs truncate leading-tight">
+                {user.name}
+              </h4>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 block truncate font-medium">
+                {user.role === 'DESIGNER' ? 'Designer' : 'Gestor de Tráfego'}
+              </span>
+            </div>
           </button>
+
+          {profileDropdownOpen && (
+            <div className="absolute right-0 top-full mt-2 w-56 bg-white dark:bg-[#111625] border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl z-50 py-2 overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800">
+                <p className="font-semibold text-slate-800 dark:text-slate-200 text-sm">{user.name}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  {user.role === 'DESIGNER' ? 'Designer' : 'Gestor de Tráfego'}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setProfileDropdownOpen(false)
+                  router.push('/login')
+                }}
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition cursor-pointer"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Trocar de usuário
+              </button>
+              <button
+                onClick={() => {
+                  setProfileDropdownOpen(false)
+                  logout()
+                }}
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 transition cursor-pointer"
+              >
+                <LogOut className="w-4 h-4" />
+                Sair
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Mobile Right side: search + theme + avatar */}
+      {/* Mobile Right side: theme + avatar with dropdown */}
       <div className="md:hidden flex items-center gap-1 shrink-0 ml-auto">
-        <button
-          onClick={toggleSearch}
-          title="Pesquisar"
-          className={`p-2 rounded-lg transition cursor-pointer ${
-            searchOpen
-              ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
-              : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50'
-          }`}
-        >
-          <Search className="w-5 h-5" />
-        </button>
         <button
           onClick={toggleTheme}
           title={theme === 'dark' ? 'Modo Claro' : 'Modo Escuro'}
@@ -182,9 +213,49 @@ export default function Header() {
         >
           {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </button>
-        <div className="relative shrink-0">
-          <Avatar name={user.name} url={user.avatarUrl} />
-          <div className="absolute bottom-0 right-0 w-2 h-2 bg-emerald-500 rounded-full border-2 border-white dark:border-[#0c1220]" />
+
+        {/* Mobile profile dropdown */}
+        <div className="relative" ref={dropdownRef}>
+          <button
+            onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+            className="cursor-pointer rounded-lg p-1 hover:bg-slate-100 dark:hover:bg-slate-800/50 transition"
+          >
+            <div className="relative shrink-0">
+              <Avatar name={user.name} url={user.avatarUrl} size="lg" />
+              <div className="absolute bottom-0 right-0 w-2 h-2 bg-emerald-500 rounded-full border-2 border-white dark:border-[#0c1220]" />
+            </div>
+          </button>
+
+          {profileDropdownOpen && (
+            <div className="absolute right-0 top-full mt-2 w-52 bg-white dark:bg-[#111625] border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl z-50 py-2 overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800">
+                <p className="font-semibold text-slate-800 dark:text-slate-200 text-sm">{user.name}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  {user.role === 'DESIGNER' ? 'Designer' : 'Gestor de Tráfego'}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setProfileDropdownOpen(false)
+                  router.push('/login')
+                }}
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition cursor-pointer"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Trocar de usuário
+              </button>
+              <button
+                onClick={() => {
+                  setProfileDropdownOpen(false)
+                  logout()
+                }}
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 transition cursor-pointer"
+              >
+                <LogOut className="w-4 h-4" />
+                Sair
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

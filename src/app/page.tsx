@@ -13,7 +13,6 @@ import {
   Plus, 
   Sparkles,
   ArrowRight,
-  TrendingUp,
   Clock
 } from 'lucide-react'
 import Link from 'next/link'
@@ -21,7 +20,7 @@ import Avatar from '@/components/Avatar'
 
 export default function DashboardPage() {
   const { user } = useUser()
-  const { tasks, loaded } = useData()
+  const { tasks, users, loaded } = useData()
 
   const visibleTasks = useMemo(() => tasks.filter((t) => !t.deletedAt), [tasks])
 
@@ -149,7 +148,7 @@ export default function DashboardPage() {
         })}
       </div>
 
-      {/* Main Grid: Upcoming deadines vs Quick Actions */}
+      {/* Main Grid: Upcoming deadlines vs Team Status */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
         {/* Left 2 Columns: Upcoming tasks */}
         <div className="lg:col-span-2 space-y-4">
@@ -217,39 +216,8 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Right 1 Column: Quick Actions & Team Status */}
+        {/* Right 1 Column: Team Status */}
         <div className="space-y-6">
-          <div className="space-y-3">
-            <h3 className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-blue-500" />
-              <span>Links Rápidos</span>
-            </h3>
-            
-            <div className="grid grid-cols-1 gap-3">
-              <Link 
-                href="/kanban"
-                className="flex items-center justify-between p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b2c] hover:bg-slate-50 dark:hover:bg-slate-800/40 hover:border-slate-300 dark:hover:border-slate-700 transition group cursor-pointer"
-              >
-                <div>
-                  <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">Painel Kanban</h4>
-                  <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5">Acompanhar e mover tarefas por colunas</p>
-                </div>
-                <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-blue-500 group-hover:translate-x-0.5 transition" />
-              </Link>
-
-              <Link 
-                href="/calendario"
-                className="flex items-center justify-between p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b2c] hover:bg-slate-50 dark:hover:bg-slate-800/40 hover:border-slate-300 dark:hover:border-slate-700 transition group cursor-pointer"
-              >
-                <div>
-                  <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">Calendário de Entregas</h4>
-                  <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5">Visualizar prazos semanais e mensais</p>
-                </div>
-                <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-blue-500 group-hover:translate-x-0.5 transition" />
-              </Link>
-            </div>
-          </div>
-
           <div className="space-y-3">
             <h3 className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-blue-500" />
@@ -257,20 +225,23 @@ export default function DashboardPage() {
             </h3>
             
             <div className="bg-white dark:bg-[#151b2c] border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm space-y-3">
-              <div className="flex items-center gap-3">
-                <Avatar name="Lucas Mendes" size="lg" />
-                <div>
-                  <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">Lucas Mendes</h4>
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">Designer</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <Avatar name="Thiago Silva" size="lg" />
-                <div>
-                  <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">Thiago Silva</h4>
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">Gestor de Tráfego</span>
-                </div>
-              </div>
+              {users.length === 0 ? (
+                <p className="text-slate-500 dark:text-slate-400 text-xs text-center py-2">
+                  Nenhum colaborador encontrado.
+                </p>
+              ) : (
+                users.map((u) => (
+                  <div key={u.id} className="flex items-center gap-3">
+                    <Avatar name={u.name} url={u.avatarUrl} size="lg" />
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">{u.name}</h4>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">
+                        {u.role === 'DESIGNER' ? 'Designer' : 'Gestor de Tráfego'}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
