@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, useMemo, type ReactNode } from 'react'
 import { useUser } from '@/context/UserContext'
 import {
   subscribeUsers,
@@ -97,6 +97,24 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // Resolver assignee e comment users com dados frescos da lista de usuários
+  const resolvedTasks = useMemo(() => {
+    return tasks.map((task) => {
+      const currentAssignee = task.assigneeId
+        ? users.find((u) => u.id === task.assigneeId) || task.assignee
+        : task.assignee
+      const resolvedComments = task.comments.map((c) => {
+        const freshUser = users.find((u) => u.id === c.user.id)
+        return freshUser ? { ...c, user: freshUser } : c
+      })
+      const resolvedLogs = task.activityLogs.map((log) => {
+        const freshUser = users.find((u) => u.id === log.user.id)
+        return freshUser ? { ...log, user: { ...freshUser } } : log
+      })
+      return { ...task, assignee: currentAssignee || null, comments: resolvedComments, activityLogs: resolvedLogs }
+    })
+  }, [tasks, users])
+
   const addTask = useCallback(async (input: NewTaskInput) => {
     await createTask({ ...input, creator: user })
   }, [user])
@@ -165,7 +183,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [users, tasks])
 
   const value: DataContextType = {
-    tasks,
+    tasks: resolvedTasks,
     users,
     loaded,
     addTask,
