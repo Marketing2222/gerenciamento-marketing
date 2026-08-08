@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 import { useUser } from '@/context/UserContext'
 import { useTheme } from '@/context/ThemeContext'
 import { useBrand } from '@/context/BrandContext'
+import { useMobileUI } from '@/context/MobileUIContext'
 import Avatar from '@/components/Avatar'
 import TrashModal from '@/components/TrashModal'
 import {
@@ -22,6 +23,7 @@ import {
   Trash2,
   Menu,
   X,
+  Search,
 } from 'lucide-react'
 
 export default function Header() {
@@ -29,6 +31,7 @@ export default function Header() {
   const { user, logout } = useUser()
   const { theme, toggleTheme } = useTheme()
   const { siteName, logoUrl } = useBrand()
+  const { toggleSearch, searchOpen } = useMobileUI()
   const [isTrashOpen, setIsTrashOpen] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
@@ -45,8 +48,16 @@ export default function Header() {
 
   return (
     <header className="h-14 w-full border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c1220] flex items-center px-2 sm:px-4 gap-2 sm:gap-4 shrink-0 select-none z-50 overflow-hidden">
-      {/* Brand */}
-      <Link href="/" className="flex items-center gap-2 shrink-0">
+      {/* Mobile: Burger on the left */}
+      <button
+        onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+        className="md:hidden p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 transition cursor-pointer shrink-0"
+      >
+        {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+      </button>
+
+      {/* Desktop: Brand */}
+      <Link href="/" className="hidden md:flex items-center gap-2 shrink-0 mr-2">
         {logoUrl ? (
           <img src={logoUrl} alt={siteName} className="w-8 h-8 rounded-lg object-cover" />
         ) : (
@@ -54,18 +65,10 @@ export default function Header() {
             <Sparkles className="w-4 h-4 text-white" />
           </div>
         )}
-        <span className="font-bold text-slate-800 dark:text-slate-200 text-sm tracking-tight hidden sm:block">
+        <span className="font-bold text-slate-800 dark:text-slate-200 text-sm tracking-tight">
           {siteName}
         </span>
       </Link>
-
-      {/* Mobile hamburger */}
-      <button
-        onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-        className="md:hidden p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 transition cursor-pointer ml-auto"
-      >
-        {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-      </button>
 
       {/* Desktop Navigation */}
       <nav className="hidden md:flex items-center gap-1 flex-1 min-w-0">
@@ -116,7 +119,7 @@ export default function Header() {
         </nav>
       )}
 
-      {/* Right side: theme toggle + trash + user */}
+      {/* Desktop Right side: theme + trash + user */}
       <div className="hidden md:flex items-center gap-2 shrink-0">
         <button
           onClick={toggleTheme}
@@ -159,8 +162,19 @@ export default function Header() {
         </div>
       </div>
 
-      {/* Mobile right side: compact */}
-      <div className="md:hidden flex items-center gap-1 shrink-0">
+      {/* Mobile Right side: search + theme + avatar */}
+      <div className="md:hidden flex items-center gap-1 shrink-0 ml-auto">
+        <button
+          onClick={toggleSearch}
+          title="Pesquisar"
+          className={`p-2 rounded-lg transition cursor-pointer ${
+            searchOpen
+              ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+              : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50'
+          }`}
+        >
+          <Search className="w-5 h-5" />
+        </button>
         <button
           onClick={toggleTheme}
           title={theme === 'dark' ? 'Modo Claro' : 'Modo Escuro'}

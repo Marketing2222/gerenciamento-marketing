@@ -9,6 +9,7 @@ import TaskModal from '@/components/TaskModal'
 import TaskCreateModal from '@/components/TaskCreateModal'
 import { useData } from '@/context/DataContext'
 import { useColumns, getColumnBadgeStyle } from '@/context/ColumnsContext'
+import { useMobileUI } from '@/context/MobileUIContext'
 
 export default function KanbanPage() {
   const searchParams = useSearchParams()
@@ -16,6 +17,7 @@ export default function KanbanPage() {
 
   const { tasks, users, loaded, updateTask } = useData()
   const { columns } = useColumns()
+  const { searchOpen, registerAddTask, openAddTask } = useMobileUI()
 
   const [search, setSearch] = React.useState('')
   const [assigneeFilter, setAssigneeFilter] = React.useState('')
@@ -62,6 +64,10 @@ export default function KanbanPage() {
     }
   }, [searchParams, activeTasks, loaded, router])
 
+  React.useEffect(() => {
+    registerAddTask(setIsCreateOpen)
+  }, [registerAddTask])
+
   const handleDragEnd = async (result: DropResult) => {
     const { source, destination, draggableId } = result
     if (!destination) return
@@ -85,10 +91,34 @@ export default function KanbanPage() {
   }
 
   return (
-    <div className="space-y-4 flex flex-col h-full overflow-hidden">
-      {/* Toolbar: search + filters + actions — all in one row */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0">
-        {/* Search */}
+    <div className="space-y-3 sm:space-y-4 flex flex-col h-full overflow-hidden">
+      {/* Mobile: Search bar (toggleable) */}
+      {searchOpen && (
+        <div className="md:hidden shrink-0">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Pesquisar..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              autoFocus
+              className="w-full pl-9 pr-9 py-2.5 bg-white dark:bg-[#151b2c] border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 font-medium"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Desktop: Toolbar */}
+      <div className="hidden md:flex items-center gap-2 shrink-0">
         <div className="relative flex-1 min-w-0">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
@@ -100,11 +130,10 @@ export default function KanbanPage() {
           />
         </div>
 
-        {/* Assignee Filter */}
         <select
           value={assigneeFilter}
           onChange={(e) => setAssigneeFilter(e.target.value)}
-          className="px-3 py-2 bg-white dark:bg-[#151b2c] border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-xs text-slate-700 dark:text-slate-300 font-semibold hidden md:block"
+          className="px-3 py-2 bg-white dark:bg-[#151b2c] border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-xs text-slate-700 dark:text-slate-300 font-semibold"
         >
           <option value="">Responsáveis</option>
           {filteredUsers.map(u => (
@@ -112,11 +141,10 @@ export default function KanbanPage() {
           ))}
         </select>
 
-        {/* Priority Filter */}
         <select
           value={priorityFilter}
           onChange={(e) => setPriorityFilter(e.target.value)}
-          className="px-3 py-2 bg-white dark:bg-[#151b2c] border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-xs text-slate-700 dark:text-slate-300 font-semibold hidden md:block"
+          className="px-3 py-2 bg-white dark:bg-[#151b2c] border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-xs text-slate-700 dark:text-slate-300 font-semibold"
         >
           <option value="">Prioridades</option>
           <option value="LOW">Baixa</option>
@@ -125,7 +153,6 @@ export default function KanbanPage() {
           <option value="URGENT">Urgente</option>
         </select>
 
-        {/* Clear filters */}
         {hasFilters && (
           <button
             onClick={clearFilters}
@@ -136,18 +163,17 @@ export default function KanbanPage() {
           </button>
         )}
 
-        {/* Nova Tarefa */}
         <button
           onClick={() => setIsCreateOpen(true)}
           className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-xl text-xs font-semibold shadow-lg shadow-blue-500/20 transition cursor-pointer shrink-0"
         >
           <Plus className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Nova Tarefa</span>
+          <span>Nova Tarefa</span>
         </button>
       </div>
 
       {/* Kanban Board */}
-      <div className="flex-1 overflow-x-auto min-h-0 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 pb-4">
+      <div className="flex-1 overflow-x-auto min-h-0 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 pb-4 md:pb-4 pb-20 md:pb-4">
         {!loaded ? (
           <div className="flex flex-col items-center justify-center h-64 text-slate-400">
             <Loader2 className="w-8 h-8 animate-spin text-blue-500 mb-2" />
@@ -155,29 +181,29 @@ export default function KanbanPage() {
           </div>
         ) : (
           <DragDropContext onDragEnd={handleDragEnd}>
-            <div className="flex gap-3 h-full items-start select-none">
+            <div className="flex gap-2 sm:gap-3 h-full items-start select-none">
               {columns.map((column) => {
                 const colTasks = getTasksByColumn(column.id)
                 
                 return (
                   <div 
                     key={column.id} 
-                    className="flex-1 min-w-[150px] sm:min-w-[180px] max-h-full flex flex-col rounded-2xl bg-slate-100/60 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800"
+                    className="flex-shrink-0 w-[48%] sm:flex-1 min-w-0 sm:min-w-[180px] max-h-full flex flex-col rounded-2xl bg-slate-100/60 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800"
                   >
                     {/* Column Header */}
-                    <div className="p-3 border-b border-slate-200 dark:border-slate-800 shrink-0 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span {...getColumnBadgeStyle(column)}>
+                    <div className="p-2 sm:p-3 border-b border-slate-200 dark:border-slate-800 shrink-0 flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                        <span {...getColumnBadgeStyle(column)} className="text-[10px] sm:text-xs">
                           {column.title}
                         </span>
-                        <span className="text-[10px] text-slate-400 font-bold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-1.5 py-0.5 rounded-md">
+                        <span className="text-[9px] sm:text-[10px] text-slate-400 font-bold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-1 sm:px-1.5 py-0.5 rounded-md shrink-0">
                           {colTasks.length}
                         </span>
                       </div>
 
                       <button
                         onClick={() => setIsCreateOpen(true)}
-                        className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition cursor-pointer"
+                        className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition cursor-pointer shrink-0"
                       >
                         <Plus className="w-3.5 h-3.5" />
                       </button>
@@ -189,7 +215,7 @@ export default function KanbanPage() {
                         <div
                           ref={provided.innerRef}
                           {...provided.droppableProps}
-                          className={`flex-1 overflow-y-auto p-2 min-h-[120px] transition-colors duration-250 ${
+                          className={`flex-1 overflow-y-auto p-1.5 sm:p-2 min-h-[100px] sm:min-h-[120px] transition-colors duration-250 ${
                             snapshot.isDraggingOver ? 'bg-blue-500/5 dark:bg-blue-500/3 rounded-b-2xl' : ''
                           }`}
                         >
@@ -204,7 +230,7 @@ export default function KanbanPage() {
                           {provided.placeholder}
                           
                           {colTasks.length === 0 && (
-                            <div className="py-6 text-center text-slate-400 text-[11px] border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
+                            <div className="py-4 sm:py-6 text-center text-slate-400 text-[10px] sm:text-[11px] border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
                               Solte aqui
                             </div>
                           )}
@@ -217,6 +243,16 @@ export default function KanbanPage() {
             </div>
           </DragDropContext>
         )}
+      </div>
+
+      {/* Mobile: Fixed footer with + button */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 h-14 bg-white dark:bg-[#0c1220] border-t border-slate-200 dark:border-slate-800 flex items-center justify-center z-40 shrink-0">
+        <button
+          onClick={openAddTask}
+          className="w-11 h-11 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-lg shadow-blue-500/30 transition cursor-pointer"
+        >
+          <Plus className="w-5 h-5" />
+        </button>
       </div>
 
       <TaskCreateModal 

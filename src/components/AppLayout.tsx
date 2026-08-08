@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation'
 import { useUser } from '@/context/UserContext'
+import { MobileUIProvider } from '@/context/MobileUIContext'
 import Header from './Header'
 import { Loader2 } from 'lucide-react'
 
@@ -29,13 +30,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex flex-col h-screen w-full overflow-hidden bg-slate-50 dark:bg-[#080d19]">
-      <Header />
-      <main className="flex-1 flex flex-col min-h-0 relative">
-        <div className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
-          {children}
-        </div>
-      </main>
-    </div>
+    <MobileUIProvider>
+      <div className="flex flex-col h-screen w-full overflow-hidden bg-slate-50 dark:bg-[#080d19]">
+        <Header />
+        <main className="flex-1 flex flex-col min-h-0 relative">
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+            {children}
+          </div>
+        </main>
+      </div>
+    </MobileUIProvider>
   )
 }
