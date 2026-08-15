@@ -49,6 +49,8 @@ export default function TaskCard({ task, index, onClick, columnColor }: TaskCard
     }
   }
 
+  const clickedRef = React.useRef(false)
+
   return (
     <Draggable draggableId={task.id} index={index}>
       {(provided, snapshot) => (
@@ -56,9 +58,11 @@ export default function TaskCard({ task, index, onClick, columnColor }: TaskCard
           ref={provided.innerRef}
           {...provided.draggableProps}
           {...provided.dragHandleProps}
-          onClick={() => onClick(task)}
-          className={`p-2.5 sm:p-4 rounded-xl bg-white dark:bg-[#151b2c] border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700 transition-all duration-200 group cursor-grab active:cursor-grabbing select-none mb-2 sm:mb-3 ${
-            snapshot.isDragging ? 'dragging-card' : ''
+          onMouseDown={() => { clickedRef.current = true }}
+          onMouseMove={() => { clickedRef.current = false }}
+          onClick={() => { if (clickedRef.current) onClick(task) }}
+          className={`p-2.5 sm:p-4 rounded-xl bg-white dark:bg-[#151b2c] border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700 group cursor-grab active:cursor-grabbing select-none mb-2 sm:mb-3 ${
+            snapshot.isDragging ? 'dragging-card' : 'transition-[background-color,border-color,box-shadow] duration-200'
           } ${isOverdue ? 'border-l-4 border-l-red-500' : ''} ${isClose ? 'border-l-4 border-l-amber-500' : ''} ${columnColor && !isOverdue && !isClose ? 'border-l-4' : ''}`}
           style={columnColor && !isOverdue && !isClose ? { borderLeftColor: columnColor } : undefined}
         >

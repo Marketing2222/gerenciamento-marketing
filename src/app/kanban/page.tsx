@@ -224,8 +224,8 @@ export default function KanbanPage() {
                         <div
                           ref={provided.innerRef}
                           {...provided.droppableProps}
-                          className={`flex-1 p-1.5 sm:p-2 min-h-[100px] sm:min-h-[120px] transition-colors duration-250 ${
-                            snapshot.isDraggingOver ? 'bg-blue-500/5 dark:bg-blue-500/3 rounded-b-2xl' : ''
+                          className={`flex-1 overflow-y-auto p-1.5 sm:p-2 min-h-[100px] sm:min-h-[120px] transition-colors duration-150 ${
+                            snapshot.isDraggingOver ? 'bg-blue-500/5 dark:bg-blue-500/10 rounded-b-2xl' : ''
                           }`}
                         >
                           {colTasks.map((task, idx) => (
