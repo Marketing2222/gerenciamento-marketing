@@ -173,7 +173,7 @@ export default function KanbanPage() {
       </div>
 
       {/* Kanban Board */}
-      <div className="flex-1 overflow-x-auto min-h-0 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 pb-4 md:pb-4 pb-20 md:pb-4">
+      <div className="flex-1 min-h-0 px-0 pb-4 md:pb-4 pb-20 md:pb-4">
         {!loaded ? (
           <div className="flex flex-col items-center justify-center h-64 text-slate-400">
             <Loader2 className="w-8 h-8 animate-spin text-blue-500 mb-2" />
@@ -224,7 +224,7 @@ export default function KanbanPage() {
                         <div
                           ref={provided.innerRef}
                           {...provided.droppableProps}
-                          className={`flex-1 overflow-y-auto p-1.5 sm:p-2 min-h-[100px] sm:min-h-[120px] transition-colors duration-250 ${
+                          className={`flex-1 p-1.5 sm:p-2 min-h-[100px] sm:min-h-[120px] transition-colors duration-250 ${
                             snapshot.isDraggingOver ? 'bg-blue-500/5 dark:bg-blue-500/3 rounded-b-2xl' : ''
                           }`}
                         >

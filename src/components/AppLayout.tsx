@@ -34,7 +34,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <MobileUIProvider>
       <div className="h-dvh w-full flex flex-col overflow-hidden bg-slate-50 dark:bg-[#080d19]">
         <Header />
-        <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 sm:px-6 lg:px-8 py-4 sm:py-6 pb-24 md:pb-6">
+        <main className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 pb-24 md:pb-6">
           {children}
         </main>
         <MobileFooter />
