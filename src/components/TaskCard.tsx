@@ -64,7 +64,7 @@ export default function TaskCard({ task, index, onClick, columnColor }: TaskCard
           className={`p-2.5 sm:p-4 rounded-xl bg-white dark:bg-[#151b2c] border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700 group cursor-grab active:cursor-grabbing select-none mb-2 sm:mb-3 ${
             snapshot.isDragging ? 'dragging-card' : 'transition-[background-color,border-color,box-shadow] duration-200'
           } ${isOverdue ? 'border-l-4 border-l-red-500' : ''} ${isClose ? 'border-l-4 border-l-amber-500' : ''} ${columnColor && !isOverdue && !isClose ? 'border-l-4' : ''}`}
-          style={columnColor && !isOverdue && !isClose ? { borderLeftColor: columnColor } : undefined}
+          style={{ ...provided.draggableProps.style, ...(columnColor && !isOverdue && !isClose ? { borderLeftColor: columnColor } : {}) }}
         >
           {/* Priority tag */}
           <div className="flex items-center justify-between gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
