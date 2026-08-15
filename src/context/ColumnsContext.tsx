@@ -61,6 +61,9 @@ interface ColumnsContextType {
   summary: CardSummaryConfig
   updateColumn: (id: string, patch: Partial<KanbanColumn>) => void
   updateSummary: (patch: Partial<CardSummaryConfig>) => void
+  addColumn: (title: string, color?: string) => void
+  removeColumn: (id: string) => void
+  reorderColumns: (fromIndex: number, toIndex: number) => void
 }
 
 const ColumnsContext = createContext<ColumnsContextType | undefined>(undefined)
@@ -147,8 +150,57 @@ export function ColumnsProvider({ children }: { children: React.ReactNode }) {
     [columns, persist]
   )
 
+  const addColumn = useCallback(
+    (title: string, color?: string) => {
+      const newId = `CUSTOM_${String(Date.now()).toUpperCase()}`
+      const baseColor = color || '#6366f1'
+      const newColumn: KanbanColumn = {
+        id: newId,
+        title,
+        color: 'bg-indigo-50',
+        textColor: 'text-indigo-700',
+        darkBg: 'dark:bg-indigo-950/20',
+        darkText: 'dark:text-indigo-400',
+        customColor: baseColor,
+        bgColor: baseColor,
+        labelColor: '#ffffff',
+        borderColor: baseColor,
+      }
+      setColumns((prev) => {
+        const next = [...prev, newColumn]
+        persist(next, summary)
+        return next
+      })
+    },
+    [summary, persist]
+  )
+
+  const removeColumn = useCallback(
+    (id: string) => {
+      setColumns((prev) => {
+        const next = prev.filter((c) => c.id !== id)
+        persist(next, summary)
+        return next
+      })
+    },
+    [summary, persist]
+  )
+
+  const reorderColumns = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      setColumns((prev) => {
+        const next = [...prev]
+        const [moved] = next.splice(fromIndex, 1)
+        next.splice(toIndex, 0, moved)
+        persist(next, summary)
+        return next
+      })
+    },
+    [summary, persist]
+  )
+
   return (
-    <ColumnsContext.Provider value={{ columns, summary, updateColumn, updateSummary }}>
+    <ColumnsContext.Provider value={{ columns, summary, updateColumn, updateSummary, addColumn, removeColumn, reorderColumns }}>
       {children}
     </ColumnsContext.Provider>
   )

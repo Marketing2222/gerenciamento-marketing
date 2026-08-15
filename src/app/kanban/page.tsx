@@ -8,7 +8,7 @@ import TaskCard from '@/components/TaskCard'
 import TaskModal from '@/components/TaskModal'
 import TaskCreateModal from '@/components/TaskCreateModal'
 import { useData } from '@/context/DataContext'
-import { useColumns, getColumnBadgeStyle } from '@/context/ColumnsContext'
+import { useColumns } from '@/context/ColumnsContext'
 import { useMobileUI } from '@/context/MobileUIContext'
 
 export default function KanbanPage() {
@@ -191,9 +191,18 @@ export default function KanbanPage() {
                     className="flex-shrink-0 w-[48%] sm:flex-1 min-w-0 sm:min-w-[180px] max-h-full flex flex-col rounded-2xl bg-slate-100/60 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800"
                   >
                     {/* Column Header */}
-                    <div className="p-2 sm:p-3 border-b border-slate-200 dark:border-slate-800 shrink-0 flex items-center justify-between">
+                    <div 
+                      className="p-2 sm:p-3 border-b border-slate-200 dark:border-slate-800 shrink-0 flex items-center justify-between rounded-t-2xl"
+                      style={{ backgroundColor: (column.bgColor || column.customColor || '#3b82f6') + '20' }}
+                    >
                       <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-                        <span {...getColumnBadgeStyle(column)} className="text-[10px] sm:text-xs">
+                        <span 
+                          className="text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-md"
+                          style={{ 
+                            backgroundColor: column.bgColor || column.customColor || '#3b82f6',
+                            color: column.labelColor || '#ffffff'
+                          }}
+                        >
                           {column.title}
                         </span>
                         <span className="text-[9px] sm:text-[10px] text-slate-400 font-bold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-1 sm:px-1.5 py-0.5 rounded-md shrink-0">
@@ -225,6 +234,7 @@ export default function KanbanPage() {
                               task={task}
                               index={idx}
                               onClick={(t) => setSelectedTaskId(t.id)}
+                              columnColor={column.bgColor || column.customColor}
                             />
                           ))}
                           {provided.placeholder}

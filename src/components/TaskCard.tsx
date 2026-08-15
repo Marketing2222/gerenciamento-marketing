@@ -11,9 +11,10 @@ interface TaskCardProps {
   task: Task
   index: number
   onClick: (task: Task) => void
+  columnColor?: string
 }
 
-export default function TaskCard({ task, index, onClick }: TaskCardProps) {
+export default function TaskCard({ task, index, onClick, columnColor }: TaskCardProps) {
   const { summary } = useColumns()
   const totalChecklist = task.checklist.length
   const completedChecklist = task.checklist.filter(item => item.isCompleted).length
@@ -58,7 +59,8 @@ export default function TaskCard({ task, index, onClick }: TaskCardProps) {
           onClick={() => onClick(task)}
           className={`p-2.5 sm:p-4 rounded-xl bg-white dark:bg-[#151b2c] border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700 transition-all duration-200 group cursor-grab active:cursor-grabbing select-none mb-2 sm:mb-3 ${
             snapshot.isDragging ? 'dragging-card' : ''
-          } ${isOverdue ? 'border-l-4 border-l-red-500' : ''} ${isClose ? 'border-l-4 border-l-amber-500' : ''}`}
+          } ${isOverdue ? 'border-l-4 border-l-red-500' : ''} ${isClose ? 'border-l-4 border-l-amber-500' : ''} ${columnColor && !isOverdue && !isClose ? 'border-l-4' : ''}`}
+          style={columnColor && !isOverdue && !isClose ? { borderLeftColor: columnColor } : undefined}
         >
           {/* Priority tag */}
           <div className="flex items-center justify-between gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">

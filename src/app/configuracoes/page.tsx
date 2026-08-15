@@ -5,7 +5,8 @@ import { useUser } from '@/context/UserContext'
 import { useBrand } from '@/context/BrandContext'
 import { useData } from '@/context/DataContext'
 import { useColumns, CardSummaryConfig } from '@/context/ColumnsContext'
-import { User, Shield, Camera, Loader2, Sparkles, Globe, Upload, X, Check, Columns3, Plus, Pencil, Trash2, Users } from 'lucide-react'
+import { User, Shield, Camera, Loader2, Sparkles, Globe, Upload, X, Check, Columns3, Plus, Pencil, Trash2, Users, GripVertical } from 'lucide-react'
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 import Avatar from '@/components/Avatar'
 
 const SUMMARY_OPTIONS: { key: keyof CardSummaryConfig; label: string }[] = [
@@ -30,7 +31,7 @@ export default function SettingsPage() {
   const { user, refreshUser } = useUser()
   const { siteName, logoUrl, applyBrand } = useBrand()
   const { saveProfile, uploadAvatar, uploadLogo, users, addUser, removeUser } = useData()
-  const { columns, summary, updateColumn, updateSummary } = useColumns()
+  const { columns, summary, updateColumn, updateSummary, addColumn, removeColumn, reorderColumns } = useColumns()
   
   const [name, setName] = useState('')
   const [role, setRole] = useState('DESIGNER')
@@ -52,6 +53,11 @@ export default function SettingsPage() {
   const [userForm, setUserForm] = useState<UserFormData>(EMPTY_USER_FORM)
   const [savingUser, setSavingUser] = useState(false)
   const [deletingUser, setDeletingUser] = useState<string | null>(null)
+
+  const [showColumnModal, setShowColumnModal] = useState(false)
+  const [newColumnTitle, setNewColumnTitle] = useState('')
+  const [newColumnColor, setNewColumnColor] = useState('#6366f1')
+  const [addingColumn, setAddingColumn] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const logoInputRef = useRef<HTMLInputElement>(null)
@@ -187,6 +193,34 @@ export default function SettingsPage() {
     }
   }
 
+  const handleAddColumn = () => {
+    if (!newColumnTitle.trim()) { setError('Nome da coluna é obrigatório'); return }
+    setAddingColumn(true)
+    setError('')
+    try {
+      addColumn(newColumnTitle.trim(), newColumnColor)
+      setNewColumnTitle('')
+      setNewColumnColor('#6366f1')
+      setShowColumnModal(false)
+      setSuccess('Coluna criada!')
+    } catch (err) {
+      setError(`Erro: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setAddingColumn(false)
+    }
+  }
+
+  const handleRemoveColumn = (id: string, title: string) => {
+    if (!confirm(`Excluir a coluna "${title}"? As tarefas nela serão movidas para "Ideia".`)) return
+    removeColumn(id)
+    setSuccess('Coluna excluída!')
+  }
+
+  const handleColumnDragEnd = (result: DropResult) => {
+    if (!result.destination) return
+    reorderColumns(result.source.index, result.destination.index)
+  }
+
   return (
     <div className="max-w-3xl mx-auto space-y-6 animate-fade-in select-none">
       <div>
@@ -237,34 +271,56 @@ export default function SettingsPage() {
 
       {/* Colunas Kanban */}
       <div className="bg-white dark:bg-[#151b2c] border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm space-y-5">
-        <div className="flex items-center gap-2"><Columns3 className="w-5 h-5 text-violet-500" /><h3 className="text-base font-bold text-slate-800 dark:text-slate-200">Colunas do Kanban</h3></div>
-        <p className="text-xs text-slate-500 dark:text-slate-400">Edite o nome, cores e o que aparece nos cards de cada coluna.</p>
-        <div className="space-y-4">
-          {columns.map((col, idx) => (
-            <div key={col.id} className="p-4 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
-              <div className="flex items-center gap-3">
-                <span className="text-[10px] font-bold text-slate-400 w-4 shrink-0">{idx + 1}</span>
-                <input type="text" value={col.title} onChange={(e) => updateColumn(col.id, { title: e.target.value })} className="flex-1 px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-semibold text-slate-800 dark:text-slate-200 outline-none focus:border-blue-500" />
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded-md border" style={{ backgroundColor: col.bgColor || col.customColor || '#3b82f6', color: col.labelColor || '#ffffff', borderColor: col.borderColor || (col.bgColor || col.customColor || '#3b82f6') + '44' }}>{col.title}</span>
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                {[
-                  { label: 'Fundo', value: col.bgColor || col.customColor || '#3b82f6', field: 'bgColor' as const },
-                  { label: 'Texto', value: col.labelColor || '#ffffff', field: 'labelColor' as const },
-                  { label: 'Borda', value: col.borderColor || (col.bgColor || col.customColor || '#3b82f6'), field: 'borderColor' as const },
-                ].map((c) => (
-                  <div key={c.field} className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">{c.label}</label>
-                    <div className="flex items-center gap-2">
-                      <input type="color" value={c.value} onChange={(e) => updateColumn(col.id, { [c.field]: e.target.value, ...(c.field === 'bgColor' ? { customColor: e.target.value } : {}) })} className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer bg-transparent" />
-                      <input type="text" value={c.value} onChange={(e) => updateColumn(col.id, { [c.field]: e.target.value, ...(c.field === 'bgColor' ? { customColor: e.target.value } : {}) })} className="flex-1 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[11px] font-mono text-slate-600 dark:text-slate-400 outline-none focus:border-blue-500" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2"><Columns3 className="w-5 h-5 text-violet-500" /><h3 className="text-base font-bold text-slate-800 dark:text-slate-200">Colunas do Kanban</h3></div>
+          <button onClick={() => setShowColumnModal(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-xs font-semibold transition cursor-pointer"><Plus className="w-3.5 h-3.5" />Nova Coluna</button>
         </div>
+        <p className="text-xs text-slate-500 dark:text-slate-400">Arraste para reordene, edite nome/cores e remova colunas.</p>
+        <DragDropContext onDragEnd={handleColumnDragEnd}>
+          <Droppable droppableId="columns">
+            {(provided) => (
+              <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-3">
+                {columns.map((col, idx) => (
+                  <Draggable key={col.id} draggableId={col.id} index={idx}>
+                    {(provided, snapshot) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.draggableProps}
+                        className={`p-4 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3 ${snapshot.isDragging ? 'shadow-lg ring-2 ring-violet-500/30' : ''}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition">
+                            <GripVertical className="w-4 h-4" />
+                          </div>
+                          <span className="text-[10px] font-bold text-slate-400 w-4 shrink-0">{idx + 1}</span>
+                          <input type="text" value={col.title} onChange={(e) => updateColumn(col.id, { title: e.target.value })} className="flex-1 px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-semibold text-slate-800 dark:text-slate-200 outline-none focus:border-blue-500" />
+                          <span className="text-[11px] font-bold px-2 py-0.5 rounded-md border" style={{ backgroundColor: col.bgColor || col.customColor || '#3b82f6', color: col.labelColor || '#ffffff', borderColor: col.borderColor || (col.bgColor || col.customColor || '#3b82f6') + '44' }}>{col.title}</span>
+                          <button onClick={() => handleRemoveColumn(col.id, col.title)} className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition cursor-pointer" title="Excluir coluna"><Trash2 className="w-4 h-4" /></button>
+                        </div>
+                        <div className="grid grid-cols-3 gap-3">
+                          {[
+                            { label: 'Fundo', value: col.bgColor || col.customColor || '#3b82f6', field: 'bgColor' as const },
+                            { label: 'Texto', value: col.labelColor || '#ffffff', field: 'labelColor' as const },
+                            { label: 'Borda', value: col.borderColor || (col.bgColor || col.customColor || '#3b82f6'), field: 'borderColor' as const },
+                          ].map((c) => (
+                            <div key={c.field} className="space-y-1">
+                              <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">{c.label}</label>
+                              <div className="flex items-center gap-2">
+                                <input type="color" value={c.value} onChange={(e) => updateColumn(col.id, { [c.field]: e.target.value, ...(c.field === 'bgColor' ? { customColor: e.target.value } : {}) })} className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer bg-transparent" />
+                                <input type="text" value={c.value} onChange={(e) => updateColumn(col.id, { [c.field]: e.target.value, ...(c.field === 'bgColor' ? { customColor: e.target.value } : {}) })} className="flex-1 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[11px] font-mono text-slate-600 dark:text-slate-400 outline-none focus:border-blue-500" />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </Draggable>
+                ))}
+                {provided.placeholder}
+              </div>
+            )}
+          </Droppable>
+        </DragDropContext>
         <div className="border-t border-slate-200 dark:border-slate-800 pt-4">
           <p className="text-xs font-bold text-slate-600 dark:text-slate-300 mb-3">Resumo do Card</p>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
@@ -390,6 +446,44 @@ export default function SettingsPage() {
                 <button type="button" onClick={() => setShowUserModal(false)} className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-sm font-semibold transition cursor-pointer">Cancelar</button>
                 <button type="button" onClick={handleSaveUser} disabled={savingUser || !userForm.name.trim()} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white rounded-xl text-sm font-semibold transition cursor-pointer flex items-center gap-2">
                   {savingUser ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}{editingUser ? 'Salvar' : 'Criar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Column Modal */}
+      {showColumnModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-white dark:bg-[#111625] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
+              <h3 className="font-bold text-slate-800 dark:text-white">Nova Coluna</h3>
+              <button onClick={() => setShowColumnModal(false)} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Nome da Coluna</label>
+                <input type="text" value={newColumnTitle} onChange={(e) => setNewColumnTitle(e.target.value)} placeholder="Ex: Lead Ganho" className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-800 dark:text-slate-200 font-semibold" autoFocus />
+              </div>
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Cor da Coluna</label>
+                <div className="flex items-center gap-3">
+                  <input type="color" value={newColumnColor} onChange={(e) => setNewColumnColor(e.target.value)} className="w-10 h-10 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer bg-transparent" />
+                  <input type="text" value={newColumnColor} onChange={(e) => setNewColumnColor(e.target.value)} className="flex-1 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-mono text-slate-600 dark:text-slate-400 outline-none focus:border-blue-500" />
+                </div>
+              </div>
+              <div className="p-3 bg-slate-100 dark:bg-slate-800/50 rounded-xl">
+                <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Preview</p>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-md" style={{ backgroundColor: newColumnColor, color: '#ffffff' }}>{newColumnTitle || 'Nome'}</span>
+                  <span className="text-[10px] text-slate-400 font-bold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-1.5 py-0.5 rounded-md">0</span>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setShowColumnModal(false)} className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-sm font-semibold transition cursor-pointer">Cancelar</button>
+                <button type="button" onClick={handleAddColumn} disabled={addingColumn || !newColumnTitle.trim()} className="px-4 py-2 bg-violet-600 hover:bg-violet-700 disabled:bg-violet-800 text-white rounded-xl text-sm font-semibold transition cursor-pointer flex items-center gap-2">
+                  {addingColumn ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}Criar Coluna
                 </button>
               </div>
             </div>
