@@ -8,6 +8,7 @@ import { useTheme } from '@/context/ThemeContext'
 import { useBrand } from '@/context/BrandContext'
 import Avatar from '@/components/Avatar'
 import TrashModal from '@/components/TrashModal'
+import VideoScheduleModal from '@/components/VideoScheduleModal'
 import {
   LayoutDashboard,
   Kanban,
@@ -24,6 +25,7 @@ import {
   X,
   User,
   RefreshCw,
+  Video,
 } from 'lucide-react'
 
 export default function Header() {
@@ -33,6 +35,7 @@ export default function Header() {
   const { theme, toggleTheme } = useTheme()
   const { siteName, logoUrl } = useBrand()
   const [isTrashOpen, setIsTrashOpen] = useState(false)
+  const [isVideoScheduleOpen, setIsVideoScheduleOpen] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -134,6 +137,15 @@ export default function Header() {
       {/* Desktop Right side: theme + trash + user dropdown */}
       <div className="hidden md:flex items-center gap-2 shrink-0">
         <button
+          onClick={() => setIsVideoScheduleOpen(true)}
+          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition cursor-pointer mr-1"
+        >
+          <Video className="w-4 h-4" />
+          <span className="hidden lg:inline">Cronograma de Vídeos</span>
+          <span className="lg:hidden">Vídeos</span>
+        </button>
+
+        <button
           onClick={toggleTheme}
           title={theme === 'dark' ? 'Modo Claro' : 'Modo Escuro'}
           className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-700 dark:hover:text-slate-200 transition cursor-pointer"
@@ -207,6 +219,13 @@ export default function Header() {
       {/* Mobile Right side: theme + avatar with dropdown */}
       <div className="md:hidden flex items-center gap-1 shrink-0 ml-auto">
         <button
+          onClick={() => setIsVideoScheduleOpen(true)}
+          title="Cronograma de Vídeos"
+          className="p-2 rounded-lg text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition cursor-pointer"
+        >
+          <Video className="w-4 h-4" />
+        </button>
+        <button
           onClick={toggleTheme}
           title={theme === 'dark' ? 'Modo Claro' : 'Modo Escuro'}
           className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 transition cursor-pointer"
@@ -260,6 +279,7 @@ export default function Header() {
       </div>
 
       <TrashModal isOpen={isTrashOpen} onClose={() => setIsTrashOpen(false)} />
+      <VideoScheduleModal isOpen={isVideoScheduleOpen} onClose={() => setIsVideoScheduleOpen(false)} />
     </header>
   )
 }

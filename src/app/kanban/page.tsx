@@ -2,11 +2,12 @@
 
 import React, { useMemo } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { DragDropContext, Droppable, DropResult } from '@hello-pangea/dnd'
+import { DragDropContext, DropResult } from '@hello-pangea/dnd'
 import { Plus, Search, Loader2, X } from 'lucide-react'
 import TaskCard from '@/components/TaskCard'
 import TaskModal from '@/components/TaskModal'
 import TaskCreateModal from '@/components/TaskCreateModal'
+import { StrictModeDroppable } from '@/components/StrictModeDroppable'
 import { useData } from '@/context/DataContext'
 import { useColumns } from '@/context/ColumnsContext'
 import { useMobileUI } from '@/context/MobileUIContext'
@@ -219,7 +220,7 @@ export default function KanbanPage() {
                     </div>
 
                     {/* Column Cards */}
-                    <Droppable droppableId={column.id}>
+                    <StrictModeDroppable droppableId={column.id}>
                       {(provided, snapshot) => (
                         <div
                           ref={provided.innerRef}
@@ -246,7 +247,7 @@ export default function KanbanPage() {
                           )}
                         </div>
                       )}
-                    </Droppable>
+                    </StrictModeDroppable>
                   </div>
                 )
               })}
