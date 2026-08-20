@@ -1,5 +1,6 @@
 'use client'
 
+import { useRef } from 'react'
 import { Draggable } from '@hello-pangea/dnd'
 import { Calendar, MessageSquare, Paperclip, CheckSquare, Clock } from 'lucide-react'
 
@@ -49,7 +50,7 @@ export default function TaskCard({ task, index, onClick, columnColor }: TaskCard
     }
   }
 
-  const clickedRef = React.useRef(false)
+  const clickedRef = useRef(false)
 
   return (
     <Draggable draggableId={task.id} index={index}>
