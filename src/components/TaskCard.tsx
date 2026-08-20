@@ -50,15 +50,21 @@ export default function TaskCard({ task, index, onOpenDetail, columnColor }: Tas
 
   const clickedRef = useRef(false)
 
-  const isPlaying = task.status === IN_PROGRESS_COLUMN_ID
+  const isPlaying = task.assigneeId === user?.id
   const isDone = task.status === DONE_COLUMN_ID
 
   const handlePlay = async (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (isActing) return
+    if (isActing || !user) return
     setIsActing(true)
     try {
-      await updateTask(task.id, { status: IN_PROGRESS_COLUMN_ID })
+      if (isPlaying) {
+        // Desmarcar: remove responsável
+        await updateTask(task.id, { assigneeId: null })
+      } else {
+        // Assumir: seta responsável e muda status para Em Andamento
+        await updateTask(task.id, { assigneeId: user.id, status: IN_PROGRESS_COLUMN_ID })
+      }
     } finally {
       setIsActing(false)
     }
@@ -69,7 +75,12 @@ export default function TaskCard({ task, index, onOpenDetail, columnColor }: Tas
     if (isActing) return
     setIsActing(true)
     try {
-      await updateTask(task.id, { status: DONE_COLUMN_ID })
+      if (isDone) {
+        // Se já tá concluído e clicou no check, volta para A Fazer
+        await updateTask(task.id, { status: 'TODO' })
+      } else {
+        await updateTask(task.id, { status: DONE_COLUMN_ID })
+      }
     } finally {
       setIsActing(false)
     }
@@ -95,10 +106,8 @@ export default function TaskCard({ task, index, onOpenDetail, columnColor }: Tas
           ref={provided.innerRef}
           {...provided.draggableProps}
           {...provided.dragHandleProps}
-          onMouseDown={() => { clickedRef.current = true }}
-          onMouseMove={() => { clickedRef.current = false }}
           className={`rounded-xl bg-white dark:bg-[#151b2c] border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md group mb-2 select-none overflow-hidden
-            ${snapshot.isDragging ? 'dragging-card ring-2 ring-blue-400/40' : 'transition-[box-shadow,border-color] duration-150 hover:border-slate-300 dark:hover:border-slate-700'}
+            ${snapshot.isDragging ? 'dragging-card ring-2 ring-blue-400/40 relative z-[9999]' : 'transition-[box-shadow,border-color] duration-150 hover:border-slate-300 dark:hover:border-slate-700'}
             ${columnColor ? 'border-l-[3px]' : ''}
           `}
           style={{
@@ -109,7 +118,7 @@ export default function TaskCard({ task, index, onOpenDetail, columnColor }: Tas
           {/* Card Body */}
           <div
             className="p-3 cursor-pointer"
-            onClick={() => { if (clickedRef.current) onOpenDetail(task) }}
+            onClick={() => onOpenDetail(task)}
           >
             {/* Top row: priority toggle + avatar */}
             <div className="flex items-start justify-between gap-2 mb-2">

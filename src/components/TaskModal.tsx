@@ -18,7 +18,6 @@ import Avatar from './Avatar'
 
 import { useData } from '@/context/DataContext'
 import { useUser } from '@/context/UserContext'
-
 import { Task } from '@/types'
 
 interface TaskModalProps {
@@ -37,6 +36,7 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
   const [status, setStatus] = useState('TODO')
   const [dueDate, setDueDate] = useState('')
   const [assigneeId, setAssigneeId] = useState('')
+  const [isVisible, setIsVisible] = useState(true) // Placeholder for 'Visível' checkbox
   
   // Sub-recursos
   const [newCheckItem, setNewCheckItem] = useState('')
@@ -47,7 +47,6 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
   const [savingDesc, setSavingDesc] = useState(false)
   const [isAddingLink, setIsAddingLink] = useState(false)
   const [previewAttachment, setPreviewAttachment] = useState<{ name: string; url: string } | null>(null)
-  const [showSidebar, setShowSidebar] = useState(false)
   
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -80,7 +79,6 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
   // Deletar Tarefa
   const handleDeleteTask = async () => {
     if (!confirm('Deseja realmente excluir esta tarefa?')) return
-
     try {
       await moveToTrash(localTask.id)
       onClose()
@@ -92,29 +90,27 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
   // Checklist Actions
   const handleToggleChecklist = async (itemId: string, isCompleted: boolean) => {
     if (!localTask) return
-    // Atualiza otimisticamente para feedback imediato
     setLocalTask((prev) => prev ? { ...prev, checklist: prev.checklist.map((it) => it.id === itemId ? { ...it, isCompleted } : it) } : prev)
     try {
       await toggleCheck(localTask.id, itemId, isCompleted)
     } catch (err) {
       console.error('Error updating checklist:', err)
-      // Reverte em caso de erro
       setLocalTask((prev) => prev ? { ...prev, checklist: prev.checklist.map((it) => it.id === itemId ? { ...it, isCompleted: !isCompleted } : it) } : prev)
     }
   }
 
   const handleAddChecklist = async () => {
     if (!newCheckItem.trim() || !localTask) return
-    const title = newCheckItem.trim()
+    const cTitle = newCheckItem.trim()
     setNewCheckItem('')
-    const tempItem = { id: `temp_${Date.now()}`, title, isCompleted: false }
+    const tempItem = { id: `temp_${Date.now()}`, title: cTitle, isCompleted: false }
     setLocalTask((prev) => prev ? { ...prev, checklist: [...prev.checklist, tempItem] } : prev)
     try {
-      await addCheckItem(localTask.id, title)
+      await addCheckItem(localTask.id, cTitle)
     } catch (err) {
       console.error('Error adding checklist:', err)
       setLocalTask((prev) => prev ? { ...prev, checklist: prev.checklist.filter((it) => it.id !== tempItem.id) } : prev)
-      setNewCheckItem(title)
+      setNewCheckItem(cTitle)
     }
   }
 
@@ -213,8 +209,6 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
     setSavingDesc(false)
   }
 
-
-
   const formatLogDate = (dateStr: unknown) => {
     if (!dateStr) return ''
     const d = dateStr && typeof dateStr === 'object' && 'toDate' in dateStr && typeof (dateStr as { toDate: unknown }).toDate === 'function'
@@ -224,62 +218,55 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm select-none">
-      <div className="relative w-full max-w-5xl bg-white dark:bg-[#111625] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl flex flex-col h-[90vh] overflow-hidden animate-scale-up">
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm select-none">
+      <div className="relative w-full max-w-[1200px] bg-white dark:bg-[#111625] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl flex flex-col h-[90vh] max-h-[900px] overflow-hidden animate-scale-up">
         
         {/* Header */}
-        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-slate-200 dark:border-slate-800 shrink-0">
-          <div className="flex items-center gap-2">
-            <div className="w-px h-4 bg-slate-200 dark:bg-slate-800 mx-1" />
-            <span className="text-xs text-slate-400 hidden sm:inline">Criado por: {localTask.creator?.name || 'Sistema'}</span>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 shrink-0">
+          <div className="flex-1 min-w-0 pr-4">
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onBlur={() => {
+                if (title.trim() && title !== localTask.title) {
+                  updateTaskField({ title: title.trim() })
+                }
+              }}
+              placeholder="NOME DA TAREFA"
+              className="w-full text-2xl font-black uppercase text-slate-800 dark:text-slate-100 bg-transparent border-b border-transparent hover:border-slate-200 dark:hover:border-slate-800 focus:border-blue-500 outline-none py-1 transition duration-150 focus:ring-0 placeholder-slate-300 dark:placeholder-slate-700"
+            />
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowSidebar(!showSidebar)}
-              className="md:hidden p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer text-xs font-bold"
-              title="Configurações"
-            >
-              {showSidebar ? '✕' : '⚙'}
-            </button>
-            <button
-              onClick={handleDeleteTask}
-              title="Excluir Tarefa"
-              className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition cursor-pointer"
-            >
-              <Trash className="w-4 h-4" />
-            </button>
-            <button 
-              onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
+          
+          <div className="flex items-center gap-4 shrink-0">
+            <span className="text-xs text-slate-400 hidden sm:inline font-medium">
+              Criado por: {localTask.creator?.name || 'Sistema'}
+            </span>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={handleDeleteTask}
+                title="Excluir Tarefa"
+                className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition cursor-pointer"
+              >
+                <Trash className="w-4.5 h-4.5" />
+              </button>
+              <button 
+                onClick={onClose}
+                className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Main Columns Container */}
-        <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
+        {/* Main 3-Column Container */}
+        <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0 bg-white dark:bg-[#111625]">
           
-          {/* Left Column (Main Scrollable Workspace) */}
-          <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 space-y-6 min-h-0">
-            
-            {/* Title Inline Edit */}
-            <div className="space-y-1.5">
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                onBlur={() => {
-                  if (title.trim() && title !== localTask.title) {
-                    updateTaskField({ title: title.trim() })
-                  }
-                }}
-                className="w-full text-xl font-bold bg-transparent border-b border-transparent hover:border-slate-200 dark:hover:border-slate-800 focus:border-blue-500 outline-none text-slate-800 dark:text-slate-100 py-1 transition duration-150 focus:ring-0"
-              />
-            </div>
-
-            {/* Description TipTap Editor */}
-            <div className="space-y-2">
+          {/* COLUMN 1: Descrição e Comentários */}
+          <div className="flex-[1.3] flex flex-col p-6 space-y-8 border-r border-slate-200 dark:border-slate-800 overflow-y-auto">
+            {/* Description */}
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Descrição</label>
                 {description !== localTask.description && (
@@ -297,197 +284,8 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
               <RichTextEditor content={description} onChange={setDescription} />
             </div>
 
-            {/* Checklist */}
-            <div className="space-y-3">
-              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Checklist (Subtarefas)</label>
-              
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={newCheckItem}
-                  onChange={(e) => setNewCheckItem(e.target.value)}
-                  placeholder="Adicionar subpasta/item..."
-                  className="flex-1 px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-800 dark:text-slate-200"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      handleAddChecklist()
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={handleAddChecklist}
-                  className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-sm font-semibold flex items-center border border-slate-200 dark:border-slate-700 transition cursor-pointer"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-              </div>
-
-              {localTask.checklist.length > 0 && (
-                <div className="border border-slate-200 dark:border-slate-800 p-4 rounded-xl bg-slate-50/30 dark:bg-slate-900/10 space-y-2.5">
-                  {localTask.checklist.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between gap-3 text-sm text-slate-700 dark:text-slate-300 group">
-                      <label className="flex items-center gap-3 cursor-pointer select-none min-w-0 flex-1">
-                        <input
-                          type="checkbox"
-                          checked={item.isCompleted}
-                          onChange={(e) => handleToggleChecklist(item.id, e.target.checked)}
-                          className="w-4.5 h-4.5 rounded border-slate-300 dark:border-slate-700 focus:ring-blue-500 text-blue-600 bg-white dark:bg-slate-900"
-                        />
-                        <span className={`truncate leading-none ${item.isCompleted ? 'line-through text-slate-400 dark:text-slate-500' : ''}`}>
-                          {item.title}
-                        </span>
-                      </label>
-                      
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteChecklist(item.id)}
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 p-1 rounded-md opacity-0 group-hover:opacity-100 transition shrink-0 cursor-pointer"
-                      >
-                        <Trash className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Anexos e Links */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Anexos & Links</label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsAddingLink(!isAddingLink)}
-                    className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    <Link2 className="w-3.5 h-3.5" />
-                    + Adicionar Link
-                  </button>
-                  <span className="text-slate-200 dark:text-slate-800">|</span>
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploading}
-                    className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    {uploading ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Paperclip className="w-3.5 h-3.5" />
-                    )}
-                    {uploading ? 'Enviando...' : '+ Anexar Arquivo'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Input Invisível para Uploads de Arquivos */}
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-
-              {/* Form de Inclusão de Link Externo */}
-              {isAddingLink && (
-                <form onSubmit={handleAddLink} className="p-4 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-900/30 space-y-3 animate-fade-in">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <input
-                      type="text"
-                      required
-                      placeholder="Nome do link (ex: Figma Layouts)"
-                      value={newLinkName}
-                      onChange={(e) => setNewLinkName(e.target.value)}
-                      className="px-3.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm text-slate-800 dark:text-slate-200"
-                    />
-                    <input
-                      type="url"
-                      required
-                      placeholder="https://..."
-                      value={newLinkUrl}
-                      onChange={(e) => setNewLinkUrl(e.target.value)}
-                      className="px-3.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm text-slate-800 dark:text-slate-200"
-                    />
-                  </div>
-                  <div className="flex justify-end gap-2 text-xs">
-                    <button
-                      type="button"
-                      onClick={() => setIsAddingLink(false)}
-                      className="px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-lg font-medium"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      type="submit"
-                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium"
-                    >
-                      Adicionar
-                    </button>
-                  </div>
-                </form>
-              )}
-
-              {/* Lista de Anexos */}
-              {localTask.attachments.length > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {localTask.attachments.map((file) => (
-                    <div 
-                      key={file.id} 
-                      className="flex items-center justify-between p-3 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/40 dark:bg-slate-900/10 hover:bg-slate-50 dark:hover:bg-slate-900/35 transition group"
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        {file.type === 'LINK' ? (
-                          <Link2 className="w-4 h-4 text-blue-500 shrink-0" />
-                        ) : (
-                          <Paperclip className="w-4 h-4 text-slate-500 shrink-0" />
-                        )}
-                        
-                        <div className="min-w-0">
-                          <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate block max-w-[200px]" title={file.name}>
-                            {file.name}
-                          </span>
-                          <span className="text-[10px] text-slate-400 block uppercase tracking-wider font-semibold">
-                            {file.type === 'LINK' ? 'Link Externo' : 'Arquivo'}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition duration-150">
-                        <a
-                          href={file.type === 'LINK' ? file.url : undefined}
-                          target="_blank"
-                          rel="noreferrer"
-                          title={file.type === 'LINK' ? 'Acessar Link' : 'Visualizar'}
-                          className="p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400"
-                          onClick={(e) => {
-                            if (file.type !== 'LINK') {
-                              e.preventDefault()
-                              setPreviewAttachment({ name: file.name, url: file.url })
-                            }
-                          }}
-                        >
-                          {file.type === 'LINK' ? <ExternalLink className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                        </a>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteAttachment(file.id)}
-                          title="Remover"
-                          className="p-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20 text-red-500"
-                        >
-                          <Trash className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Comments Section */}
-            <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+            {/* Comments */}
+            <div className="space-y-4 pt-2">
               <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                 <MessageSquare className="w-4 h-4 text-slate-400" />
                 Comentários ({localTask.comments.length})
@@ -517,14 +315,14 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
               {/* Novo Comentário */}
               <form onSubmit={handleAddComment} className="flex gap-3">
                 <Avatar
-                  name={users.find(u => u.id === assigneeId)?.name || ''}
-                  url={users.find(u => u.id === assigneeId)?.avatarUrl}
+                  name={user?.name || ''}
+                  url={user?.avatarUrl}
                   className="hidden sm:block"
                 />
                 <div className="flex-1 space-y-2">
                   <textarea
                     rows={3}
-                    placeholder="Arte enviada para aprovação... Cliente solicitou alteração..."
+                    placeholder="Escreva um comentário..."
                     value={newComment}
                     onChange={(e) => setNewComment(e.target.value)}
                     className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-800 dark:text-slate-200 resize-none font-medium"
@@ -533,7 +331,7 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
                     <button
                       type="submit"
                       disabled={!newComment.trim()}
-                      className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800/80 text-white rounded-xl text-xs font-semibold shadow-md shadow-blue-500/10 transition cursor-pointer"
+                      className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800/80 text-white rounded-full text-xs font-bold shadow-md shadow-blue-500/10 transition cursor-pointer"
                     >
                       Enviar Comentário
                     </button>
@@ -541,28 +339,214 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
                 </div>
               </form>
             </div>
-
           </div>
 
-          {/* Right Column (Sidebar Configuration Details) */}
-          <div className={`${showSidebar ? 'fixed inset-0 z-[60] bg-white dark:bg-[#111625] overflow-y-auto p-4 space-y-6' : 'hidden'} md:relative md:block md:w-80 md:border-l md:border-slate-200 md:dark:border-slate-800 md:bg-slate-50 md:dark:bg-[#0c1220] md:overflow-y-auto md:p-6 md:space-y-6 md:shrink`}>
-            <div className="flex items-center justify-between mb-4 md:hidden">
-              <span className="text-sm font-bold text-slate-800 dark:text-slate-200">Configurações</span>
-              <button onClick={() => setShowSidebar(false)} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer">
-                <X className="w-4 h-4" />
-              </button>
+          {/* COLUMN 2: Checklist e Anexos */}
+          <div className="flex-1 flex flex-col p-6 space-y-8 md:border-r border-slate-200 dark:border-slate-800 overflow-y-auto bg-slate-50/30 dark:bg-[#0c1220]/30">
+            {/* Checklist */}
+            <div className="space-y-4">
+              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Checklist (Subtarefas)</label>
+              
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newCheckItem}
+                  onChange={(e) => setNewCheckItem(e.target.value)}
+                  placeholder="Adicionar subpasta/item..."
+                  className="flex-1 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-800 dark:text-slate-200 shadow-sm"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleAddChecklist()
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={handleAddChecklist}
+                  className="p-2.5 bg-white hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl text-sm font-semibold flex items-center border border-slate-200 dark:border-slate-700 shadow-sm transition cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+
+              {localTask.checklist.length > 0 && (
+                <div className="space-y-3 pt-2">
+                  {localTask.checklist.map((item) => (
+                    <div key={item.id} className="flex items-start justify-between gap-3 text-sm text-slate-700 dark:text-slate-300 group">
+                      <label className="flex items-start gap-3 cursor-pointer select-none min-w-0 flex-1 pt-1">
+                        <input
+                          type="checkbox"
+                          checked={item.isCompleted}
+                          onChange={(e) => handleToggleChecklist(item.id, e.target.checked)}
+                          className="w-4.5 h-4.5 rounded border-slate-300 dark:border-slate-700 focus:ring-blue-500 text-blue-600 bg-white dark:bg-slate-900 mt-0.5"
+                        />
+                        <span className={`leading-relaxed ${item.isCompleted ? 'line-through text-slate-400 dark:text-slate-500' : 'font-medium'}`}>
+                          {item.title}
+                        </span>
+                      </label>
+                      
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteChecklist(item.id)}
+                        className="text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition shrink-0 cursor-pointer mt-0.5"
+                      >
+                        <Trash className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
+
+            {/* Anexos e Links */}
+            <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-800">
+              <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Anexos & Links</label>
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingLink(!isAddingLink)}
+                    className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Link2 className="w-3.5 h-3.5" />
+                    + Adicionar Link
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    {uploading ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Paperclip className="w-3.5 h-3.5" />
+                    )}
+                    {uploading ? 'Enviando...' : '+ Anexar Arquivo'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Input Invisível para Uploads de Arquivos */}
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+
+              {/* Form de Inclusão de Link Externo */}
+              {isAddingLink && (
+                <form onSubmit={handleAddLink} className="p-4 border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-900 space-y-3 animate-fade-in shadow-sm">
+                  <div className="grid grid-cols-1 gap-3">
+                    <input
+                      type="text"
+                      required
+                      placeholder="Nome do link (ex: Figma Layouts)"
+                      value={newLinkName}
+                      onChange={(e) => setNewLinkName(e.target.value)}
+                      className="px-3.5 py-2 bg-slate-50 dark:bg-[#0c1220] border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-800 dark:text-slate-200"
+                    />
+                    <input
+                      type="url"
+                      required
+                      placeholder="https://..."
+                      value={newLinkUrl}
+                      onChange={(e) => setNewLinkUrl(e.target.value)}
+                      className="px-3.5 py-2 bg-slate-50 dark:bg-[#0c1220] border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-800 dark:text-slate-200"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2 text-xs pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setIsAddingLink(false)}
+                      className="px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-lg font-bold"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-sm"
+                    >
+                      Adicionar
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* Lista de Anexos */}
+              {localTask.attachments.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  {localTask.attachments.map((file) => (
+                    <div 
+                      key={file.id} 
+                      className="flex items-center justify-between p-3 border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700 transition group shadow-sm"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
+                          {file.type === 'LINK' ? (
+                            <Link2 className="w-4 h-4 text-blue-500" />
+                          ) : (
+                            <Paperclip className="w-4 h-4 text-slate-500" />
+                          )}
+                        </div>
+                        
+                        <div className="min-w-0 pr-2">
+                          <span className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate block max-w-[200px]" title={file.name}>
+                            {file.name}
+                          </span>
+                          <span className="text-[9px] text-slate-400 block uppercase tracking-wider font-bold">
+                            {file.type === 'LINK' ? 'Link Externo' : 'Arquivo'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition duration-150">
+                        <a
+                          href={file.type === 'LINK' ? file.url : undefined}
+                          target="_blank"
+                          rel="noreferrer"
+                          title={file.type === 'LINK' ? 'Acessar Link' : 'Visualizar'}
+                          className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400"
+                          onClick={(e) => {
+                            if (file.type !== 'LINK') {
+                              e.preventDefault()
+                              setPreviewAttachment({ name: file.name, url: file.url })
+                            }
+                          }}
+                        >
+                          {file.type === 'LINK' ? <ExternalLink className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteAttachment(file.id)}
+                          title="Remover"
+                          className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20 text-red-500"
+                        >
+                          <Trash className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* COLUMN 3: Sidebar de Configurações */}
+          <div className="w-full md:w-72 lg:w-80 shrink-0 p-6 space-y-7 overflow-y-auto bg-slate-50 dark:bg-[#0c1220]">
             
             {/* Status Select */}
-            <div className="space-y-1.5">
-              <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider">Status</label>
+            <div className="space-y-2">
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</label>
               <select
                 value={status}
                 onChange={(e) => {
                   setStatus(e.target.value)
                   updateTaskField({ status: e.target.value })
                 }}
-                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-xs text-slate-700 dark:text-slate-300 font-bold"
+                className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-800 dark:text-slate-200 font-bold shadow-sm"
               >
                 <option value="BACKLOG">Ideia</option>
                 <option value="TODO">A Fazer</option>
@@ -572,34 +556,47 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
               </select>
             </div>
 
-            {/* Prioridade Select */}
-            <div className="space-y-1.5">
-              <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider">Prioridade</label>
-              <select
-                value={priority}
-                onChange={(e) => {
-                  setPriority(e.target.value)
-                  updateTaskField({ priority: e.target.value })
-                }}
-                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-xs text-slate-700 dark:text-slate-300 font-bold"
-              >
-                <option value="LOW">Baixa</option>
-                <option value="MEDIUM">Média</option>
-                <option value="HIGH">Alta</option>
-                <option value="URGENT">Urgente</option>
-              </select>
+            {/* Prioridade e Visível */}
+            <div className="flex gap-4">
+              <div className="flex-1 space-y-2">
+                <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Prioridade</label>
+                <select
+                  value={priority}
+                  onChange={(e) => {
+                    setPriority(e.target.value)
+                    updateTaskField({ priority: e.target.value })
+                  }}
+                  className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-800 dark:text-slate-200 font-bold shadow-sm"
+                >
+                  <option value="LOW">Baixa</option>
+                  <option value="MEDIUM">Média</option>
+                  <option value="HIGH">Alta</option>
+                  <option value="URGENT">Urgente</option>
+                </select>
+              </div>
+              <div className="w-16 shrink-0 space-y-2 flex flex-col items-center">
+                <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-center">Visível</label>
+                <div className="flex items-center justify-center h-[42px]">
+                  <input 
+                    type="checkbox" 
+                    checked={isVisible}
+                    onChange={(e) => setIsVisible(e.target.checked)}
+                    className="w-5 h-5 rounded border-slate-300 dark:border-slate-700 text-blue-600 focus:ring-blue-500 bg-white dark:bg-slate-900 cursor-pointer" 
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Responsável Select */}
-            <div className="space-y-1.5">
-              <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider">Responsável</label>
+            <div className="space-y-2">
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Responsável</label>
               <select
                 value={assigneeId}
                 onChange={(e) => {
                   setAssigneeId(e.target.value)
                   updateTaskField({ assigneeId: e.target.value || null })
                 }}
-                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-xs text-slate-700 dark:text-slate-300 font-bold"
+                className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-800 dark:text-slate-200 font-bold shadow-sm"
               >
                 <option value="">Sem responsável</option>
                 {users.map(u => (
@@ -611,41 +608,43 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
             </div>
 
             {/* Vencimento Input */}
-            <div className="space-y-1.5">
-              <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider">Data Limite de Entrega</label>
-              <input
-                type="date"
-                value={dueDate}
-                onChange={(e) => {
-                  setDueDate(e.target.value)
-                  updateTaskField({ dueDate: e.target.value || null })
-                }}
-                className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-xs text-slate-700 dark:text-slate-300 font-bold dark:[color-scheme:dark]"
-              />
+            <div className="space-y-2">
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Data Limite de Entrega</label>
+              <div className="relative">
+                <input
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => {
+                    setDueDate(e.target.value)
+                    updateTaskField({ dueDate: e.target.value || null })
+                  }}
+                  className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-800 dark:text-slate-200 font-bold dark:[color-scheme:dark] shadow-sm appearance-none"
+                />
+              </div>
             </div>
 
             {/* Activity History Logs */}
-            <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-800">
-              <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                <Clock className="w-3.5 h-3.5" />
+            <div className="space-y-4 pt-6 border-t border-slate-200 dark:border-slate-800">
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Clock className="w-4 h-4" />
                 Histórico de Atividades
               </label>
 
-              <div className="space-y-4 max-h-56 overflow-y-auto pr-1">
+              <div className="space-y-4 pr-1">
                 {localTask.activityLogs.length === 0 ? (
-                  <p className="text-[10px] text-slate-400 dark:text-slate-500">Sem atividades registradas.</p>
+                  <p className="text-xs font-medium text-slate-400 dark:text-slate-500 text-center py-4">Sem atividades registradas.</p>
                 ) : (
-                  <div className="relative pl-3 border-l border-slate-200 dark:border-slate-800 space-y-4">
+                  <div className="relative pl-3.5 border-l-2 border-slate-200 dark:border-slate-800 space-y-5">
                     {localTask.activityLogs.map((log) => (
                       <div key={log.id} className="text-xs relative">
                         {/* Indicador de Timeline */}
-                        <div className="absolute -left-[16.5px] top-1 w-2.5 h-2.5 rounded-full bg-blue-500 border-2 border-slate-50 dark:border-[#0c1220]" />
+                        <div className="absolute -left-[19px] top-1 w-2.5 h-2.5 rounded-full bg-blue-500 border-2 border-slate-50 dark:border-[#0c1220]" />
                         
-                        <div className="font-semibold text-slate-700 dark:text-slate-300">
+                        <div className="font-bold text-slate-700 dark:text-slate-300">
                           {log.action}
                         </div>
-                        <div className="text-[9px] text-slate-400 dark:text-slate-500 mt-0.5">
-                          Por: {log.user.name} • {formatLogDate(log.createdAt)}
+                        <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 font-medium">
+                          Por: <span className="font-bold">{log.user.name}</span> • {formatLogDate(log.createdAt)}
                         </div>
                       </div>
                     ))}
@@ -662,23 +661,23 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
 
       {/* Preview Modal for file attachments */}
       {previewAttachment && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm" onClick={() => setPreviewAttachment(null)}>
-          <div className="relative max-w-3xl w-full bg-white dark:bg-[#111625] rounded-2xl shadow-2xl overflow-hidden animate-scale-up" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 dark:border-slate-800">
-              <span className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">{previewAttachment.name}</span>
-              <button onClick={() => setPreviewAttachment(null)} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer">
-                <X className="w-4 h-4" />
+        <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm" onClick={() => setPreviewAttachment(null)}>
+          <div className="relative max-w-4xl w-full bg-white dark:bg-[#111625] rounded-2xl shadow-2xl overflow-hidden animate-scale-up" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
+              <span className="text-base font-bold text-slate-800 dark:text-slate-200 truncate">{previewAttachment.name}</span>
+              <button onClick={() => setPreviewAttachment(null)} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer">
+                <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-4 flex items-center justify-center max-h-[70vh] overflow-auto">
+            <div className="p-4 flex items-center justify-center h-[70vh] max-h-[800px] overflow-auto bg-slate-100 dark:bg-slate-950">
               {previewAttachment.url.startsWith('data:image/') ? (
-                <img src={previewAttachment.url} alt={previewAttachment.name} className="max-w-full max-h-[65vh] rounded-lg object-contain" />
+                <img src={previewAttachment.url} alt={previewAttachment.name} className="max-w-full max-h-full rounded-lg object-contain shadow-sm" />
               ) : previewAttachment.url.startsWith('data:application/pdf') ? (
-                <iframe src={previewAttachment.url} className="w-full h-[65vh] rounded-lg border-0" title={previewAttachment.name} />
+                <iframe src={previewAttachment.url} className="w-full h-full rounded-lg border-0 shadow-sm" title={previewAttachment.name} />
               ) : (
                 <div className="text-center py-10 text-slate-400">
                   <p className="text-sm font-medium mb-3">Pré-visualização não disponível</p>
-                  <a href={previewAttachment.url} download={previewAttachment.name} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold cursor-pointer">
+                  <a href={previewAttachment.url} download={previewAttachment.name} className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold cursor-pointer shadow-md transition">
                     Baixar arquivo
                   </a>
                 </div>
