@@ -266,13 +266,9 @@ export default function Header({
               <Link
                 key={item.href!}
                 href={item.href!}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition duration-200 whitespace-nowrap ${
-                  isActive
-                    ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
-                }`}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition duration-200 whitespace-nowrap text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200"
               >
-                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : ''}`} />
+                <Icon className="w-3.5 h-3.5" />
                 <span>{item.name}</span>
               </Link>
             )
@@ -309,7 +305,7 @@ export default function Header({
             <button
               onClick={onOpenCalendarFilter}
               title="Filtrar por semana/dia"
-              className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 transition cursor-pointer"
+              className="p-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-500/20 transition cursor-pointer"
             >
               <CalendarDays className="w-4 h-4" />
             </button>
@@ -365,7 +361,7 @@ export default function Header({
         {/* Mobile right */}
         <div className="md:hidden flex items-center gap-1 shrink-0">
           {isKanban && onOpenCalendarFilter && (
-            <button onClick={onOpenCalendarFilter} className="p-2 rounded-lg text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition">
+            <button onClick={onOpenCalendarFilter} className="p-2 rounded-lg bg-blue-600 text-white shadow-sm transition">
               <CalendarDays className="w-4 h-4" />
             </button>
           )}

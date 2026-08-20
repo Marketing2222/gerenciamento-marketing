@@ -7,6 +7,7 @@ import { BrandProvider } from "@/context/BrandContext";
 import { ColumnsProvider } from "@/context/ColumnsContext";
 import { DataProvider } from "@/context/DataContext";
 import AppLayout from "@/components/AppLayout";
+import DynamicHead from "@/components/DynamicHead";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -51,6 +52,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
         <ThemeProvider>
           <BrandProvider>
+            <DynamicHead />
             <ColumnsProvider>
               <UserProvider>
                 <DataProvider>
