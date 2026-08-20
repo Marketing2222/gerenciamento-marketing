@@ -3,18 +3,17 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useMobileUI } from '@/context/MobileUIContext'
-import { LayoutDashboard, Kanban, Plus, Calendar, ListTodo } from 'lucide-react'
+import { Kanban, Plus, FolderOpen, Settings } from 'lucide-react'
 
 export default function MobileFooter() {
   const pathname = usePathname()
   const { openAddTask } = useMobileUI()
 
   const footerItems = [
-    { name: 'Home', href: '/', icon: LayoutDashboard },
     { name: 'Kanban', href: '/kanban', icon: Kanban },
     { name: '', href: '', icon: Plus, isAdd: true },
-    { name: 'Calendário', href: '/calendario', icon: Calendar },
-    { name: 'Tarefas', href: '/tarefas', icon: ListTodo },
+    { name: 'Arquivos', href: '/arquivos', icon: FolderOpen },
+    { name: 'Config.', href: '/configuracoes', icon: Settings },
   ]
 
   return (

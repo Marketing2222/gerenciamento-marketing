@@ -3,14 +3,46 @@
 import { usePathname } from 'next/navigation'
 import { useUser } from '@/context/UserContext'
 import { MobileUIProvider } from '@/context/MobileUIContext'
+import { KanbanFilterProvider, useKanbanFilter } from '@/context/KanbanFilterContext'
 import Header from './Header'
 import MobileFooter from './MobileFooter'
+import CalendarFilterPanel from './CalendarFilterPanel'
 import { Loader2 } from 'lucide-react'
+
+// Inner component so it can access KanbanFilterContext
+function AppInner({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname()
+  const {
+    assigneeFilter, setAssigneeFilter,
+    priorityFilter, setPriorityFilter,
+    setIsCalendarOpen, setIsCreateOpen,
+  } = useKanbanFilter()
+
+  const isKanban = pathname === '/kanban'
+
+  return (
+    <div className="h-dvh w-full flex flex-col bg-slate-50 dark:bg-[#080d19]">
+      <Header
+        onOpenCalendarFilter={isKanban ? () => setIsCalendarOpen(true) : undefined}
+        onAssigneeChange={setAssigneeFilter}
+        onPriorityChange={setPriorityFilter}
+        assigneeFilter={assigneeFilter}
+        priorityFilter={priorityFilter}
+        onCreateTask={() => setIsCreateOpen(true)}
+      />
+      {/* Calendar filter panel (floating, only relevant on kanban) */}
+      {isKanban && <CalendarFilterPanel />}
+      <main className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 pb-24 md:pb-6">
+        {children}
+      </main>
+      <MobileFooter />
+    </div>
+  )
+}
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const { user, loading } = useUser()
-
   const isLoginPage = pathname === '/login'
 
   if (loading) {
@@ -22,23 +54,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     )
   }
 
-  if (isLoginPage) {
-    return <>{children}</>
-  }
-
-  if (!user) {
-    return null
-  }
+  if (isLoginPage) return <>{children}</>
+  if (!user) return null
 
   return (
     <MobileUIProvider>
-      <div className="h-dvh w-full flex flex-col bg-slate-50 dark:bg-[#080d19]">
-        <Header />
-        <main className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 pb-24 md:pb-6">
-          {children}
-        </main>
-        <MobileFooter />
-      </div>
+      <KanbanFilterProvider>
+        <AppInner>{children}</AppInner>
+      </KanbanFilterProvider>
     </MobileUIProvider>
   )
 }

@@ -1,56 +1,92 @@
 'use client'
 
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { Draggable } from '@hello-pangea/dnd'
-import { Calendar, MessageSquare, Paperclip, CheckSquare, Clock } from 'lucide-react'
+import { Play, CheckCircle2, MessageSquare, MoreHorizontal, ChevronDown } from 'lucide-react'
 
 import { Task } from '@/types'
 import Avatar from '@/components/Avatar'
 import { useColumns } from '@/context/ColumnsContext'
+import { useData } from '@/context/DataContext'
+import { useUser } from '@/context/UserContext'
 
 interface TaskCardProps {
   task: Task
   index: number
-  onClick: (task: Task) => void
+  onOpenDetail: (task: Task) => void
   columnColor?: string
 }
 
-export default function TaskCard({ task, index, onClick, columnColor }: TaskCardProps) {
+const DONE_COLUMN_ID = 'DONE'
+const IN_PROGRESS_COLUMN_ID = 'IN_PROGRESS'
+
+const getPriorityColors = (prio: string) => {
+  switch (prio) {
+    case 'URGENT': return 'bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/20'
+    case 'HIGH':   return 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20'
+    case 'MEDIUM': return 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20'
+    default:       return 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20'
+  }
+}
+
+const getPriorityLabel = (prio: string) => {
+  switch (prio) {
+    case 'URGENT': return 'Urgente'
+    case 'HIGH':   return 'Alta'
+    case 'MEDIUM': return 'Média'
+    default:       return 'Baixa'
+  }
+}
+
+export default function TaskCard({ task, index, onOpenDetail, columnColor }: TaskCardProps) {
   const { summary } = useColumns()
-  const totalChecklist = task.checklist.length
-  const completedChecklist = task.checklist.filter(item => item.isCompleted).length
-  
-  const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'DONE'
-  const isClose = task.dueDate && !isOverdue && (new Date(task.dueDate).getTime() - new Date().getTime() < 48 * 60 * 60 * 1000) && task.status !== 'DONE'
+  const { updateTask, addComment } = useData()
+  const { user } = useUser()
+
+  const [showPriority, setShowPriority] = useState(true)
+  const [showComment, setShowComment] = useState(false)
+  const [commentText, setCommentText] = useState('')
+  const [isActing, setIsActing] = useState(false)
+
+  const clickedRef = useRef(false)
+
+  const isPlaying = task.status === IN_PROGRESS_COLUMN_ID
+  const isDone = task.status === DONE_COLUMN_ID
+
+  const handlePlay = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (isActing) return
+    setIsActing(true)
+    try {
+      await updateTask(task.id, { status: IN_PROGRESS_COLUMN_ID })
+    } finally {
+      setIsActing(false)
+    }
+  }
+
+  const handleCheck = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (isActing) return
+    setIsActing(true)
+    try {
+      await updateTask(task.id, { status: DONE_COLUMN_ID })
+    } finally {
+      setIsActing(false)
+    }
+  }
+
+  const handleCommentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!commentText.trim()) return
+    await addComment(task.id, commentText.trim())
+    setCommentText('')
+    setShowComment(false)
+  }
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr)
     return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
   }
-
-  const getPriorityColors = (prio: string) => {
-    switch (prio) {
-      case 'URGENT':
-        return 'bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/20'
-      case 'HIGH':
-        return 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20'
-      case 'MEDIUM':
-        return 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20'
-      default:
-        return 'bg-slate-500/10 text-slate-700 dark:text-slate-400 border border-slate-500/20'
-    }
-  }
-
-  const getPriorityLabel = (prio: string) => {
-    switch (prio) {
-      case 'URGENT': return 'Urgente'
-      case 'HIGH': return 'Alta'
-      case 'MEDIUM': return 'Média'
-      default: return 'Baixa'
-    }
-  }
-
-  const clickedRef = useRef(false)
 
   return (
     <Draggable draggableId={task.id} index={index}>
@@ -61,106 +97,156 @@ export default function TaskCard({ task, index, onClick, columnColor }: TaskCard
           {...provided.dragHandleProps}
           onMouseDown={() => { clickedRef.current = true }}
           onMouseMove={() => { clickedRef.current = false }}
-          onClick={() => { if (clickedRef.current) onClick(task) }}
-          className={`p-2.5 sm:p-4 rounded-xl bg-white dark:bg-[#151b2c] border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700 group cursor-grab active:cursor-grabbing select-none mb-2 sm:mb-3 ${
-            snapshot.isDragging ? 'dragging-card' : 'transition-[background-color,border-color,box-shadow] duration-200'
-          } ${isOverdue ? 'border-l-4 border-l-red-500' : ''} ${isClose ? 'border-l-4 border-l-amber-500' : ''} ${columnColor && !isOverdue && !isClose ? 'border-l-4' : ''}`}
-          style={{ ...provided.draggableProps.style, ...(columnColor && !isOverdue && !isClose ? { borderLeftColor: columnColor } : {}) }}
+          className={`rounded-xl bg-white dark:bg-[#151b2c] border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md group mb-2 select-none overflow-hidden
+            ${snapshot.isDragging ? 'dragging-card ring-2 ring-blue-400/40' : 'transition-[box-shadow,border-color] duration-150 hover:border-slate-300 dark:hover:border-slate-700'}
+            ${columnColor ? 'border-l-[3px]' : ''}
+          `}
+          style={{
+            ...provided.draggableProps.style,
+            ...(columnColor ? { borderLeftColor: columnColor } : {}),
+          }}
         >
-          {/* Priority tag */}
-          <div className="flex items-center justify-between gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
-            {summary.showPriority && (
-              <span className={`text-[8px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-md ${getPriorityColors(task.priority)}`}>
-                {getPriorityLabel(task.priority)}
-              </span>
-            )}
+          {/* Card Body */}
+          <div
+            className="p-3 cursor-pointer"
+            onClick={() => { if (clickedRef.current) onOpenDetail(task) }}
+          >
+            {/* Top row: priority toggle + avatar */}
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                {summary.showPriority && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setShowPriority(v => !v) }}
+                    className={`flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-md transition ${getPriorityColors(task.priority)}`}
+                    title="Mostrar/Recolher prioridade"
+                  >
+                    {showPriority && getPriorityLabel(task.priority)}
+                    <ChevronDown className={`w-2.5 h-2.5 transition-transform ${showPriority ? 'rotate-0' : '-rotate-90'}`} />
+                  </button>
+                )}
+                {task.dueDate && summary.showDueDate && (
+                  <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500">
+                    {formatDate(task.dueDate)}
+                  </span>
+                )}
+              </div>
+              {summary.showAssignee && task.assignee && (
+                <Avatar
+                  name={task.assignee.name}
+                  url={task.assignee.avatarUrl}
+                  size="sm"
+                  className="shrink-0 border-2 border-white dark:border-slate-800 shadow-sm"
+                />
+              )}
+            </div>
 
-            {isOverdue && (
-              <span className="flex items-center gap-0.5 text-[7px] sm:text-[9px] text-red-500 dark:text-red-400 font-extrabold uppercase tracking-wider">
-                <Clock className="w-2 h-2 sm:w-2.5 sm:h-2.5" />
-                Atrasado
-              </span>
-            )}
-            {isClose && !isOverdue && (
-              <span className="flex items-center gap-0.5 text-[7px] sm:text-[9px] text-amber-600 dark:text-amber-400 font-extrabold uppercase tracking-wider">
-                <Clock className="w-2 h-2 sm:w-2.5 sm:h-2.5" />
-                Próximo
-              </span>
+            {/* Title */}
+            <h4 className="font-semibold text-slate-800 dark:text-slate-200 text-xs sm:text-[13px] leading-snug line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition mb-1">
+              {task.title}
+            </h4>
+
+            {/* Checklist summary */}
+            {summary.showChecklist && task.checklist.length > 0 && (
+              <div className="flex items-center gap-1 mt-1.5">
+                <div className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-full h-1 overflow-hidden">
+                  <div
+                    className="bg-emerald-500 h-1 rounded-full transition-all"
+                    style={{ width: `${(task.checklist.filter(i => i.isCompleted).length / task.checklist.length) * 100}%` }}
+                  />
+                </div>
+                <span className="text-[9px] text-slate-400 font-medium shrink-0">
+                  {task.checklist.filter(i => i.isCompleted).length}/{task.checklist.length}
+                </span>
+              </div>
             )}
           </div>
 
-          {/* Title */}
-          <h4 className="font-bold text-slate-800 dark:text-slate-200 text-xs sm:text-sm group-hover:text-blue-600 dark:group-hover:text-blue-400 transition leading-snug mb-2 sm:mb-3 line-clamp-3">
-            {task.title}
-          </h4>
+          {/* Inline comment box */}
+          {showComment && (
+            <form
+              onSubmit={handleCommentSubmit}
+              onClick={e => e.stopPropagation()}
+              className="px-3 pb-2"
+            >
+              <input
+                autoFocus
+                type="text"
+                value={commentText}
+                onChange={e => setCommentText(e.target.value)}
+                placeholder="Escreva um comentário..."
+                className="w-full text-xs bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1.5 outline-none focus:border-blue-400 text-slate-800 dark:text-slate-200 placeholder-slate-400"
+                onKeyDown={e => { if (e.key === 'Escape') setShowComment(false) }}
+              />
+              <div className="flex gap-1.5 mt-1.5 justify-end">
+                <button type="button" onClick={() => setShowComment(false)} className="text-[10px] px-2 py-1 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 rounded transition">Cancelar</button>
+                <button type="submit" className="text-[10px] px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded transition font-semibold">Enviar</button>
+              </div>
+            </form>
+          )}
 
-          {/* Card Footer */}
-          <div className="flex items-center justify-between pt-2 sm:pt-3 border-t border-slate-100 dark:border-slate-800 text-slate-400">
-            <div className="flex items-center gap-2 sm:gap-3">
-              {summary.showChecklist && totalChecklist > 0 && (
-                <div 
-                  className={`flex items-center gap-0.5 sm:gap-1 font-semibold ${
-                    completedChecklist === totalChecklist 
-                      ? 'text-emerald-600 dark:text-emerald-400' 
-                      : 'text-slate-500 dark:text-slate-400'
-                  }`}
-                  title={`Checklist: ${completedChecklist}/${totalChecklist}`}
-                >
-                  <CheckSquare className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                  <span className="text-[8px] sm:text-[10px]">{completedChecklist}/{totalChecklist}</span>
-                </div>
-              )}
+          {/* Action buttons footer */}
+          <div className="flex items-center justify-between px-3 py-2 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/20">
+            <div className="flex items-center gap-1">
+              {/* Play */}
+              <button
+                onClick={handlePlay}
+                title="Marcar como Em Andamento"
+                disabled={isActing}
+                className={`p-1.5 rounded-lg transition ${
+                  isPlaying
+                    ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400'
+                    : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-amber-500'
+                }`}
+              >
+                <Play className="w-3.5 h-3.5" fill={isPlaying ? 'currentColor' : 'none'} />
+              </button>
 
-              {summary.showAttachments && task.attachments.length > 0 && (
-                <div className="flex items-center gap-0.5 sm:gap-1" title="Anexos">
-                  <Paperclip className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                  <span className="text-[8px] sm:text-[10px]">{task.attachments.length}</span>
-                </div>
-              )}
+              {/* Check */}
+              <button
+                onClick={handleCheck}
+                title="Marcar como Concluído"
+                disabled={isActing}
+                className={`p-1.5 rounded-lg transition ${
+                  isDone
+                    ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400'
+                    : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-emerald-500'
+                }`}
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+              </button>
 
-              {summary.showComments && task.comments.length > 0 && (
-                <div className="flex items-center gap-0.5 sm:gap-1" title="Comentários">
-                  <MessageSquare className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                  <span className="text-[8px] sm:text-[10px]">{task.comments.length}</span>
-                </div>
-              )}
+              {/* Comment */}
+              <button
+                onClick={e => { e.stopPropagation(); setShowComment(v => !v) }}
+                title="Comentar"
+                className={`p-1.5 rounded-lg transition relative ${
+                  showComment
+                    ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600'
+                    : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-blue-500'
+                }`}
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                {task.comments.length > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 bg-blue-500 text-white text-[8px] font-bold rounded-full w-3.5 h-3.5 flex items-center justify-center leading-none">
+                    {task.comments.length > 9 ? '9+' : task.comments.length}
+                  </span>
+                )}
+              </button>
+
+              {/* Ellipsis / Full detail */}
+              <button
+                onClick={e => { e.stopPropagation(); onOpenDetail(task) }}
+                title="Ver detalhes"
+                className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-600 dark:hover:text-slate-300 transition"
+              >
+                <MoreHorizontal className="w-3.5 h-3.5" />
+              </button>
             </div>
 
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              {summary.showDueDate && task.dueDate && (
-                <span 
-                  className={`text-[8px] sm:text-[10px] font-bold flex items-center gap-0.5 ${
-                    isOverdue 
-                      ? 'text-red-500' 
-                      : isClose 
-                      ? 'text-amber-600 dark:text-amber-400' 
-                      : 'text-slate-500 dark:text-slate-400'
-                  }`}
-                  title={`Data de Entrega: ${new Date(task.dueDate).toLocaleDateString('pt-BR')}`}
-                >
-                  <Calendar className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
-                  {formatDate(task.dueDate)}
-                </span>
-              )}
-
-              {summary.showAssignee && (
-                task.assignee ? (
-                  <Avatar
-                    name={task.assignee.name}
-                    url={task.assignee.avatarUrl}
-                    size="sm"
-                    className="border border-slate-200 dark:border-slate-800"
-                  />
-                ) : (
-                  <div 
-                    className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-slate-100 dark:bg-slate-800 border border-dashed border-slate-300 dark:border-slate-700 flex items-center justify-center text-[7px] sm:text-[8px] font-bold text-slate-400"
-                    title="Sem responsável"
-                  >
-                    —
-                  </div>
-                )
-              )}
-            </div>
+            {/* Comments count summary */}
+            {summary.showComments && task.comments.length > 0 && !showComment && (
+              <span className="text-[9px] text-slate-400 font-medium">{task.comments.length} coment.</span>
+            )}
           </div>
         </div>
       )}
