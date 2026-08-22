@@ -19,6 +19,7 @@ import Avatar from './Avatar'
 
 import { useData } from '@/context/DataContext'
 import { useUser } from '@/context/UserContext'
+import { useColumns } from '@/context/ColumnsContext'
 import { Task } from '@/types'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 
@@ -43,6 +44,7 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
     removeAttachment, 
     uploadGeneral 
   } = useData()
+  const { columns } = useColumns()
   const { user } = useUser()
   const [localTask, setLocalTask] = useState<Task | null>(null)
   const [title, setTitle] = useState('')
@@ -633,11 +635,9 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
                 }}
                 className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-800 dark:text-slate-200 font-bold shadow-sm"
               >
-                <option value="BACKLOG">Ideia</option>
-                <option value="TODO">A Fazer</option>
-                <option value="IN_PROGRESS">Em Andamento</option>
-                <option value="AWAITING_APPROVAL">Aguardando Aprovação</option>
-                <option value="DONE">Concluído</option>
+                {columns.map(col => (
+                  <option key={col.id} value={col.id}>{col.title}</option>
+                ))}
               </select>
             </div>
 
@@ -715,7 +715,7 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
                 Histórico de Atividades
               </label>
 
-              <div className="space-y-4 pr-1">
+              <div className="space-y-4 pr-1 max-h-[300px] overflow-y-auto scrollbar-thin">
                 {localTask.activityLogs.length === 0 ? (
                   <p className="text-xs font-medium text-slate-400 dark:text-slate-500 text-center py-4">Sem atividades registradas.</p>
                 ) : (

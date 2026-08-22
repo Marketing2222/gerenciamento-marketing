@@ -258,37 +258,43 @@ export default function KanbanPage() {
                             snapshot.isDraggingOver ? 'bg-blue-500/5 dark:bg-blue-500/10 rounded-b-2xl' : ''
                           }`}
                         >
-                          {sortedDays.length === 0 && (
-                            <div className="py-4 text-center text-slate-400 text-[10px] border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
-                              Solte aqui
-                            </div>
-                          )}
-
-                          {sortedDays.map(day => {
-                            const dayTasks = colDayMap[day]
-                            const dayInfo = day !== '__no_date__' ? formatDayHeader(day) : null
-                            return (
-                              <div key={day} className="mb-2">
-                                {dayInfo && (
-                                  <div className="flex items-center gap-1 mb-1 px-0.5">
-                                    <span className="text-[8px] font-bold text-slate-400 dark:text-slate-600 uppercase tracking-wider">
-                                      {dayInfo.weekday} {dayInfo.date}
-                                    </span>
-                                    <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
-                                  </div>
-                                )}
-                                {dayTasks.map((task, idx) => (
-                                  <TaskCard
-                                    key={task.id}
-                                    task={task}
-                                    index={idx}
-                                    onOpenDetail={t => setSelectedTaskId(t.id)}
-                                    columnColor={column.bgColor || column.customColor}
-                                  />
-                                ))}
+                          {(() => {
+                            let globalIndex = 0;
+                            return sortedDays.length === 0 ? (
+                              <div className="py-4 text-center text-slate-400 text-[10px] border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
+                                Solte aqui
                               </div>
+                            ) : (
+                              sortedDays.map(day => {
+                                const dayTasks = colDayMap[day]
+                                const dayInfo = day !== '__no_date__' ? formatDayHeader(day) : null
+                                return (
+                                  <div key={day} className="mb-2">
+                                    {dayInfo && (
+                                      <div className="flex items-center gap-1 mb-1 px-0.5">
+                                        <span className="text-[8px] font-bold text-slate-400 dark:text-slate-600 uppercase tracking-wider">
+                                          {dayInfo.weekday} {dayInfo.date}
+                                        </span>
+                                        <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
+                                      </div>
+                                    )}
+                                    {dayTasks.map((task) => {
+                                      const currentIndex = globalIndex++;
+                                      return (
+                                        <TaskCard
+                                          key={task.id}
+                                          task={task}
+                                          index={currentIndex}
+                                          onOpenDetail={t => setSelectedTaskId(t.id)}
+                                          columnColor={column.bgColor || column.customColor}
+                                        />
+                                      )
+                                    })}
+                                  </div>
+                                )
+                              })
                             )
-                          })}
+                          })()}
 
                           {provided.placeholder}
                         </div>
