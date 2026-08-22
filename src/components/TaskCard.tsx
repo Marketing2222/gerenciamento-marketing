@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { Draggable } from '@hello-pangea/dnd'
 import { Play, CheckCircle2, MessageSquare, MoreHorizontal, ChevronDown } from 'lucide-react'
 
@@ -18,7 +18,6 @@ interface TaskCardProps {
 }
 
 const DONE_COLUMN_ID = 'DONE'
-const IN_PROGRESS_COLUMN_ID = 'IN_PROGRESS'
 
 const getPriorityColors = (prio: string) => {
   switch (prio) {
@@ -48,8 +47,6 @@ export default function TaskCard({ task, index, onOpenDetail, columnColor }: Tas
   const [commentText, setCommentText] = useState('')
   const [isActing, setIsActing] = useState(false)
 
-  const clickedRef = useRef(false)
-
   const isPlaying = task.assigneeId === user?.id
   const isDone = task.status === DONE_COLUMN_ID
 
@@ -59,11 +56,9 @@ export default function TaskCard({ task, index, onOpenDetail, columnColor }: Tas
     setIsActing(true)
     try {
       if (isPlaying) {
-        // Desmarcar: remove responsável
         await updateTask(task.id, { assigneeId: null })
       } else {
-        // Assumir: seta responsável e muda status para Em Andamento
-        await updateTask(task.id, { assigneeId: user.id, status: IN_PROGRESS_COLUMN_ID })
+        await updateTask(task.id, { assigneeId: user.id })
       }
     } finally {
       setIsActing(false)
@@ -252,10 +247,6 @@ export default function TaskCard({ task, index, onOpenDetail, columnColor }: Tas
               </button>
             </div>
 
-            {/* Comments count summary */}
-            {summary.showComments && task.comments.length > 0 && !showComment && (
-              <span className="text-[9px] text-slate-400 font-medium">{task.comments.length} coment.</span>
-            )}
           </div>
         </div>
       )}

@@ -167,7 +167,7 @@ export default function KanbanPage() {
     }
   }, [loaded, tasks, columns, updateTaskOrders])
 
-  const handleDragEnd = async (result: DropResult) => {
+  const handleDragEnd = (result: DropResult) => {
     const { source, destination, draggableId } = result
     if (!destination) return
     if (source.droppableId === destination.droppableId && source.index === destination.index) return
@@ -195,11 +195,9 @@ export default function KanbanPage() {
     // Insert at destination
     let destWithDragged: Task[]
     if (srcColId === destColId) {
-      // Same column: insert into the source array at destination index
       destWithDragged = [...srcWithout]
       destWithDragged.splice(destination.index, 0, draggedTask)
     } else {
-      // Different column: insert into destination array at destination index
       destWithDragged = [...destTasks]
       destWithDragged.splice(destination.index, 0, draggedTask)
     }
@@ -208,7 +206,6 @@ export default function KanbanPage() {
     const updates: { id: string; order: number }[] = []
 
     if (srcColId === destColId) {
-      // Same column: just reindex the single column
       destWithDragged.forEach((task, idx) => {
         const newOrder = idx + 1
         if (task.order !== newOrder) {
@@ -216,7 +213,6 @@ export default function KanbanPage() {
         }
       })
     } else {
-      // Different column: reindex both columns
       srcWithout.forEach((task, idx) => {
         const newOrder = idx + 1
         if (task.order !== newOrder) {
@@ -231,17 +227,12 @@ export default function KanbanPage() {
       })
     }
 
-    try {
-      // Update status if cross-column
-      if (srcColId !== destColId) {
-        await updateTask(draggableId, { status: destColId })
-      }
-      // Save all order updates
-      if (updates.length > 0) {
-        await updateTaskOrders(updates)
-      }
-    } catch (err) {
-      console.error(err)
+    // Fire-and-forget: don't await to avoid re-render during DnD cleanup
+    if (srcColId !== destColId) {
+      updateTask(draggableId, { status: destColId }).catch(console.error)
+    }
+    if (updates.length > 0) {
+      updateTaskOrders(updates).catch(console.error)
     }
   }
 
