@@ -6,7 +6,6 @@ import { DragDropContext, DropResult } from '@hello-pangea/dnd'
 import { Plus, Loader2 } from 'lucide-react'
 import TaskCard from '@/components/TaskCard'
 import TaskModal from '@/components/TaskModal'
-import TaskCreateModal from '@/components/TaskCreateModal'
 import { StrictModeDroppable } from '@/components/StrictModeDroppable'
 import { useData } from '@/context/DataContext'
 import { useColumns } from '@/context/ColumnsContext'
@@ -421,15 +420,11 @@ export default function KanbanPage() {
         )}
       </div>
 
-      <TaskCreateModal
-        isOpen={isCreateOpen}
-        onClose={() => setIsCreateOpen(false)}
-        onCreated={() => {}}
-      />
       <TaskModal
-        task={selectedTask}
-        isOpen={selectedTask !== null}
-        onClose={() => setSelectedTaskId(null)}
+        task={selectedTask || null}
+        isOpen={selectedTask !== null || isCreateOpen}
+        onClose={() => { setSelectedTaskId(null); setIsCreateOpen(false) }}
+        initialStatus="TODO"
       />
     </div>
   )

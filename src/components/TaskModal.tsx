@@ -27,9 +27,10 @@ interface TaskModalProps {
   task: Task | null
   isOpen: boolean
   onClose: () => void
+  initialStatus?: string
 }
 
-export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
+export default function TaskModal({ task, isOpen, onClose, initialStatus = 'TODO' }: TaskModalProps) {
   const { 
     users, 
     updateTask, 
@@ -42,7 +43,8 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
     reorderChecklist,
     addFileAttachment, 
     removeAttachment, 
-    uploadGeneral 
+    uploadGeneral,
+    addTask
   } = useData()
   const { columns } = useColumns()
   const { user } = useUser()
@@ -54,6 +56,8 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
   const [dueDate, setDueDate] = useState('')
   const [assigneeId, setAssigneeId] = useState('')
   const [isVisible, setIsVisible] = useState(true)
+  const [creatingTask, setCreatingTask] = useState(false)
+  const isCreateMode = task === null
   
   // Sub-recursos
   const [newCheckItem, setNewCheckItem] = useState('')
@@ -69,8 +73,35 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
 
   // Carregar dados da tarefa e usuários
   useEffect(() => {
+    if (isOpen && !task) {
+      setLocalTask({
+        id: '',
+        title: '',
+        description: '',
+        priority: 'MEDIUM',
+        status: initialStatus,
+        order: 0,
+        dueDate: null,
+        assigneeId: null,
+        creatorId: null,
+        assignee: null,
+        creator: null,
+        checklist: [],
+        comments: [],
+        attachments: [],
+        activityLogs: [],
+        deletedAt: null,
+        createdAt: '',
+      })
+      setTitle('')
+      setDescription('')
+      setPriority('MEDIUM')
+      setStatus(initialStatus)
+      setDueDate('')
+      setAssigneeId('')
+      return
+    }
     if (task && isOpen) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLocalTask(task)
       setTitle(task.title)
       setDescription(task.description)
@@ -79,13 +110,14 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
       setDueDate(task.dueDate ? task.dueDate.split('T')[0] : '')
       setAssigneeId(task.assigneeId || '')
     }
-  }, [task, isOpen])
+  }, [task, isOpen, initialStatus])
 
-  if (!isOpen || !localTask) return null
+  if (!isOpen) return null
 
   // Atualizar campo específico da tarefa (no banco de dados e localmente)
   const updateTaskField = async (fields: Partial<Task>) => {
     setLocalTask((prev) => prev ? { ...prev, ...fields } : prev)
+    if (!localTask) return
     try {
       await updateTask(localTask.id, fields)
     } catch (err) {
@@ -97,10 +129,36 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
   const handleDeleteTask = async () => {
     if (!confirm('Deseja realmente excluir esta tarefa?')) return
     try {
-      await moveToTrash(localTask.id)
+      await moveToTrash(localTask!.id)
       onClose()
     } catch (err) {
       console.error('Error deleting task:', err)
+    }
+  }
+
+  const handleCreateTask = async () => {
+    if (!title.trim()) return
+    setCreatingTask(true)
+    try {
+      const assignee = users.find((u) => u.id === assigneeId) || null
+      await addTask({
+        title: title.trim(),
+        description,
+        priority,
+        status,
+        dueDate: dueDate || null,
+        assigneeId: assigneeId || null,
+        assignee,
+        checklist: (localTask?.checklist || []).map((it) => ({
+          title: it.title,
+          isCompleted: it.isCompleted,
+        })),
+      })
+      onClose()
+    } catch (err) {
+      console.error('Error creating task:', err)
+    } finally {
+      setCreatingTask(false)
     }
   }
 
@@ -108,6 +166,7 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
   const handleToggleChecklist = async (itemId: string, isCompleted: boolean) => {
     if (!localTask) return
     setLocalTask((prev) => prev ? { ...prev, checklist: prev.checklist.map((it) => it.id === itemId ? { ...it, isCompleted } : it) } : prev)
+    if (isCreateMode) return
     try {
       await toggleCheck(localTask.id, itemId, isCompleted)
     } catch (err) {
@@ -122,6 +181,7 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
     setNewCheckItem('')
     const tempItem = { id: `temp_${Date.now()}`, title: cTitle, isCompleted: false }
     setLocalTask((prev) => prev ? { ...prev, checklist: [...prev.checklist, tempItem] } : prev)
+    if (isCreateMode) return
     try {
       await addCheckItem(localTask.id, cTitle)
     } catch (err) {
@@ -135,6 +195,7 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
     if (!localTask) return
     const removed = localTask.checklist.find((it) => it.id === itemId)
     setLocalTask((prev) => prev ? { ...prev, checklist: prev.checklist.filter((it) => it.id !== itemId) } : prev)
+    if (isCreateMode) return
     try {
       await removeCheckItem(localTask.id, itemId)
     } catch (err) {
@@ -153,6 +214,7 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
     
     // Otimista
     setLocalTask((prev) => prev ? { ...prev, checklist: newChecklist } : prev)
+    if (isCreateMode) return
     try {
       await reorderChecklist(localTask.id, result.source.index, result.destination.index)
     } catch (err) {
@@ -175,6 +237,7 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
     }
     setLocalTask((prev) => prev ? { ...prev, comments: [...prev.comments, tempComment] } : prev)
 
+    if (!localTask) return
     try {
       await addComment(localTask.id, content)
     } catch (err) {
@@ -275,36 +338,40 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               onBlur={() => {
-                if (title.trim() && title !== localTask.title) {
+                if (!isCreateMode && localTask && title.trim() && title !== localTask.title) {
                   updateTaskField({ title: title.trim() })
                 }
               }}
-              placeholder="NOME DA TAREFA"
+              placeholder={isCreateMode ? "NOVA TAREFA" : "NOME DA TAREFA"}
               className="w-full text-2xl font-black uppercase text-slate-800 dark:text-slate-100 bg-transparent border-b border-transparent hover:border-slate-200 dark:hover:border-slate-800 focus:border-blue-500 outline-none py-1 transition duration-150 focus:ring-0 placeholder-slate-300 dark:placeholder-slate-700"
             />
           </div>
           
           <div className="flex items-center gap-4 shrink-0">
-            <span className="text-xs text-slate-400 hidden sm:inline font-medium">
-              Criado por: {localTask.creator?.name || 'Sistema'}
-            </span>
+            {!isCreateMode && localTask && (
+              <span className="text-xs text-slate-400 hidden sm:inline font-medium">
+                Criado por: {localTask.creator?.name || 'Sistema'}
+              </span>
+            )}
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
-                onClick={handleSaveAll}
-                disabled={savingTask}
+                onClick={isCreateMode ? handleCreateTask : handleSaveAll}
+                disabled={isCreateMode ? creatingTask : savingTask}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-70 text-white rounded-lg text-sm font-bold shadow-sm transition flex items-center gap-1.5"
               >
-                {savingTask && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                Salvar
+                {(isCreateMode ? creatingTask : savingTask) && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {isCreateMode ? 'Criar Tarefa' : 'Salvar'}
               </button>
-              <button
-                onClick={handleDeleteTask}
-                title="Excluir Tarefa"
-                className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition cursor-pointer ml-2"
-              >
-                <Trash className="w-4.5 h-4.5" />
-              </button>
+              {!isCreateMode && (
+                <button
+                  onClick={handleDeleteTask}
+                  title="Excluir Tarefa"
+                  className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition cursor-pointer ml-2"
+                >
+                  <Trash className="w-4.5 h-4.5" />
+                </button>
+              )}
               <button 
                 onClick={onClose}
                 className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
@@ -331,6 +398,7 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
             </div>
 
             {/* Comments */}
+            {!isCreateMode && localTask && (
             <div className="space-y-4 pt-2">
               <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                 <MessageSquare className="w-4 h-4 text-slate-400" />
@@ -394,6 +462,7 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
                 </div>
               </form>
             </div>
+            )}
           </div>
 
           {/* COLUMN 2: Checklist e Anexos */}
@@ -425,7 +494,7 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
                 </button>
               </div>
 
-              {localTask.checklist.length > 0 && (
+              {localTask && localTask.checklist.length > 0 && (
                 <div className="space-y-3 pt-2">
                   <DragDropContext onDragEnd={handleDragEndChecklist}>
                     <Droppable droppableId={`checklist-${localTask.id}`}>
@@ -487,6 +556,7 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
             </div>
 
             {/* Anexos e Links */}
+            {!isCreateMode && localTask && (
             <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-800">
               <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Anexos & Links</label>
@@ -619,9 +689,8 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
                 </div>
               )}
             </div>
+            )}
           </div>
-
-          {/* COLUMN 3: Sidebar de Configurações */}
           <div className="w-full md:w-72 lg:w-80 shrink-0 p-6 space-y-7 overflow-y-auto bg-slate-50 dark:bg-[#0c1220]">
             
             {/* Status Select */}
@@ -631,7 +700,7 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
                 value={status}
                 onChange={(e) => {
                   setStatus(e.target.value)
-                  updateTaskField({ status: e.target.value })
+                  if (!isCreateMode) updateTaskField({ status: e.target.value })
                 }}
                 className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-800 dark:text-slate-200 font-bold shadow-sm"
               >
@@ -649,7 +718,7 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
                   value={priority}
                   onChange={(e) => {
                     setPriority(e.target.value)
-                    updateTaskField({ priority: e.target.value })
+                    if (!isCreateMode) updateTaskField({ priority: e.target.value })
                   }}
                   className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-800 dark:text-slate-200 font-bold shadow-sm"
                 >
@@ -679,7 +748,7 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
                 value={assigneeId}
                 onChange={(e) => {
                   setAssigneeId(e.target.value)
-                  updateTaskField({ assigneeId: e.target.value || null })
+                  if (!isCreateMode) updateTaskField({ assigneeId: e.target.value || null })
                 }}
                 className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-800 dark:text-slate-200 font-bold shadow-sm"
               >
@@ -701,7 +770,7 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
                   value={dueDate}
                   onChange={(e) => {
                     setDueDate(e.target.value)
-                    updateTaskField({ dueDate: e.target.value || null })
+                    if (!isCreateMode) updateTaskField({ dueDate: e.target.value || null })
                   }}
                   className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-800 dark:text-slate-200 font-bold dark:[color-scheme:dark] shadow-sm appearance-none"
                 />
@@ -709,6 +778,7 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
             </div>
 
             {/* Activity History Logs */}
+            {!isCreateMode && localTask && (
             <div className="space-y-4 pt-6 border-t border-slate-200 dark:border-slate-800">
               <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                 <Clock className="w-4 h-4" />
@@ -737,6 +807,7 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
                 )}
               </div>
             </div>
+            )}
 
           </div>
 

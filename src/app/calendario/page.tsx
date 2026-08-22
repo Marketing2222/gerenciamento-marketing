@@ -3,7 +3,6 @@
 import React, { useMemo, useState } from 'react'
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Plus, Loader2 } from 'lucide-react'
 import TaskModal from '@/components/TaskModal'
-import TaskCreateModal from '@/components/TaskCreateModal'
 import Avatar from '@/components/Avatar'
 import { useData } from '@/context/DataContext'
 
@@ -400,18 +399,10 @@ export default function CalendarPage() {
         </div>
       )}
 
-      {/* Detail Modal */}
-      <TaskModal 
-        task={selectedTask}
-        isOpen={selectedTask !== null}
-        onClose={() => setSelectedTaskId(null)}
-      />
-
-      {/* Create Modal */}
-      <TaskCreateModal 
-        isOpen={isCreateOpen} 
-        onClose={() => setIsCreateOpen(false)} 
-        onCreated={() => {}}
+      <TaskModal
+        task={selectedTask || null}
+        isOpen={selectedTask !== null || isCreateOpen}
+        onClose={() => { setSelectedTaskId(null); setIsCreateOpen(false) }}
         initialStatus="TODO"
       />
     </div>

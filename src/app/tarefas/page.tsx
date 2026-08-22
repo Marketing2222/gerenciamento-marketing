@@ -3,7 +3,6 @@
 import React, { useMemo, useState } from 'react'
 import { Plus, Search, Loader2, Calendar, Paperclip, MessageSquare } from 'lucide-react'
 import TaskModal from '@/components/TaskModal'
-import TaskCreateModal from '@/components/TaskCreateModal'
 import Avatar from '@/components/Avatar'
 import { useData } from '@/context/DataContext'
 
@@ -307,18 +306,11 @@ export default function TasksPage() {
         )}
       </div>
 
-      {/* Task Creation Modal */}
-      <TaskCreateModal 
-        isOpen={isCreateOpen} 
-        onClose={() => setIsCreateOpen(false)} 
-        onCreated={() => {}}
-      />
-
-      {/* Task Details Modal */}
-      <TaskModal 
-        task={selectedTask}
-        isOpen={selectedTask !== null}
-        onClose={() => setSelectedTaskId(null)}
+      <TaskModal
+        task={selectedTask || null}
+        isOpen={selectedTask !== null || isCreateOpen}
+        onClose={() => { setSelectedTaskId(null); setIsCreateOpen(false) }}
+        initialStatus="TODO"
       />
     </div>
   )
