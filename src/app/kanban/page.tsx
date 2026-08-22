@@ -245,10 +245,10 @@ export default function KanbanPage() {
     }
   }
 
-  // Tasks grouped: colId → dayISO → tasks[] (sorted by order)
-  const tasksByColumnAndDay = useMemo(() => {
-    const result: Record<string, Record<string, Task[]>> = {}
-    columns.forEach(col => { result[col.id] = {} })
+  // Tasks grouped: colId → tasks[] (flat, sorted by order)
+  const tasksByColumn = useMemo(() => {
+    const result: Record<string, Task[]> = {}
+    columns.forEach(col => { result[col.id] = [] })
 
     // Lazy migration: assign order to tasks that don't have one
     const orderCounters: Record<string, number> = {}
@@ -266,10 +266,8 @@ export default function KanbanPage() {
     })
     sortedByOrder.forEach(task => {
       const colId = task.status
-      if (!result[colId]) result[colId] = {}
-      const day = task.dueDate ? task.dueDate.split('T')[0] : '__no_date__'
-      if (!result[colId][day]) result[colId][day] = []
-      result[colId][day].push(task)
+      if (!result[colId]) result[colId] = []
+      result[colId].push(task)
     })
     return result
   }, [filteredTasks, columns])
@@ -320,13 +318,8 @@ export default function KanbanPage() {
               }}
             >
               {columns.map(column => {
-                const colDayMap = tasksByColumnAndDay[column.id] || {}
-                const sortedDays = Object.keys(colDayMap).sort((a, b) => {
-                  if (a === '__no_date__') return 1
-                  if (b === '__no_date__') return -1
-                  return a.localeCompare(b)
-                })
-                const totalCount = filteredTasks.filter(t => t.status === column.id).length
+                const colTasks = tasksByColumn[column.id] || []
+                const totalCount = colTasks.length
 
                 return (
                   <div
@@ -370,43 +363,21 @@ export default function KanbanPage() {
                             snapshot.isDraggingOver ? 'bg-blue-500/5 dark:bg-blue-500/10 rounded-b-2xl' : ''
                           }`}
                         >
-                          {(() => {
-                            let globalIndex = 0;
-                            return sortedDays.length === 0 ? (
-                              <div className="py-4 text-center text-slate-400 text-[10px] border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
-                                Solte aqui
-                              </div>
-                            ) : (
-                              sortedDays.map(day => {
-                                const dayTasks = colDayMap[day]
-                                const dayInfo = day !== '__no_date__' ? formatDayHeader(day) : null
-                                return (
-                                  <div key={day} className="mb-2">
-                                    {dayInfo && (
-                                      <div className="flex items-center gap-1 mb-1 px-0.5">
-                                        <span className="text-[8px] font-bold text-slate-400 dark:text-slate-600 uppercase tracking-wider">
-                                          {dayInfo.weekday} {dayInfo.date}
-                                        </span>
-                                        <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
-                                      </div>
-                                    )}
-                                    {dayTasks.map((task) => {
-                                      const currentIndex = globalIndex++;
-                                      return (
-                                        <TaskCard
-                                          key={task.id}
-                                          task={task}
-                                          index={currentIndex}
-                                          onOpenDetail={t => setSelectedTaskId(t.id)}
-                                          columnColor={column.bgColor || column.customColor}
-                                        />
-                                      )
-                                    })}
-                                  </div>
-                                )
-                              })
-                            )
-                          })()}
+                          {colTasks.length === 0 ? (
+                            <div className="py-4 text-center text-slate-400 text-[10px] border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
+                              Solte aqui
+                            </div>
+                          ) : (
+                            colTasks.map((task, index) => (
+                              <TaskCard
+                                key={task.id}
+                                task={task}
+                                index={index}
+                                onOpenDetail={t => setSelectedTaskId(t.id)}
+                                columnColor={column.bgColor || column.customColor}
+                              />
+                            ))
+                          )}
 
                           {provided.placeholder}
                         </div>
