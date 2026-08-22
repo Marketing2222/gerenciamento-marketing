@@ -271,17 +271,20 @@ function logObj(action: string, user: User | null): ActivityLog {
 
 export async function addComment(taskId: string, content: string, user: User | null): Promise<void> {
   const current = await readList<Comment>(taskId, 'comments')
-  const comment: Comment = {
-    id: generateId(),
-    content,
-    user: user
-      ? { id: user.id, name: user.name, avatarUrl: user.avatarUrl, role: user.role }
-      : { id: '', name: 'Desconhecido', avatarUrl: '', role: '' },
-    createdAt: new Date().toISOString(),
-  }
-  await writeList(taskId, 'comments', [...current, comment])
-  const logs = await readList<ActivityLog>(taskId, 'activityLogs')
-  await writeList(taskId, 'activityLogs', [...logs, logObj('Adicionou um comentário', user)])
+  await writeList(taskId, 'comments', [
+    ...current,
+    {
+      id: generateId(),
+      content,
+      user: user ? { id: user.id, name: user.name, avatarUrl: user.avatarUrl, role: user.role } : { id: '', name: 'Sistema', avatarUrl: '', role: '' },
+      createdAt: new Date().toISOString(),
+    },
+  ])
+}
+
+export async function deleteComment(taskId: string, commentId: string): Promise<void> {
+  const current = await readList<Comment>(taskId, 'comments')
+  await writeList(taskId, 'comments', current.filter((c) => c.id !== commentId))
 }
 
 export async function addChecklistItem(taskId: string, title: string): Promise<void> {
@@ -298,6 +301,15 @@ export async function toggleChecklistItem(taskId: string, itemId: string, isComp
 export async function deleteChecklistItem(taskId: string, itemId: string): Promise<void> {
   const current = await readList<ChecklistItem>(taskId, 'checklist')
   await writeList(taskId, 'checklist', current.filter((it) => it.id !== itemId))
+}
+
+export async function reorderChecklistItem(taskId: string, sourceIndex: number, destIndex: number): Promise<void> {
+  const current = await readList<ChecklistItem>(taskId, 'checklist')
+  if (sourceIndex < 0 || sourceIndex >= current.length || destIndex < 0 || destIndex >= current.length) return
+  const updated = [...current]
+  const [removed] = updated.splice(sourceIndex, 1)
+  updated.splice(destIndex, 0, removed)
+  await writeList(taskId, 'checklist', updated)
 }
 
 export async function addAttachment(taskId: string, name: string, type: string, url: string): Promise<void> {

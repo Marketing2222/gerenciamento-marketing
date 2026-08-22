@@ -15,12 +15,14 @@ import {
   addChecklistItem,
   toggleChecklistItem,
   deleteChecklistItem,
+  reorderChecklistItem,
   addAttachment,
   deleteAttachment,
   updateUser,
   createUser,
   deleteUser as firestoreDeleteUser,
   seedDatabase,
+  deleteComment as firestoreDeleteComment,
 } from '@/lib/firestore'
 import { isFirebaseConfigured } from '@/lib/firebaseClient'
 import type { Task, User } from '@/types'
@@ -54,9 +56,11 @@ interface DataContextType {
   clearTrash: () => Promise<void>
   // Sub-recursos
   addComment: (id: string, content: string) => Promise<void>
+  removeComment: (taskId: string, commentId: string) => Promise<void>
   addCheckItem: (id: string, title: string) => Promise<void>
   toggleCheck: (id: string, itemId: string, completed: boolean) => Promise<void>
   removeCheckItem: (id: string, itemId: string) => Promise<void>
+  reorderChecklist: (id: string, sourceIndex: number, destIndex: number) => Promise<void>
   addFileAttachment: (id: string, name: string, type: string, url: string) => Promise<void>
   removeAttachment: (id: string, attachmentId: string) => Promise<void>
   // Usuários / uploads / seed
@@ -170,6 +174,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
     await deleteChecklistItem(id, itemId)
   }, [])
 
+  const reorderChecklist = useCallback(async (id: string, sourceIndex: number, destIndex: number) => {
+    await reorderChecklistItem(id, sourceIndex, destIndex)
+  }, [])
+
+  const removeComment = useCallback(async (taskId: string, commentId: string) => {
+    await firestoreDeleteComment(taskId, commentId)
+  }, [])
+
   const addAttachmentToTask = useCallback(async (id: string, name: string, type: string, url: string) => {
     await addAttachment(id, name, type, url)
   }, [])
@@ -205,9 +217,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     deleteForever,
     clearTrash,
     addComment: addCommentToTask,
+    removeComment,
     addCheckItem,
     toggleCheck,
     removeCheckItem,
+    reorderChecklist,
     addFileAttachment: addAttachmentToTask,
     removeAttachment: removeAttachmentFromTask,
     saveProfile,

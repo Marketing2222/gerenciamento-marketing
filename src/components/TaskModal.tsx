@@ -11,7 +11,8 @@ import {
   Loader2, 
   Eye, 
   ExternalLink,
-  Link2
+  Link2,
+  GripVertical
 } from 'lucide-react'
 import RichTextEditor from './RichTextEditor'
 import Avatar from './Avatar'
@@ -19,6 +20,7 @@ import Avatar from './Avatar'
 import { useData } from '@/context/DataContext'
 import { useUser } from '@/context/UserContext'
 import { Task } from '@/types'
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 
 interface TaskModalProps {
   task: Task | null
@@ -27,7 +29,20 @@ interface TaskModalProps {
 }
 
 export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
-  const { users, updateTask, moveToTrash, addComment, addCheckItem, toggleCheck, removeCheckItem, addFileAttachment, removeAttachment, uploadGeneral } = useData()
+  const { 
+    users, 
+    updateTask, 
+    moveToTrash, 
+    addComment, 
+    removeComment,
+    addCheckItem, 
+    toggleCheck, 
+    removeCheckItem, 
+    reorderChecklist,
+    addFileAttachment, 
+    removeAttachment, 
+    uploadGeneral 
+  } = useData()
   const { user } = useUser()
   const [localTask, setLocalTask] = useState<Task | null>(null)
   const [title, setTitle] = useState('')
@@ -36,7 +51,7 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
   const [status, setStatus] = useState('TODO')
   const [dueDate, setDueDate] = useState('')
   const [assigneeId, setAssigneeId] = useState('')
-  const [isVisible, setIsVisible] = useState(true) // Placeholder for 'Visível' checkbox
+  const [isVisible, setIsVisible] = useState(true)
   
   // Sub-recursos
   const [newCheckItem, setNewCheckItem] = useState('')
@@ -44,7 +59,7 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
   const [newLinkName, setNewLinkName] = useState('')
   const [newLinkUrl, setNewLinkUrl] = useState('')
   const [uploading, setUploading] = useState(false)
-  const [savingDesc, setSavingDesc] = useState(false)
+  const [savingTask, setSavingTask] = useState(false)
   const [isAddingLink, setIsAddingLink] = useState(false)
   const [previewAttachment, setPreviewAttachment] = useState<{ name: string; url: string } | null>(null)
   
@@ -126,6 +141,23 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
     }
   }
 
+  const handleDragEndChecklist = async (result: DropResult) => {
+    if (!result.destination || !localTask) return
+    if (result.source.index === result.destination.index) return
+
+    const newChecklist = Array.from(localTask.checklist)
+    const [moved] = newChecklist.splice(result.source.index, 1)
+    newChecklist.splice(result.destination.index, 0, moved)
+    
+    // Otimista
+    setLocalTask((prev) => prev ? { ...prev, checklist: newChecklist } : prev)
+    try {
+      await reorderChecklist(localTask.id, result.source.index, result.destination.index)
+    } catch (err) {
+      console.error('Error reordering checklist:', err)
+    }
+  }
+
   // Comments Actions
   const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -147,6 +179,18 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
       console.error('Error adding comment:', err)
       setLocalTask((prev) => prev ? { ...prev, comments: prev.comments.filter((c) => c.id !== tempComment.id) } : prev)
       setNewComment(content)
+    }
+  }
+
+  const handleDeleteComment = async (commentId: string) => {
+    if (!localTask) return
+    const removed = localTask.comments.find((c) => c.id === commentId)
+    setLocalTask((prev) => prev ? { ...prev, comments: prev.comments.filter((c) => c.id !== commentId) } : prev)
+    try {
+      await removeComment(localTask.id, commentId)
+    } catch (err) {
+      console.error('Error deleting comment:', err)
+      if (removed) setLocalTask((prev) => prev ? { ...prev, comments: [...prev.comments, removed] } : prev)
     }
   }
 
@@ -203,10 +247,10 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
     }
   }
 
-  const handleSaveDescription = async () => {
-    setSavingDesc(true)
-    await updateTaskField({ description })
-    setSavingDesc(false)
+  const handleSaveAll = async () => {
+    setSavingTask(true)
+    await updateTaskField({ title, description })
+    setSavingTask(false)
   }
 
   const formatLogDate = (dateStr: unknown) => {
@@ -223,7 +267,7 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
         
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 shrink-0">
-          <div className="flex-1 min-w-0 pr-4">
+          <div className="flex-1 min-w-0 pr-4 flex items-center gap-4">
             <input
               type="text"
               value={title}
@@ -244,9 +288,18 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
             </span>
             <div className="flex items-center gap-1.5">
               <button
+                type="button"
+                onClick={handleSaveAll}
+                disabled={savingTask}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-70 text-white rounded-lg text-sm font-bold shadow-sm transition flex items-center gap-1.5"
+              >
+                {savingTask && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                Salvar
+              </button>
+              <button
                 onClick={handleDeleteTask}
                 title="Excluir Tarefa"
-                className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition cursor-pointer"
+                className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition cursor-pointer ml-2"
               >
                 <Trash className="w-4.5 h-4.5" />
               </button>
@@ -269,19 +322,10 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Descrição</label>
-                {description !== localTask.description && (
-                  <button
-                    type="button"
-                    onClick={handleSaveDescription}
-                    disabled={savingDesc}
-                    className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    {savingDesc && <Loader2 className="w-3 h-3 animate-spin" />}
-                    Salvar Descrição
-                  </button>
-                )}
               </div>
-              <RichTextEditor content={description} onChange={setDescription} />
+              <div className="max-h-[250px] overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-800 scrollbar-thin">
+                <RichTextEditor content={description} onChange={setDescription} />
+              </div>
             </div>
 
             {/* Comments */}
@@ -295,13 +339,22 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
               {localTask.comments.length > 0 && (
                 <div className="space-y-4">
                   {localTask.comments.map((comment) => (
-                    <div key={comment.id} className="flex gap-3 bg-slate-50/50 dark:bg-slate-900/10 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl">
+                    <div key={comment.id} className="flex gap-3 bg-slate-50/50 dark:bg-slate-900/10 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl group">
                       <Avatar name={comment.user.name} url={comment.user.avatarUrl} />
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap relative">
                           <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{comment.user.name}</span>
                           <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">({comment.user.role === 'DESIGNER' ? 'Designer' : 'Tráfego'})</span>
-                          <span className="text-[10px] text-slate-400 ml-auto">{formatLogDate(comment.createdAt)}</span>
+                          <span className="text-[10px] text-slate-400 ml-auto mr-6">{formatLogDate(comment.createdAt)}</span>
+                          
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteComment(comment.id)}
+                            className="absolute top-0 right-0 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 p-1 rounded-md opacity-0 group-hover:opacity-100 transition shrink-0 cursor-pointer"
+                            title="Remover Comentário"
+                          >
+                            <Trash className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                         <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
                           {comment.content}
@@ -372,29 +425,61 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
 
               {localTask.checklist.length > 0 && (
                 <div className="space-y-3 pt-2">
-                  {localTask.checklist.map((item) => (
-                    <div key={item.id} className="flex items-start justify-between gap-3 text-sm text-slate-700 dark:text-slate-300 group">
-                      <label className="flex items-start gap-3 cursor-pointer select-none min-w-0 flex-1 pt-1">
-                        <input
-                          type="checkbox"
-                          checked={item.isCompleted}
-                          onChange={(e) => handleToggleChecklist(item.id, e.target.checked)}
-                          className="w-4.5 h-4.5 rounded border-slate-300 dark:border-slate-700 focus:ring-blue-500 text-blue-600 bg-white dark:bg-slate-900 mt-0.5"
-                        />
-                        <span className={`leading-relaxed ${item.isCompleted ? 'line-through text-slate-400 dark:text-slate-500' : 'font-medium'}`}>
-                          {item.title}
-                        </span>
-                      </label>
-                      
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteChecklist(item.id)}
-                        className="text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition shrink-0 cursor-pointer mt-0.5"
-                      >
-                        <Trash className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
+                  <DragDropContext onDragEnd={handleDragEndChecklist}>
+                    <Droppable droppableId={`checklist-${localTask.id}`}>
+                      {(provided) => (
+                        <div
+                          {...provided.droppableProps}
+                          ref={provided.innerRef}
+                          className="space-y-2"
+                        >
+                          {localTask.checklist.map((item, index) => (
+                            <Draggable key={item.id} draggableId={item.id} index={index}>
+                              {(providedDraggable, snapshot) => (
+                                <div
+                                  ref={providedDraggable.innerRef}
+                                  {...providedDraggable.draggableProps}
+                                  className={`flex items-start justify-between gap-3 text-sm text-slate-700 dark:text-slate-300 group p-2 rounded-lg bg-white dark:bg-slate-900/50 border ${
+                                    snapshot.isDragging ? 'border-blue-500 shadow-lg' : 'border-transparent hover:border-slate-200 dark:hover:border-slate-800'
+                                  }`}
+                                >
+                                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                                    <div
+                                      {...providedDraggable.dragHandleProps}
+                                      className="mt-1 cursor-grab text-slate-300 hover:text-slate-500 dark:text-slate-600 dark:hover:text-slate-400 opacity-0 group-hover:opacity-100 transition"
+                                      title="Reordenar"
+                                    >
+                                      <GripVertical className="w-4 h-4" />
+                                    </div>
+                                    <label className="flex items-start gap-3 cursor-pointer select-none min-w-0 flex-1 pt-0.5">
+                                      <input
+                                        type="checkbox"
+                                        checked={item.isCompleted}
+                                        onChange={(e) => handleToggleChecklist(item.id, e.target.checked)}
+                                        className="w-4.5 h-4.5 rounded border-slate-300 dark:border-slate-700 focus:ring-blue-500 text-blue-600 bg-white dark:bg-slate-900 mt-0.5 cursor-pointer"
+                                      />
+                                      <span className={`leading-relaxed ${item.isCompleted ? 'line-through text-slate-400 dark:text-slate-500' : 'font-medium'}`}>
+                                        {item.title}
+                                      </span>
+                                    </label>
+                                  </div>
+                                  
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteChecklist(item.id)}
+                                    className="text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition shrink-0 cursor-pointer mt-0.5"
+                                  >
+                                    <Trash className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              )}
+                            </Draggable>
+                          ))}
+                          {provided.placeholder}
+                        </div>
+                      )}
+                    </Droppable>
+                  </DragDropContext>
                 </div>
               )}
             </div>
