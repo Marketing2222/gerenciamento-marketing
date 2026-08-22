@@ -43,6 +43,7 @@ export interface Task {
   description: string
   priority: string
   status: string
+  order: number
   dueDate: string | null
   createdAt: string
   deletedAt: string | null

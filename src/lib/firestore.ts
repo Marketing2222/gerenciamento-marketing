@@ -59,6 +59,7 @@ function toTaskData(d: FireDoc): Task {
     description: toStr(docData.description),
     priority: toStr(docData.priority, 'MEDIUM'),
     status: toStr(docData.status, 'TODO'),
+    order: typeof docData.order === 'number' ? docData.order : 0,
     dueDate: toIso(docData.dueDate),
     createdAt: toIso(docData.createdAt) || '',
     deletedAt: toIso(docData.deletedAt),
@@ -158,6 +159,7 @@ export async function createTask(input: {
   description?: string
   priority?: string
   status?: string
+  order?: number
   dueDate?: string | null
   assigneeId?: string | null
   assignee?: User | null
@@ -172,6 +174,7 @@ export async function createTask(input: {
     description: input.description || '',
     priority: input.priority || 'MEDIUM',
     status: input.status || 'TODO',
+    order: input.order ?? 0,
     createdAt: now,
     dueDate: input.dueDate ? new Date(input.dueDate) : null,
     deletedAt: null,
@@ -210,13 +213,14 @@ export async function createTask(input: {
 
 export async function updateTaskFields(
   taskId: string,
-  patch: Partial<Pick<Task, 'title' | 'description' | 'priority' | 'status' | 'dueDate' | 'assigneeId' | 'assignee' | 'deletedAt'>>
+  patch: Partial<Pick<Task, 'title' | 'description' | 'priority' | 'status' | 'order' | 'dueDate' | 'assigneeId' | 'assignee' | 'deletedAt'>>
 ): Promise<void> {
   const partial: Record<string, unknown> = {}
   if (patch.title !== undefined) partial.title = patch.title
   if (patch.description !== undefined) partial.description = patch.description
   if (patch.priority !== undefined) partial.priority = patch.priority
   if (patch.status !== undefined) partial.status = patch.status
+  if (patch.order !== undefined) partial.order = patch.order
   if (patch.dueDate !== undefined) partial.dueDate = patch.dueDate ? new Date(patch.dueDate) : null
   if (patch.assigneeId !== undefined) {
     partial.assigneeId = patch.assigneeId
@@ -224,6 +228,13 @@ export async function updateTaskFields(
   }
   if (patch.deletedAt !== undefined) partial.deletedAt = patch.deletedAt ? new Date(patch.deletedAt) : null
   await updateDoc(taskDoc(taskId), partial)
+}
+
+export async function updateTaskOrders(updates: { id: string; order: number }[]): Promise<void> {
+  const promises = updates.map(({ id, order }) =>
+    updateDoc(taskDoc(id), { order })
+  )
+  await Promise.all(promises)
 }
 
 export async function softDeleteTask(taskId: string): Promise<void> {

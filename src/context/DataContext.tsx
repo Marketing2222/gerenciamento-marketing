@@ -7,6 +7,7 @@ import {
   subscribeTasks,
   createTask,
   updateTaskFields,
+  updateTaskOrders as firestoreUpdateTaskOrders,
   softDeleteTask,
   restoreTask,
   permanentDeleteTask,
@@ -50,6 +51,7 @@ interface DataContextType {
     id: string,
     patch: Partial<Pick<Task, 'title' | 'description' | 'priority' | 'status' | 'dueDate' | 'assigneeId' | 'assignee'>>
   ) => Promise<void>
+  updateTaskOrders: (updates: { id: string; order: number }[]) => Promise<void>
   moveToTrash: (id: string) => Promise<void>
   restore: (id: string) => Promise<void>
   deleteForever: (id: string) => Promise<void>
@@ -139,6 +141,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
     [users]
   )
 
+  const updateTaskOrders = useCallback(async (updates: { id: string; order: number }[]) => {
+    await firestoreUpdateTaskOrders(updates)
+  }, [])
+
   const moveToTrash = useCallback(async (id: string) => {
     await softDeleteTask(id)
   }, [])
@@ -212,6 +218,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     loaded,
     addTask,
     updateTask,
+    updateTaskOrders,
     moveToTrash,
     restore,
     deleteForever,

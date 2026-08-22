@@ -12,6 +12,7 @@ import { useData } from '@/context/DataContext'
 import { useColumns } from '@/context/ColumnsContext'
 import { useMobileUI } from '@/context/MobileUIContext'
 import { useKanbanFilter } from '@/context/KanbanFilterContext'
+import type { Task } from '@/types'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const WEEKDAY_PT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
@@ -84,7 +85,7 @@ export default function KanbanPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
 
-  const { tasks, loaded, updateTask } = useData()
+  const { tasks, loaded, updateTask, updateTaskOrders } = useData()
   const { columns } = useColumns()
   const { registerAddTask } = useMobileUI()
   const {
@@ -137,22 +138,134 @@ export default function KanbanPage() {
     registerAddTask(setIsCreateOpen)
   }, [registerAddTask, setIsCreateOpen])
 
+  // Persist migrated orders for tasks that don't have one yet
+  React.useEffect(() => {
+    if (!loaded || tasks.length === 0) return
+    const tasksNeedingOrder = tasks.filter(t => t.order === 0 && !t.deletedAt)
+    if (tasksNeedingOrder.length === 0) return
+
+    const orderCounters: Record<string, number> = {}
+    columns.forEach(col => { orderCounters[col.id] = 1 })
+
+    // Count existing orders per column to avoid conflicts
+    tasks.forEach(t => {
+      if (t.order > 0 && !t.deletedAt) {
+        const col = t.status
+        if (!orderCounters[col]) orderCounters[col] = 1
+        if (t.order >= orderCounters[col]) {
+          orderCounters[col] = t.order + 1
+        }
+      }
+    })
+
+    const updates = tasksNeedingOrder.map(t => {
+      if (!orderCounters[t.status]) orderCounters[t.status] = 1
+      return { id: t.id, order: orderCounters[t.status]++ }
+    })
+
+    if (updates.length > 0) {
+      updateTaskOrders(updates).catch(console.error)
+    }
+  }, [loaded, tasks, columns, updateTaskOrders])
+
   const handleDragEnd = async (result: DropResult) => {
     const { source, destination, draggableId } = result
     if (!destination) return
     if (source.droppableId === destination.droppableId && source.index === destination.index) return
+
+    const srcColId = source.droppableId
+    const destColId = destination.droppableId
+
+    // Get tasks for source and destination columns, sorted by order
+    const srcTasks = tasks
+      .filter(t => t.status === srcColId && !t.deletedAt)
+      .sort((a, b) => a.order - b.order)
+    const destTasks = srcColId === destColId
+      ? srcTasks
+      : tasks
+          .filter(t => t.status === destColId && !t.deletedAt)
+          .sort((a, b) => a.order - b.order)
+
+    // Find the dragged task
+    const draggedTask = srcTasks.find(t => t.id === draggableId)
+    if (!draggedTask) return
+
+    // Remove from source
+    const srcWithout = srcTasks.filter(t => t.id !== draggableId)
+
+    // Insert at destination
+    let destWithDragged: Task[]
+    if (srcColId === destColId) {
+      // Same column: insert into the source array at destination index
+      destWithDragged = [...srcWithout]
+      destWithDragged.splice(destination.index, 0, draggedTask)
+    } else {
+      // Different column: insert into destination array at destination index
+      destWithDragged = [...destTasks]
+      destWithDragged.splice(destination.index, 0, draggedTask)
+    }
+
+    // Calculate new orders
+    const updates: { id: string; order: number }[] = []
+
+    if (srcColId === destColId) {
+      // Same column: just reindex the single column
+      destWithDragged.forEach((task, idx) => {
+        const newOrder = idx + 1
+        if (task.order !== newOrder) {
+          updates.push({ id: task.id, order: newOrder })
+        }
+      })
+    } else {
+      // Different column: reindex both columns
+      srcWithout.forEach((task, idx) => {
+        const newOrder = idx + 1
+        if (task.order !== newOrder) {
+          updates.push({ id: task.id, order: newOrder })
+        }
+      })
+      destWithDragged.forEach((task, idx) => {
+        const newOrder = idx + 1
+        if (task.order !== newOrder) {
+          updates.push({ id: task.id, order: newOrder })
+        }
+      })
+    }
+
     try {
-      await updateTask(draggableId, { status: destination.droppableId })
+      // Update status if cross-column
+      if (srcColId !== destColId) {
+        await updateTask(draggableId, { status: destColId })
+      }
+      // Save all order updates
+      if (updates.length > 0) {
+        await updateTaskOrders(updates)
+      }
     } catch (err) {
       console.error(err)
     }
   }
 
-  // Tasks grouped: colId → dayISO → tasks[]
+  // Tasks grouped: colId → dayISO → tasks[] (sorted by order)
   const tasksByColumnAndDay = useMemo(() => {
-    const result: Record<string, Record<string, typeof filteredTasks>> = {}
+    const result: Record<string, Record<string, Task[]>> = {}
     columns.forEach(col => { result[col.id] = {} })
-    filteredTasks.forEach(task => {
+
+    // Lazy migration: assign order to tasks that don't have one
+    const orderCounters: Record<string, number> = {}
+    columns.forEach(col => { orderCounters[col.id] = 1 })
+    const migratedOrders = new Map<string, number>()
+    const sortedByOrder = [...filteredTasks].sort((a, b) => {
+      const aOrder = a.order !== 0 ? a.order : (migratedOrders.get(a.id) ?? (orderCounters[a.status]++))
+      const bOrder = b.order !== 0 ? b.order : (migratedOrders.get(b.id) ?? (orderCounters[b.status]++))
+      if (a.order === 0 && !migratedOrders.has(a.id)) migratedOrders.set(a.id, aOrder)
+      if (b.order === 0 && !migratedOrders.has(b.id)) migratedOrders.set(b.id, bOrder)
+      if (a.order === 0 && b.order === 0) return aOrder - bOrder
+      if (a.order === 0) return 1
+      if (b.order === 0) return -1
+      return a.order - b.order
+    })
+    sortedByOrder.forEach(task => {
       const colId = task.status
       if (!result[colId]) result[colId] = {}
       const day = task.dueDate ? task.dueDate.split('T')[0] : '__no_date__'
