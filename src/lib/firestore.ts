@@ -1,4 +1,4 @@
-import { db, isFirebaseConfigured } from '@/lib/firebaseClient'
+import { db, isFirebaseConfigured, waitForConfig } from '@/lib/firebaseClient'
 import {
   collection,
   onSnapshot,
@@ -84,14 +84,14 @@ function toUserData(d: FireDoc): User {
   }
 }
 
-function usersCol() {
-  return collection(db(), 'users')
+async function usersCol() {
+  return collection(await db(), 'users')
 }
-function tasksCol() {
-  return collection(db(), 'tasks')
+async function tasksCol() {
+  return collection(await db(), 'tasks')
 }
-function taskDoc(id: string) {
-  return doc(db(), 'tasks', id)
+async function taskDoc(id: string) {
+  return doc(await db(), 'tasks', id)
 }
 
 // ===== Assinaturas em tempo real =====
@@ -101,10 +101,14 @@ export function subscribeUsers(callback: (users: User[]) => void): () => void {
     callback([])
     return () => {}
   }
-  const q = query(usersCol())
-  return onSnapshot(q, (snapshot) => {
-    callback(snapshot.docs.map((d) => toUserData(d as unknown as FireDoc)))
+  let unsub: (() => void) | null = null
+  void waitForConfig().then(async () => {
+    const q = query(await usersCol())
+    unsub = onSnapshot(q, (snapshot) => {
+      callback(snapshot.docs.map((d) => toUserData(d as unknown as FireDoc)))
+    })
   })
+  return () => { unsub?.() }
 }
 
 export function subscribeTasks(callback: (tasks: Task[]) => void): () => void {
@@ -112,10 +116,14 @@ export function subscribeTasks(callback: (tasks: Task[]) => void): () => void {
     callback([])
     return () => {}
   }
-  const q = query(tasksCol())
-  return onSnapshot(q, (snapshot) => {
-    callback(snapshot.docs.map((d) => toTaskData(d as unknown as FireDoc)))
+  let unsub: (() => void) | null = null
+  void waitForConfig().then(async () => {
+    const q = query(await tasksCol())
+    unsub = onSnapshot(q, (snapshot) => {
+      callback(snapshot.docs.map((d) => toTaskData(d as unknown as FireDoc)))
+    })
   })
+  return () => { unsub?.() }
 }
 
 // ===== Escritas - Usuários =====
@@ -127,7 +135,7 @@ export async function createUser(input: {
   pin?: string
 }): Promise<User> {
   const id = generateId()
-  await setDoc(doc(usersCol(), id), {
+  await setDoc(doc(await usersCol(), id), {
     name: input.name,
     role: input.role,
     avatarUrl: input.avatarUrl || '',
@@ -145,11 +153,11 @@ export async function updateUser(
   if (patch.role !== undefined) partial.role = patch.role
   if (patch.avatarUrl !== undefined) partial.avatarUrl = patch.avatarUrl
   if (patch.pin !== undefined) partial.pin = patch.pin
-  await updateDoc(doc(usersCol(), id), partial)
+  await updateDoc(doc(await usersCol(), id), partial)
 }
 
 export async function deleteUser(id: string): Promise<void> {
-  await deleteDoc(doc(usersCol(), id))
+  await deleteDoc(doc(await usersCol(), id))
 }
 
 // ===== Tarefas =====
@@ -208,7 +216,7 @@ export async function createTask(input: {
         ]
       : [],
   }
-  await setDoc(doc(tasksCol(), taskId), data)
+  await setDoc(doc(await tasksCol(), taskId), data)
 }
 
 export async function updateTaskFields(
@@ -227,48 +235,48 @@ export async function updateTaskFields(
     partial.assignee = patch.assignee || null
   }
   if (patch.deletedAt !== undefined) partial.deletedAt = patch.deletedAt ? new Date(patch.deletedAt) : null
-  await updateDoc(taskDoc(taskId), partial)
+  await updateDoc(await taskDoc(taskId), partial)
 }
 
 export async function updateTaskOrders(updates: { id: string; order: number }[]): Promise<void> {
-  const promises = updates.map(({ id, order }) =>
-    updateDoc(taskDoc(id), { order })
+  const promises = updates.map(async ({ id, order }) =>
+    updateDoc(await taskDoc(id), { order })
   )
   await Promise.all(promises)
 }
 
 export async function softDeleteTask(taskId: string): Promise<void> {
-  await updateDoc(taskDoc(taskId), { deletedAt: new Date() })
+  await updateDoc(await taskDoc(taskId), { deletedAt: new Date() })
 }
 
 export async function restoreTask(taskId: string): Promise<void> {
-  await updateDoc(taskDoc(taskId), { deletedAt: null })
+  await updateDoc(await taskDoc(taskId), { deletedAt: null })
 }
 
 export async function permanentDeleteTask(taskId: string): Promise<void> {
-  await deleteDoc(taskDoc(taskId))
+  await deleteDoc(await taskDoc(taskId))
 }
 
 export async function emptyTrash(): Promise<void> {
-  const snap = await getDocs(query(tasksCol()))
+  const snap = await getDocs(query(await tasksCol()))
   for (const d of snap.docs) {
     const docData = d.data()
     if (docData.deletedAt) {
-      await deleteDoc(doc(tasksCol(), d.id))
+      await deleteDoc(doc(await tasksCol(), d.id))
     }
   }
 }
 
 // Lê o array atual de um sub-recurso da tarefa.
 async function readList<T>(taskId: string, key: string): Promise<T[]> {
-  const taskRef = taskDoc(taskId)
+  const taskRef = await taskDoc(taskId)
   const snap = await getDoc(taskRef)
   if (!snap.exists()) return []
   return (snap.data()?.[key] || []) as T[]
 }
 
 async function writeList(taskId: string, key: string, list: unknown[]): Promise<void> {
-  await updateDoc(taskDoc(taskId), { [key]: list })
+  await updateDoc(await taskDoc(taskId), { [key]: list })
 }
 
 function logObj(action: string, user: User | null): ActivityLog {
@@ -338,10 +346,10 @@ export async function deleteAttachment(taskId: string, attachmentId: string): Pr
 
 export async function seedDatabase(currentUsers: User[], currentTasks: Task[]): Promise<{ users: User[]; tasks: string[] }> {
   for (const u of currentUsers) {
-    await deleteDoc(doc(usersCol(), u.id))
+    await deleteDoc(doc(await usersCol(), u.id))
   }
   for (const t of currentTasks) {
-    await deleteDoc(taskDoc(t.id))
+    await deleteDoc(await taskDoc(t.id))
   }
 
   const designer = await createUser({ name: 'Lucas Mendes', role: 'DESIGNER', pin: '1234' })
@@ -352,7 +360,7 @@ export async function seedDatabase(currentUsers: User[], currentTasks: Task[]): 
 
   // Tarefa 1
   const t1 = generateId()
-  await setDoc(doc(tasksCol(), t1), {
+  await setDoc(doc(await tasksCol(), t1), {
     title: 'Criar criativos para campanha de Dia dos Pais',
     description: '<p>Desenvolver 3 variações de criativos estáticos e 1 animação em vídeo para a campanha de Dia dos Pais.</p>',
     priority: 'HIGH',
@@ -379,7 +387,7 @@ export async function seedDatabase(currentUsers: User[], currentTasks: Task[]): 
 
   // Tarefa 2
   const t2 = generateId()
-  await setDoc(doc(tasksCol(), t2), {
+  await setDoc(doc(await tasksCol(), t2), {
     title: 'Subir campanha de tráfego pago - Lançamento Produto X',
     description: '<p>Configurar conjuntos de anúncios no Meta Ads e Google Ads com foco em conversão para a landing page.</p>',
     priority: 'URGENT',
@@ -408,7 +416,7 @@ export async function seedDatabase(currentUsers: User[], currentTasks: Task[]): 
 
   // Tarefa 3
   const t3 = generateId()
-  await setDoc(doc(tasksCol(), t3), {
+  await setDoc(doc(await tasksCol(), t3), {
     title: 'Identidade visual do novo cliente Y',
     description: '<p>Definição de tipografia, paleta de cores primárias e secundárias, e logotipo principal do cliente Y.</p>',
     priority: 'MEDIUM',

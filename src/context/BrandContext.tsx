@@ -1,7 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
-import { isFirebaseConfigured } from '@/lib/firebaseClient'
+import { isFirebaseConfigured, waitForConfig } from '@/lib/firebaseClient'
 import { doc, onSnapshot, setDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebaseClient'
 
@@ -20,10 +20,8 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
   const [siteName, setSiteNameState] = useState(DEFAULT_NAME)
   const [logoUrl, setLogoUrlState] = useState(DEFAULT_LOGO)
 
-  // Carrega e escuta o documento de marca no Firestore quando configurado.
-    useEffect(() => {
+  useEffect(() => {
     if (!isFirebaseConfigured()) {
-      // Fallback para localStorage (sem Firebase)
       if (typeof window !== 'undefined') {
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setSiteNameState(localStorage.getItem('mktflow-site-name') || DEFAULT_NAME)
@@ -31,23 +29,26 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
       }
       return
     }
-    const brandRef = doc(db(), 'settings', 'brand')
-    const unsub = onSnapshot(brandRef, (snap) => {
-      if (snap.exists()) {
-        const d = snap.data()
-        setSiteNameState(d.siteName || DEFAULT_NAME)
-        setLogoUrlState(d.logoUrl || DEFAULT_LOGO)
-      } else {
-        setSiteNameState(DEFAULT_NAME)
-        setLogoUrlState(DEFAULT_LOGO)
-      }
+    let unsub: (() => void) | null = null
+    void waitForConfig().then(async () => {
+      const brandRef = doc(await db(), 'settings', 'brand')
+      unsub = onSnapshot(brandRef, (snap) => {
+        if (snap.exists()) {
+          const d = snap.data()
+          setSiteNameState(d.siteName || DEFAULT_NAME)
+          setLogoUrlState(d.logoUrl || DEFAULT_LOGO)
+        } else {
+          setSiteNameState(DEFAULT_NAME)
+          setLogoUrlState(DEFAULT_LOGO)
+        }
+      })
     })
-    return () => unsub()
+    return () => { unsub?.() }
   }, [])
 
-  const persist = useCallback((name: string, logo: string) => {
+  const persist = useCallback(async (name: string, logo: string) => {
     if (isFirebaseConfigured()) {
-      void setDoc(doc(db(), 'settings', 'brand'), { siteName: name, logoUrl: logo })
+      void setDoc(doc(await db(), 'settings', 'brand'), { siteName: name, logoUrl: logo })
     } else if (typeof window !== 'undefined') {
       localStorage.setItem('mktflow-site-name', name)
       localStorage.setItem('mktflow-logo-url', logo)

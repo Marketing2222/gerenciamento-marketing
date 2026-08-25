@@ -224,17 +224,29 @@ const ManageOptionsModal = ({
   )
 }
 
-const AUTH_PASSWORD = process.env.NEXT_PUBLIC_SCHEDULE_PASSWORD || '1234'
+const AUTH_PASSWORD_DEFAULT = '1234'
+
+function useSchedulePassword(): string {
+  const [password, setPassword] = useState(AUTH_PASSWORD_DEFAULT)
+  useEffect(() => {
+    fetch('/api/firebase-config')
+      .then(r => r.json())
+      .then(c => { if (c.schedulePassword) setPassword(c.schedulePassword) })
+      .catch(() => {})
+  }, [])
+  return password
+}
 
 const PasswordModal = ({ isOpen, onClose, onSuccess }: { isOpen: boolean, onClose: () => void, onSuccess: () => void }) => {
   const [pwd, setPwd] = useState('')
   const [error, setError] = useState(false)
+  const authPassword = useSchedulePassword()
 
   if (!isOpen) return null
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (pwd === AUTH_PASSWORD) {
+    if (pwd === authPassword) {
       onSuccess()
       setPwd('')
       setError(false)

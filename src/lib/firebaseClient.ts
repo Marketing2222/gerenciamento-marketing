@@ -1,42 +1,67 @@
-import { initializeApp, getApp as getDefaultApp, FirebaseApp } from 'firebase/app'
-import { getFirestore, Firestore } from 'firebase/firestore'
+import { initializeApp, getApp as getDefaultApp, type FirebaseApp } from 'firebase/app'
+import { getFirestore, type Firestore } from 'firebase/firestore'
 
-const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY
-const authDomain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
-const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-const messagingSenderId = process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-const appId = process.env.NEXT_PUBLIC_FIREBASE_APP_ID
+interface FirebaseConfig {
+  apiKey: string
+  authDomain: string
+  projectId: string
+  storageBucket: string
+  messagingSenderId: string
+  appId: string
+}
+
+let _config: FirebaseConfig | null = null
+let _configPromise: Promise<FirebaseConfig> | null = null
+
+function fetchConfig(): Promise<FirebaseConfig> {
+  if (_config) return Promise.resolve(_config)
+  if (!_configPromise) {
+    _configPromise = fetch('/api/firebase-config')
+      .then((r) => r.json())
+      .then((c: FirebaseConfig) => {
+        _config = c
+        return c
+      })
+  }
+  return _configPromise
+}
 
 export function isFirebaseConfigured(): boolean {
-  return !!(apiKey && projectId)
+  return !!(_config?.apiKey && _config?.projectId)
 }
 
 let _app: FirebaseApp | null = null
+let _db: Firestore | null = null
 
-function firebaseApp(): FirebaseApp {
-  if (!_app) {
+function initSync(): Firestore {
+  if (!_db && _config?.apiKey) {
     try {
       _app = getDefaultApp()
     } catch {
       _app = initializeApp({
-        apiKey,
-        authDomain,
-        projectId,
-        storageBucket,
-        messagingSenderId,
-        appId,
+        apiKey: _config.apiKey,
+        authDomain: _config.authDomain,
+        projectId: _config.projectId,
+        storageBucket: _config.storageBucket,
+        messagingSenderId: _config.messagingSenderId,
+        appId: _config.appId,
       })
     }
+    _db = getFirestore(_app)
   }
-  return _app
+  return _db!
 }
 
-let _db: Firestore | null = null
+export async function db(): Promise<Firestore> {
+  if (_db) return _db
+  await fetchConfig()
+  return initSync()
+}
 
-export function db(): Firestore {
-  if (!_db) {
-    _db = getFirestore(firebaseApp())
-  }
+export function dbSync(): Firestore | null {
   return _db
+}
+
+export function waitForConfig(): Promise<FirebaseConfig> {
+  return fetchConfig()
 }

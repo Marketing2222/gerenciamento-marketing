@@ -1,7 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
-import { isFirebaseConfigured } from '@/lib/firebaseClient'
+import { isFirebaseConfigured, waitForConfig } from '@/lib/firebaseClient'
 import { doc, onSnapshot, setDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebaseClient'
 
@@ -108,20 +108,23 @@ export function ColumnsProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isFirebaseConfigured()) return
-    const ref = doc(db(), 'settings', 'kanban')
-    const unsub = onSnapshot(ref, (snap) => {
-      if (snap.exists()) {
-        const d = snap.data()
-        if (Array.isArray(d.columns)) setColumns(d.columns)
-        if (d.summary && typeof d.summary === 'object') setSummary(d.summary)
-      }
+    let unsub: (() => void) | null = null
+    void waitForConfig().then(async () => {
+      const ref = doc(await db(), 'settings', 'kanban')
+      unsub = onSnapshot(ref, (snap) => {
+        if (snap.exists()) {
+          const d = snap.data()
+          if (Array.isArray(d.columns)) setColumns(d.columns)
+          if (d.summary && typeof d.summary === 'object') setSummary(d.summary)
+        }
+      })
     })
-    return () => unsub()
+    return () => { unsub?.() }
   }, [])
 
-  const persist = useCallback((cols: KanbanColumn[], sum: CardSummaryConfig) => {
+  const persist = useCallback(async (cols: KanbanColumn[], sum: CardSummaryConfig) => {
     if (isFirebaseConfigured()) {
-      void setDoc(doc(db(), 'settings', 'kanban'), { columns: cols, summary: sum })
+      void setDoc(doc(await db(), 'settings', 'kanban'), { columns: cols, summary: sum })
     } else if (typeof window !== 'undefined') {
       localStorage.setItem('mktflow-columns', JSON.stringify(cols))
       localStorage.setItem('mktflow-summary', JSON.stringify(sum))

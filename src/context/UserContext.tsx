@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { db, isFirebaseConfigured } from '@/lib/firebaseClient'
+import { db, isFirebaseConfigured, waitForConfig } from '@/lib/firebaseClient'
 import { onSnapshot, getDoc, doc } from 'firebase/firestore'
 
 interface User {
@@ -32,7 +32,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const unsubRef = React.useRef<(() => void) | null>(null)
 
   const refreshUser = useCallback(() => {
-    // Cleanup previous listener
     if (unsubRef.current) {
       unsubRef.current()
       unsubRef.current = null
@@ -57,33 +56,35 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       return undefined
     }
 
-    // Ouve o documento do usuário logado (tempo real p/ atualizações de perfil)
-    const unsub = onSnapshot(
-      doc(db(), 'users', savedId),
-      (snap) => {
-        if (snap.exists()) {
-          const d = snap.data()
-          const u: User = { id: snap.id, name: d.name || '', role: d.role || '', avatarUrl: d.avatarUrl || '' }
-          setUser(u)
-        } else {
-          localStorage.removeItem(USER_STORAGE_KEY)
+    let unsub: (() => void) | null = null
+    void waitForConfig().then(async () => {
+      unsub = onSnapshot(
+        doc(await db(), 'users', savedId),
+        (snap) => {
+          if (snap.exists()) {
+            const d = snap.data()
+            const u: User = { id: snap.id, name: d.name || '', role: d.role || '', avatarUrl: d.avatarUrl || '' }
+            setUser(u)
+          } else {
+            localStorage.removeItem(USER_STORAGE_KEY)
+            setUser(null)
+            if (pathname !== '/login') {
+              router.push('/login')
+            }
+          }
+          setLoading(false)
+        },
+        () => {
           setUser(null)
+          setLoading(false)
           if (pathname !== '/login') {
             router.push('/login')
           }
         }
-        setLoading(false)
-      },
-      () => {
-        setUser(null)
-        setLoading(false)
-        if (pathname !== '/login') {
-          router.push('/login')
-        }
-      }
-    )
-    unsubRef.current = unsub
-    return unsub
+      )
+      unsubRef.current = unsub
+    })
+    return () => { unsub?.() }
   }, [pathname, router])
 
   useEffect(() => {
@@ -103,7 +104,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         return { success: false, error: 'Firebase não configurado. Preencha as variáveis de ambiente e recarregue.' }
       }
       try {
-        const snap = await getDoc(doc(db(), 'users', userId))
+        const snap = await getDoc(doc(await db(), 'users', userId))
         if (!snap.exists()) {
           return { success: false, error: 'Usuário não encontrado' }
         }
