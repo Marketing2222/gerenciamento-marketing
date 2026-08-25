@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { X, Save, Plus, Trash2, CheckCircle2, ChevronDown, Edit2 } from 'lucide-react'
 
 // ================= TYPES =================
@@ -224,6 +224,8 @@ const ManageOptionsModal = ({
   )
 }
 
+const AUTH_PASSWORD = process.env.NEXT_PUBLIC_SCHEDULE_PASSWORD || '1234'
+
 const PasswordModal = ({ isOpen, onClose, onSuccess }: { isOpen: boolean, onClose: () => void, onSuccess: () => void }) => {
   const [pwd, setPwd] = useState('')
   const [error, setError] = useState(false)
@@ -232,8 +234,7 @@ const PasswordModal = ({ isOpen, onClose, onSuccess }: { isOpen: boolean, onClos
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    // Validação simulada (Senha provisória: 1234)
-    if (pwd === '1234') {
+    if (pwd === AUTH_PASSWORD) {
       onSuccess()
       setPwd('')
       setError(false)
@@ -257,10 +258,10 @@ const PasswordModal = ({ isOpen, onClose, onSuccess }: { isOpen: boolean, onClos
             autoFocus
             value={pwd}
             onChange={(e) => { setPwd(e.target.value); setError(false) }}
-            placeholder="Senha (1234)"
+            placeholder="Digite a senha..."
             className={`w-full bg-slate-50 dark:bg-slate-800 border ${error ? 'border-red-500 focus:border-red-500' : 'border-slate-200 dark:border-slate-700 focus:border-blue-500'} rounded-lg px-3 py-2 text-sm outline-none mb-2 text-slate-800 dark:text-slate-200`}
           />
-          {error && <span className="text-[10px] text-red-500 font-medium">Senha incorreta. Tente "1234".</span>}
+          {error && <span className="text-[10px] text-red-500 font-medium">Senha incorreta. Tente novamente.</span>}
           
           <div className="mt-5 flex justify-end gap-2">
             <button type="button" onClick={onClose} className="px-4 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition">Cancelar</button>
@@ -274,25 +275,52 @@ const PasswordModal = ({ isOpen, onClose, onSuccess }: { isOpen: boolean, onClos
 
 
 // ================= MAIN MODAL =================
+const STORAGE_KEY_TITLE = 'mktflow-video-schedule-title'
+const STORAGE_KEY_MONTH = 'mktflow-video-schedule-month'
+const STORAGE_KEY_DATA = 'mktflow-video-schedule-data'
+const STORAGE_KEY_OPTIONS = 'mktflow-video-schedule-options'
+
+function loadFromStorage<T>(key: string, fallback: T): T {
+  if (typeof window === 'undefined') return fallback
+  try {
+    const raw = localStorage.getItem(key)
+    if (raw) return JSON.parse(raw) as T
+  } catch { /* ignore */ }
+  return fallback
+}
+
+function saveToStorage(key: string, value: unknown) {
+  if (typeof window === 'undefined') return
+  try { localStorage.setItem(key, JSON.stringify(value)) } catch { /* ignore */ }
+}
+
 export default function VideoScheduleModal({ isOpen, onClose }: VideoScheduleModalProps) {
-  const [title, setTitle] = useState('CRONOGRAMA DE VÍDEOS')
-  const [selectedMonth, setSelectedMonth] = useState('Agosto')
-  const [monthData, setMonthData] = useState<Record<string, ScheduleRow[]>>({
-    'Agosto': defaultRows
-  })
+  const [title, setTitle] = useState(() => loadFromStorage(STORAGE_KEY_TITLE, 'CRONOGRAMA DE VÍDEOS'))
+  const [selectedMonth, setSelectedMonth] = useState(() => loadFromStorage(STORAGE_KEY_MONTH, 'Agosto'))
+  const [monthData, setMonthData] = useState<Record<string, ScheduleRow[]>>(() =>
+    loadFromStorage(STORAGE_KEY_DATA, { 'Agosto': defaultRows })
+  )
   
-  const [optionsMap, setOptionsMap] = useState<ColumnOptions>(initialOptions)
+  const [optionsMap, setOptionsMap] = useState<ColumnOptions>(() =>
+    loadFromStorage(STORAGE_KEY_OPTIONS, initialOptions)
+  )
   
   // Modals state
   const [manageCol, setManageCol] = useState<keyof ColumnOptions | null>(null)
   const [passwordRowId, setPasswordRowId] = useState<string | null>(null)
+
+  // Persist to localStorage on every change
+  useEffect(() => { saveToStorage(STORAGE_KEY_TITLE, title) }, [title])
+  useEffect(() => { saveToStorage(STORAGE_KEY_MONTH, selectedMonth) }, [selectedMonth])
+  useEffect(() => { saveToStorage(STORAGE_KEY_DATA, monthData) }, [monthData])
+  useEffect(() => { saveToStorage(STORAGE_KEY_OPTIONS, optionsMap) }, [optionsMap])
 
   if (!isOpen) return null
 
   const rows = monthData[selectedMonth] || []
 
   // Helpers
-  const updateRow = (id: string, field: keyof ScheduleRow, value: any) => {
+  const updateRow = (id: string, field: keyof ScheduleRow, value: ScheduleRow[keyof ScheduleRow]) => {
     const updated = rows.map(row => row.id === id ? { ...row, [field]: value } : row)
     setMonthData(prev => ({ ...prev, [selectedMonth]: updated }))
   }

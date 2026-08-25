@@ -131,7 +131,7 @@ export default function KanbanPage() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, loaded])
+  }, [searchParams, loaded, activeTasks, setIsCreateOpen, router])
 
   React.useEffect(() => {
     registerAddTask(setIsCreateOpen)
@@ -227,13 +227,20 @@ export default function KanbanPage() {
       })
     }
 
-    // Fire-and-forget: don't await to avoid re-render during DnD cleanup
-    if (srcColId !== destColId) {
-      updateTask(draggableId, { status: destColId }).catch(console.error)
+    // Sequential: first change status (if cross-column), then update orders
+    const doDrag = async () => {
+      try {
+        if (srcColId !== destColId) {
+          await updateTask(draggableId, { status: destColId })
+        }
+        if (updates.length > 0) {
+          await updateTaskOrders(updates)
+        }
+      } catch (err) {
+        console.error('Drag-and-drop error:', err)
+      }
     }
-    if (updates.length > 0) {
-      updateTaskOrders(updates).catch(console.error)
-    }
+    doDrag()
   }
 
   // Tasks grouped: colId → tasks[] (flat, sorted by order)

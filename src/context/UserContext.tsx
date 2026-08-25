@@ -29,15 +29,22 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
   const router = useRouter()
   const pathname = usePathname()
+  const unsubRef = React.useRef<(() => void) | null>(null)
 
   const refreshUser = useCallback(() => {
+    // Cleanup previous listener
+    if (unsubRef.current) {
+      unsubRef.current()
+      unsubRef.current = null
+    }
+
     if (!isFirebaseConfigured()) {
       setUser(null)
       setLoading(false)
       if (pathname !== '/login') {
         router.push('/login')
       }
-      return
+      return undefined
     }
 
     const savedId = typeof window !== 'undefined' ? localStorage.getItem(USER_STORAGE_KEY) : null
@@ -47,7 +54,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       if (pathname !== '/login') {
         router.push('/login')
       }
-      return
+      return undefined
     }
 
     // Ouve o documento do usuário logado (tempo real p/ atualizações de perfil)
@@ -75,11 +82,19 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         }
       }
     )
+    unsubRef.current = unsub
     return unsub
   }, [pathname, router])
 
   useEffect(() => {
-    return refreshUser()
+    const unsub = refreshUser()
+    return () => {
+      unsub?.()
+      if (unsubRef.current) {
+        unsubRef.current()
+        unsubRef.current = null
+      }
+    }
   }, [refreshUser])
 
   const login = useCallback(
@@ -94,20 +109,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         }
         const data = snap.data()
         const storedPin = data.pin || ''
-        if (storedPin && storedPin !== pin) {
+        if (!storedPin) {
+          return { success: false, error: 'Este usuário não possui PIN configurado. Configure um PIN primeiro.' }
+        }
+        if (storedPin !== pin) {
           return { success: false, error: 'PIN incorreto' }
         }
         localStorage.setItem(USER_STORAGE_KEY, userId)
-        // Dispara refresh para re-aparecer a sessão sem recarregar a página
-        const unsub = onSnapshot(doc(db(), 'users', userId), (s) => {
-          if (s.exists()) {
-            const d = s.data()
-            const u: User = { id: s.id, name: d.name || '', role: d.role || '', avatarUrl: d.avatarUrl || '' }
-            setUser(u)
-            setLoading(false)
-          }
-        })
-        setTimeout(() => unsub(), 1500)
+        // Let refreshUser handle the session listener (no duplicate)
+        setUser({ id: snap.id, name: data.name || '', role: data.role || '', avatarUrl: data.avatarUrl || '' })
+        setLoading(false)
         router.push('/')
         return { success: true }
       } catch (err: unknown) {

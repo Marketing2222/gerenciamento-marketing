@@ -21,6 +21,13 @@ function getWeekOfMonth(date: Date) {
   return Math.ceil((date.getDate() + firstDay) / 7)
 }
 
+function toLocalIsoDate(d: Date): string {
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 export default function CalendarFilterPanel() {
   const { isCalendarOpen, setIsCalendarOpen, weekFilter, setWeekFilter, dayFilter, setDayFilter } = useKanbanFilter()
   const ref = useRef<HTMLDivElement>(null)
@@ -68,7 +75,7 @@ export default function CalendarFilterPanel() {
   }
 
   const handleDayClick = (d: Date) => {
-    const iso = d.toISOString().split('T')[0]
+    const iso = toLocalIsoDate(d)
     if (dayFilter === iso) { setDayFilter('') }
     else { setDayFilter(iso); setWeekFilter('') }
   }
@@ -153,7 +160,7 @@ export default function CalendarFilterPanel() {
               </div>
               <div className="grid grid-cols-7 gap-0.5 p-1">
                 {daysByWeek[w].map(d => {
-                  const iso = d.toISOString().split('T')[0]
+                  const iso = toLocalIsoDate(d)
                   const isSelected = dayFilter === iso
                   const isToday = d.toDateString() === now.toDateString()
                   return (

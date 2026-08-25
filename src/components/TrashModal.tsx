@@ -4,26 +4,25 @@ import React, { useMemo, useState } from 'react'
 import { Trash2, X, RotateCcw, Loader2, Inbox } from 'lucide-react'
 import Avatar from '@/components/Avatar'
 import { useData } from '@/context/DataContext'
+import { useColumns } from '@/context/ColumnsContext'
 
 interface TrashModalProps {
   isOpen: boolean
   onClose: () => void
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  BACKLOG: 'Ideia',
-  TODO: 'A Fazer',
-  IN_PROGRESS: 'Em Andamento',
-  AWAITING_APPROVAL: 'Aprovação',
-  DONE: 'Concluído',
-}
-
 export default function TrashModal({ isOpen, onClose }: TrashModalProps) {
   const { tasks, loaded, restore, deleteForever, clearTrash } = useData()
+  const { columns } = useColumns()
   const [acting, setActing] = useState<string | null>(null)
   const [emptying, setEmptying] = useState(false)
 
   const trashTasks = useMemo(() => tasks.filter((t) => t.deletedAt), [tasks])
+  const statusLabelMap = useMemo(() => {
+    const map: Record<string, string> = {}
+    columns.forEach(col => { map[col.id] = col.title })
+    return map
+  }, [columns])
 
   const handleRestore = async (id: string) => {
     setActing(id)
@@ -127,7 +126,7 @@ export default function TrashModal({ isOpen, onClose }: TrashModalProps) {
                   </h4>
                   <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500 dark:text-slate-400 font-medium">
                     <span className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                      {STATUS_LABELS[task.status] || task.status}
+                      {statusLabelMap[task.status] || task.status}
                     </span>
                     {task.deletedAt && (
                       <span>Excluída em {new Date(task.deletedAt).toLocaleDateString('pt-BR')}</span>

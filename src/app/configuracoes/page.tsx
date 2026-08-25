@@ -30,7 +30,7 @@ const EMPTY_USER_FORM: UserFormData = { name: '', role: 'DESIGNER', pin: '', ava
 export default function SettingsPage() {
   const { user, refreshUser } = useUser()
   const { siteName, logoUrl, applyBrand } = useBrand()
-  const { saveProfile, uploadAvatar, uploadLogo, users, addUser, removeUser } = useData()
+  const { saveProfile, uploadAvatar, uploadLogo, users, addUser, removeUser, tasks, updateTask } = useData()
   const { columns, summary, updateColumn, updateSummary, addColumn, removeColumn, reorderColumns } = useColumns()
   
   const [name, setName] = useState('')
@@ -210,8 +210,19 @@ export default function SettingsPage() {
     }
   }
 
-  const handleRemoveColumn = (id: string, title: string) => {
-    if (!confirm(`Excluir a coluna "${title}"? As tarefas nela serão movidas para "Ideia".`)) return
+  const handleRemoveColumn = async (id: string, title: string) => {
+    const orphanedTasks = tasks.filter(t => t.status === id && !t.deletedAt)
+    const orphanMsg = orphanedTasks.length > 0
+      ? `\n\nExistem ${orphanedTasks.length} tarefa(s) nesta coluna que serão movidas para "${columns[0]?.title || 'a primeira coluna'}".`
+      : ''
+    if (!confirm(`Excluir a coluna "${title}"?${orphanMsg}`)) return
+    // Move orphaned tasks to the first available column before removing
+    if (orphanedTasks.length > 0 && columns.length > 0) {
+      const firstColId = columns[0].id
+      if (firstColId !== id) {
+        await Promise.all(orphanedTasks.map(t => updateTask(t.id, { status: firstColId })))
+      }
+    }
     removeColumn(id)
     setSuccess('Coluna excluída!')
   }

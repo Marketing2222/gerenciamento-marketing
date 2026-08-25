@@ -314,7 +314,7 @@ export default function TaskModal({ task, isOpen, onClose, initialStatus = 'TODO
 
   const handleSaveAll = async () => {
     setSavingTask(true)
-    await updateTaskField({ title, description })
+    await updateTaskField({ title, description, priority, status, dueDate: dueDate || null, assigneeId: assigneeId || null })
     setSavingTask(false)
   }
 

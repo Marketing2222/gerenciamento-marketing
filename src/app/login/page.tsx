@@ -17,6 +17,7 @@ export default function LoginPage() {
   const [seedSuccess, setSeedSuccess] = useState('')
 
   const handleSeed = async () => {
+    if (!confirm('Isso irá apagar todos os dados existentes e criar dados de exemplo. Deseja continuar?')) return
     setSeeding(true)
     setSeedSuccess('')
     setError('')

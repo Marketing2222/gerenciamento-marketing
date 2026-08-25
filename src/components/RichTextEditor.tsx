@@ -3,7 +3,7 @@
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import { Bold, Italic, List, ListOrdered, Undo, Redo } from 'lucide-react'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
 interface RichTextEditorProps {
   content: string
@@ -12,6 +12,10 @@ interface RichTextEditorProps {
 }
 
 export default function RichTextEditor({ content, onChange, editable = true }: RichTextEditorProps) {
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => { setMounted(true) }, [])
+
   const editor = useEditor({
     extensions: [StarterKit],
     content: content,
@@ -28,7 +32,7 @@ export default function RichTextEditor({ content, onChange, editable = true }: R
     }
   }, [content, editor])
 
-  if (!editor) {
+  if (!mounted || !editor) {
     return <div className="h-28 w-full bg-slate-100 dark:bg-slate-800 animate-pulse rounded-lg border border-slate-200 dark:border-slate-700" />
   }
 
