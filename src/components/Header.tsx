@@ -30,7 +30,10 @@ import {
   CalendarDays,
   ChevronRight,
   Link2,
+  Trophy,
+  type LucideIcon,
 } from 'lucide-react'
+import { useGamification } from '@/context/GamificationContext'
 
 interface HeaderProps {
   onOpenCalendarFilter?: () => void
@@ -55,6 +58,7 @@ export default function Header({
   const { theme, toggleTheme } = useTheme()
   const { siteName, logoUrl } = useBrand()
   const { users, roles } = useData()
+  const { unlockedCount, totalAchievements, newAchievements, loading: gamLoading } = useGamification()
 
   const [isTrashOpen, setIsTrashOpen] = useState(false)
   const [isVideoScheduleOpen, setIsVideoScheduleOpen] = useState(false)
@@ -67,9 +71,30 @@ export default function Header({
   const drawerRef = useRef<HTMLDivElement>(null)
 
   // Nav items — Dashboard, Calendário, Tarefas removed
-  const navItems = [
+  type NavItem = {
+    name: string
+    href: string | null
+    icon: LucideIcon
+    isAction?: boolean
+    action?: () => void
+    highlight?: boolean
+    badge?: React.ReactNode
+  }
+  const navItems: NavItem[] = [
     { name: 'Nova Tarefa', href: null, icon: Plus, isAction: true, action: () => onCreateTask?.(), highlight: true },
     { name: 'Kanban', href: '/kanban', icon: Kanban },
+    { name: 'Conquistas', href: '/conquistas', icon: Trophy, badge: gamLoading ? null : (
+        <span className="flex items-center gap-1">
+          <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+            {unlockedCount}/{totalAchievements}
+          </span>
+          {newAchievements > 0 && (
+            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-orange-600 text-white shadow-sm shadow-orange-600/40">
+              {newAchievements} novas
+            </span>
+          )}
+        </span>
+      ) },
     { name: 'Arquivos', href: '/arquivos', icon: FolderOpen },
     { name: 'Configurações', href: '/configuracoes', icon: Settings },
     { name: 'Cronograma de Vídeos', href: null, icon: Video, isAction: true, action: () => setIsVideoScheduleOpen(true) },
@@ -260,7 +285,7 @@ export default function Header({
                   key={item.name}
                   onClick={item.action}
                   className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition duration-200 whitespace-nowrap cursor-pointer ${
-                    (item as any).highlight
+                    item.highlight
                       ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20 hover:bg-blue-700'
                       : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
                   }`}
@@ -275,10 +300,15 @@ export default function Header({
               <Link
                 key={item.href!}
                 href={item.href!}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition duration-200 whitespace-nowrap text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200"
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition duration-200 whitespace-nowrap ${
+                  isActive
+                    ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
               >
                 <Icon className="w-3.5 h-3.5" />
                 <span>{item.name}</span>
+                {item.badge}
               </Link>
             )
           })}
@@ -298,9 +328,10 @@ export default function Header({
                 )
               }
               return (
-                <Link key={item.href} href={item.href!} onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 transition">
+                <Link key={item.href} href={item.href!} onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/50 transition w-full text-left">
                   <Icon className="w-4 h-4" />
                   <span>{item.name}</span>
+                  {item.badge}
                 </Link>
               )
             })}

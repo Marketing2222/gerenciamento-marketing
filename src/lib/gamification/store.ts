@@ -1,0 +1,379 @@
+import { db, isFirebaseConfigured, waitForConfig } from '@/lib/firebaseClient'
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  onSnapshot,
+  runTransaction,
+  setDoc,
+  writeBatch,
+} from 'firebase/firestore'
+import type { AchievementUnlock, ContentCategory, UserProgress, XpEvent } from './types'
+import { ACHIEVEMENTS, ACHIEVEMENTS_BY_ID } from './achievements'
+import { computeCounters, dueResultFor, isUnlocked, requirementProgress, resolveContentCategory } from './engine'
+import { backfillXp, completionXp } from './xp'
+import { levelFromXp, titleForLevel, iconForLevel } from './levels'
+import { gamificationBus } from './bus'
+
+const USERS = 'gamification_users'
+const META = 'gamification_meta'
+
+// ===== Caminhos =====
+
+async function userRef(uid: string) {
+  return doc(await db(), USERS, uid)
+}
+async function eventsCol(uid: string) {
+  return collection(await db(), USERS, uid, 'events')
+}
+async function eventRef(uid: string, taskId: string) {
+  return doc(await db(), USERS, uid, 'events', taskId)
+}
+async function unlocksCol(uid: string) {
+  return collection(await db(), USERS, uid, 'achievements')
+}
+async function unlockRef(uid: string, achId: string) {
+  return doc(await db(), USERS, uid, 'achievements', achId)
+}
+
+function nowIso(): string {
+  return new Date().toISOString()
+}
+
+function toProgress(uid: string, raw: Record<string, unknown>): UserProgress {
+  return {
+    userId: uid,
+    totalXp: typeof raw.totalXp === 'number' ? raw.totalXp : 0,
+    level: typeof raw.level === 'number' ? raw.level : 1,
+    newAchievements: typeof raw.newAchievements === 'number' ? raw.newAchievements : 0,
+    updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : '',
+  }
+}
+
+function toXpEvent(id: string, raw: Record<string, unknown>): XpEvent {
+  return {
+    id,
+    taskId: typeof raw.taskId === 'string' ? raw.taskId : id,
+    xp: typeof raw.xp === 'number' ? raw.xp : 0,
+    priority: typeof raw.priority === 'string' ? raw.priority : 'MEDIUM',
+    contentCategory: (raw.contentCategory as ContentCategory) ?? 'geral',
+    completedAt: typeof raw.completedAt === 'string' ? raw.completedAt : new Date(0).toISOString(),
+    dueDate: typeof raw.dueDate === 'string' ? raw.dueDate : null,
+    dueResult: (raw.dueResult as XpEvent['dueResult']) ?? 'none',
+    createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : '',
+    assigneeId: typeof raw.assigneeId === 'string' ? raw.assigneeId : null,
+    checklistTotal: typeof raw.checklistTotal === 'number' ? raw.checklistTotal : 0,
+    checklistDone: typeof raw.checklistDone === 'number' ? raw.checklistDone : 0,
+    backfilled: raw.backfilled === true,
+  }
+}
+
+// ===== Assinaturas em tempo real =====
+
+export function subscribeProgress(uid: string, callback: (p: UserProgress | null) => void): () => void {
+  if (!isFirebaseConfigured()) {
+    callback(null)
+    return () => {}
+  }
+  let unsub: (() => void) | null = null
+  void (async () => {
+    waitForConfig()
+    unsub = onSnapshot(await userRef(uid), (snap) => {
+      callback(snap.exists() ? toProgress(uid, snap.data()) : null)
+    })
+  })()
+  return () => {
+    unsub?.()
+  }
+}
+
+export function subscribeUnlocks(uid: string, callback: (map: Record<string, AchievementUnlock>) => void): () => void {
+  if (!isFirebaseConfigured()) {
+    callback({})
+    return () => {}
+  }
+  let unsub: (() => void) | null = null
+  void (async () => {
+    waitForConfig()
+    unsub = onSnapshot(await unlocksCol(uid), (snap) => {
+      const map: Record<string, AchievementUnlock> = {}
+      snap.docs.forEach((d) => {
+        const raw = d.data()
+        map[d.id] = {
+          achievementId: d.id,
+          unlockedAt: typeof raw.unlockedAt === 'string' ? raw.unlockedAt : '',
+          progress: typeof raw.progress === 'number' ? raw.progress : 0,
+        }
+      })
+      callback(map)
+    })
+  })()
+  return () => {
+    unsub?.()
+  }
+}
+
+export async function resetNewAchievements(uid: string): Promise<void> {
+  if (!isFirebaseConfigured()) return
+  waitForConfig()
+  const ref = await userRef(uid)
+  const snap = await getDoc(ref)
+  if (snap.exists() && (snap.data().newAchievements ?? 0) > 0) {
+    await setDoc(ref, { newAchievements: 0, updatedAt: nowIso() }, { merge: true })
+  }
+}
+
+export function subscribeEvents(uid: string, callback: (events: XpEvent[]) => void): () => void {
+  if (!isFirebaseConfigured()) {
+    callback([])
+    return () => {}
+  }
+  let unsub: (() => void) | null = null
+  void (async () => {
+    waitForConfig()
+    unsub = onSnapshot(await eventsCol(uid), (snap) => {
+      callback(snap.docs.map((d) => toXpEvent(d.id, d.data())))
+    })
+  })()
+  return () => {
+    unsub?.()
+  }
+}
+
+async function listEvents(uid: string): Promise<XpEvent[]> {
+  const snap = await getDocs(await eventsCol(uid))
+  return snap.docs.map((d) => toXpEvent(d.id, d.data()))
+}
+
+function localDayKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+// ===== Registro de conclusão (ao vivo) =====
+
+export interface ConclusionInput {
+  userId: string
+  taskId: string
+  priority: string
+  dueDate: string | null
+  createdAt: string
+  assigneeId: string | null
+  checklistTotal: number
+  checklistDone: number
+  contentCategory: ContentCategory
+}
+
+/**
+ * Registra a conclusão de uma tarefa: XP + conquistas.
+ * Dedup por doc id determinístico (taskId) em transação — XP conta 1x por tarefa.
+ * Silencioso quando o evento já existir (reconclusão/edições).
+ */
+export async function recordConclusion(input: ConclusionInput): Promise<void> {
+  if (!isFirebaseConfigured() || !input.userId || !input.taskId) return
+  waitForConfig()
+
+  const existing = await listEvents(input.userId)
+  if (existing.some((e) => e.id === input.taskId)) return
+
+  const completedAt = nowIso()
+  const dueResult = dueResultFor(input.dueDate, completedAt)
+  const todayKey = localDayKey(new Date())
+  const alreadyToday = existing.filter(
+    (e) => !e.backfilled && localDayKey(new Date(e.completedAt)) === todayKey
+  ).length
+
+  const xp = completionXp(input.priority, { alreadyToday, dueResult })
+  const event: XpEvent = {
+    id: input.taskId,
+    taskId: input.taskId,
+    xp,
+    priority: input.priority,
+    contentCategory: input.contentCategory,
+    completedAt,
+    dueDate: input.dueDate,
+    dueResult,
+    createdAt: input.createdAt,
+    assigneeId: input.assigneeId,
+    checklistTotal: input.checklistTotal,
+    checklistDone: input.checklistDone,
+    backfilled: false,
+  }
+
+  const counters = computeCounters([...existing, event])
+  const unlocksSnap = await getDocs(await unlocksCol(input.userId))
+  const unlockedIds = new Set(unlocksSnap.docs.map((d) => d.id))
+  const newlyUnlocked = ACHIEVEMENTS.filter((a) => !unlockedIds.has(a.id) && isUnlocked(a, counters))
+  const achievementXp = newlyUnlocked.reduce((sum, a) => sum + a.xpReward, 0)
+
+  // Holder (e não `let`) para que o TS não estreite para `never` após a transação.
+  const outcome: { value: { totalXp: number; levelBefore: number; levelAfter: number } | null } = { value: null }
+  const evRef = await eventRef(input.userId, input.taskId)
+  const uRef = await userRef(input.userId)
+
+  await runTransaction(await db(), async (tx) => {
+    const evSnap = await tx.get(evRef)
+    if (evSnap.exists()) return
+
+    const uSnap = await tx.get(uRef)
+    const prev = uSnap.exists() ? uSnap.data() : null
+    const prevTotal = typeof prev?.totalXp === 'number' ? prev.totalXp : 0
+    const prevNew = typeof prev?.newAchievements === 'number' ? prev.newAchievements : 0
+    const totalXp = prevTotal + xp + achievementXp
+    const levelBefore = typeof prev?.level === 'number' ? prev.level : levelFromXp(prevTotal)
+    const levelAfter = levelFromXp(totalXp)
+
+    tx.set(evRef, { ...event })
+    tx.set(
+      uRef,
+      {
+        userId: input.userId,
+        totalXp,
+        level: levelAfter,
+        newAchievements: prevNew + newlyUnlocked.length,
+        updatedAt: nowIso(),
+      },
+      { merge: true }
+    )
+    for (const a of newlyUnlocked) {
+      const aRef = await unlockRef(input.userId, a.id)
+      tx.set(aRef, {
+        achievementId: a.id,
+        unlockedAt: nowIso(),
+        progress: requirementProgress(a, counters),
+      })
+    }
+    outcome.value = { totalXp, levelBefore, levelAfter }
+  })
+
+  const res = outcome.value
+  if (!res) return
+
+  gamificationBus.emit({ kind: 'xp', amount: xp, totalXp: res.totalXp })
+  for (const a of newlyUnlocked) {
+    gamificationBus.emit({ kind: 'achievement', achievement: a })
+  }
+  if (res.levelAfter > res.levelBefore) {
+    gamificationBus.emit({
+      kind: 'levelup',
+      from: res.levelBefore,
+      to: res.levelAfter,
+      title: titleForLevel(res.levelAfter),
+      icon: iconForLevel(res.levelAfter),
+    })
+  }
+}
+
+// ===== Backfill (rodar 1x para tarefas já concluídas) =====
+
+interface RawTask {
+  id: string
+  title: string
+  status: string
+  priority: string
+  dueDate: string | null
+  createdAt: string
+  assigneeId: string | null
+  creatorId: string | null
+  checklist: { isCompleted?: boolean; completed?: boolean }[]
+}
+
+export async function runBackfillIfNeeded(): Promise<void> {
+  if (!isFirebaseConfigured()) return
+  waitForConfig()
+
+  const metaRef = doc(await db(), META, 'global')
+  const meta = await getDoc(metaRef)
+  if (meta.exists()) return
+
+  const tasksSnap = await getDocs(collection(await db(), 'tasks'))
+  const doneTasks = tasksSnap.docs
+    .map((d) => {
+      const raw = d.data() as Partial<RawTask>
+      return {
+        id: d.id,
+        title: typeof raw.title === 'string' ? raw.title : '',
+        status: typeof raw.status === 'string' ? raw.status : '',
+        priority: typeof raw.priority === 'string' ? raw.priority : 'MEDIUM',
+        dueDate: typeof raw.dueDate === 'string' ? raw.dueDate : null,
+        createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : nowIso(),
+        assigneeId: typeof raw.assigneeId === 'string' ? raw.assigneeId : null,
+        creatorId: typeof raw.creatorId === 'string' ? raw.creatorId : null,
+        checklist: Array.isArray(raw.checklist)
+          ? (raw.checklist as { isCompleted?: boolean; completed?: boolean }[])
+          : [],
+      } satisfies RawTask
+    })
+    .filter((t) => t.status === 'DONE')
+
+  const byUser = new Map<string, RawTask[]>()
+  for (const t of doneTasks) {
+    const uid = t.assigneeId ?? t.creatorId
+    if (!uid) continue
+    const list = byUser.get(uid)
+    if (list) list.push(t)
+    else byUser.set(uid, [t])
+  }
+
+  for (const [uid, tasks] of byUser) {
+    const existing = await listEvents(uid)
+    const existingIds = new Set(existing.map((e) => e.id))
+    const newEvents: XpEvent[] = tasks
+      .filter((t) => !existingIds.has(t.id))
+      .map((t) => ({
+        id: t.id,
+        taskId: t.id,
+        xp: backfillXp(t.priority),
+        priority: t.priority,
+        contentCategory: resolveContentCategory(t.title),
+        completedAt: t.createdAt,
+        dueDate: t.dueDate,
+        dueResult: 'none',
+        createdAt: t.createdAt,
+        assigneeId: t.assigneeId,
+        checklistTotal: t.checklist.length,
+        checklistDone: t.checklist.filter((c) => c.isCompleted === true || c.completed === true).length,
+        backfilled: true,
+      }))
+
+    const allEvents = [...existing, ...newEvents]
+    if (allEvents.length === 0) continue
+
+    const counters = computeCounters(allEvents)
+    const unlocksSnap = await getDocs(await unlocksCol(uid))
+    const unlockedIds = new Set(unlocksSnap.docs.map((d) => d.id))
+    const newlyUnlocked = ACHIEVEMENTS.filter((a) => !unlockedIds.has(a.id) && isUnlocked(a, counters))
+    const allUnlockedIds = [...unlockedIds, ...newlyUnlocked.map((a) => a.id)]
+
+    const eventsXp = allEvents.reduce((sum, e) => sum + e.xp, 0)
+    const rewardsXp = allUnlockedIds.reduce((sum, id) => sum + (ACHIEVEMENTS_BY_ID[id]?.xpReward ?? 0), 0)
+    const totalXp = eventsXp + rewardsXp
+    const level = levelFromXp(totalXp)
+
+    const batch = writeBatch(await db())
+    for (const e of newEvents) {
+      batch.set(await eventRef(uid, e.id), { ...e })
+    }
+    for (const a of newlyUnlocked) {
+      batch.set(await unlockRef(uid, a.id), {
+        achievementId: a.id,
+        unlockedAt: nowIso(),
+        progress: requirementProgress(a, counters),
+      })
+    }
+    batch.set(
+      await userRef(uid),
+      {
+        userId: uid,
+        totalXp,
+        level,
+        newAchievements: 0,
+        updatedAt: nowIso(),
+      },
+      { merge: true }
+    )
+    await batch.commit()
+  }
+
+  await setDoc(metaRef, { backfilledAt: nowIso(), version: 1 })
+}

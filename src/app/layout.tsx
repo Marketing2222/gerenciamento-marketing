@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/context/ThemeContext";
 import { BrandProvider } from "@/context/BrandContext";
 import { ColumnsProvider } from "@/context/ColumnsContext";
 import { DataProvider } from "@/context/DataContext";
+import { GamificationProvider } from "@/context/GamificationContext";
 import AppLayout from "@/components/AppLayout";
 import DynamicHead from "@/components/DynamicHead";
 
@@ -56,7 +57,9 @@ export default function RootLayout({
             <ColumnsProvider>
               <UserProvider>
                 <DataProvider>
-                  <AppLayout>{children}</AppLayout>
+                  <GamificationProvider>
+                    <AppLayout>{children}</AppLayout>
+                  </GamificationProvider>
                 </DataProvider>
               </UserProvider>
             </ColumnsProvider>

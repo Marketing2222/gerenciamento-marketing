@@ -40,6 +40,10 @@ import {
   deleteQuickLinkCategory as firestoreDeleteQuickLinkCategory,
 } from '@/lib/firestore'
 import { isFirebaseConfigured } from '@/lib/firebaseClient'
+import { useColumns } from '@/context/ColumnsContext'
+import { recordConclusion } from '@/lib/gamification/store'
+import { resolveContentCategory } from '@/lib/gamification/engine'
+import type { ContentCategory } from '@/lib/gamification/types'
 import type { Task, User } from '@/types'
 import type { Role, QuickLink, QuickLinkCategory } from '@/lib/firestore'
 import { uploadFile, uploadAvatar, uploadLogo } from '@/lib/storage'
@@ -109,6 +113,7 @@ const DataContext = createContext<DataContextType | undefined>(undefined)
 
 export function DataProvider({ children }: { children: ReactNode }) {
   const { user } = useUser()
+  const { columns } = useColumns()
   const [tasks, setTasks] = useState<Task[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [roles, setRoles] = useState<Role[]>([])
@@ -181,9 +186,32 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const found = users.find((u) => u.id === patch.assigneeId)
         resolvedPatch = { ...patch, assignee: found || null }
       }
+
+      const prevTask = tasks.find((t) => t.id === id)
+      const prevStatus = prevTask?.status
+      const willComplete = patch.status === 'DONE' && prevStatus !== 'DONE' && prevTask !== undefined
+
       await updateTaskFields(id, resolvedPatch)
+
+      if (willComplete && prevTask && user) {
+        // Gamificação: dispara em fire-and-forget — nunca bloqueia/derruba a mutação.
+        const prevColumnTitle = columns.find((c) => c.id === prevStatus)?.title
+        let contentCategory: ContentCategory = prevColumnTitle ? resolveContentCategory(prevColumnTitle) : 'geral'
+        if (contentCategory === 'geral') contentCategory = resolveContentCategory(prevTask.title)
+        void recordConclusion({
+          userId: user.id,
+          taskId: id,
+          priority: prevTask.priority,
+          dueDate: prevTask.dueDate,
+          createdAt: prevTask.createdAt,
+          assigneeId: prevTask.assigneeId,
+          checklistTotal: prevTask.checklist.length,
+          checklistDone: prevTask.checklist.filter((c) => c.isCompleted).length,
+          contentCategory,
+        }).catch((err) => console.error('[gamification] recordConclusion', err))
+      }
     },
-    [users]
+    [users, tasks, columns, user]
   )
 
   const updateTaskOrders = useCallback(async (updates: { id: string; order: number }[]) => {
