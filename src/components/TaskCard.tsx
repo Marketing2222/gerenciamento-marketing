@@ -10,6 +10,7 @@ import { useColumns } from '@/context/ColumnsContext'
 import { useData } from '@/context/DataContext'
 import { useUser } from '@/context/UserContext'
 import { formatDateOnly } from '@/lib/dates'
+import DoneConfirmPopup from '@/components/DoneConfirmPopup'
 
 interface TaskCardProps {
   task: Task
@@ -47,6 +48,7 @@ export default function TaskCard({ task, index, onOpenDetail, columnColor }: Tas
   const [showComment, setShowComment] = useState(false)
   const [commentText, setCommentText] = useState('')
   const [isActing, setIsActing] = useState(false)
+  const [showDoneConfirm, setShowDoneConfirm] = useState(false)
 
   const isPlaying = task.assigneeId === user?.id
   const isDone = task.status === DONE_COLUMN_ID
@@ -69,14 +71,26 @@ export default function TaskCard({ task, index, onOpenDetail, columnColor }: Tas
   const handleCheck = async (e: React.MouseEvent) => {
     e.stopPropagation()
     if (isActing) return
+    if (isDone) {
+      // Se já tá concluído e clicou no check, volta para A Fazer
+      setIsActing(true)
+      try {
+        await updateTask(task.id, { status: 'TODO' })
+      } finally {
+        setIsActing(false)
+      }
+    } else {
+      // Marcar como concluído: pede confirmação antes
+      setShowDoneConfirm(true)
+    }
+  }
+
+  const confirmDoneCheck = async () => {
+    setShowDoneConfirm(false)
+    if (isActing) return
     setIsActing(true)
     try {
-      if (isDone) {
-        // Se já tá concluído e clicou no check, volta para A Fazer
-        await updateTask(task.id, { status: 'TODO' })
-      } else {
-        await updateTask(task.id, { status: DONE_COLUMN_ID })
-      }
+      await updateTask(task.id, { status: DONE_COLUMN_ID })
     } finally {
       setIsActing(false)
     }
@@ -95,6 +109,7 @@ export default function TaskCard({ task, index, onOpenDetail, columnColor }: Tas
   }
 
   return (
+    <>
     <Draggable draggableId={task.id} index={index}>
       {(provided, snapshot) => (
         <div
@@ -258,5 +273,12 @@ export default function TaskCard({ task, index, onOpenDetail, columnColor }: Tas
         </div>
       )}
     </Draggable>
+    {showDoneConfirm && (
+      <DoneConfirmPopup
+        onConfirm={confirmDoneCheck}
+        onCancel={() => setShowDoneConfirm(false)}
+      />
+    )}
+    </>
   )
 }

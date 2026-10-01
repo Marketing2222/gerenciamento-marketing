@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { 
   X, 
   Trash, 
@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import RichTextEditor from './RichTextEditor'
 import Avatar from './Avatar'
+import DoneConfirmPopup from './DoneConfirmPopup'
 
 import { useData } from '@/context/DataContext'
 import { useUser } from '@/context/UserContext'
@@ -80,6 +81,8 @@ export default function TaskModal({ task, isOpen, onClose, initialStatus = 'TODO
   const [isFixed, setIsFixed] = useState(false)
   const [editingCheck, setEditingCheck] = useState<{ id: string; value: string } | null>(null)
   const editCancelledRef = useRef(false)
+  const [showDonePopup, setShowDonePopup] = useState(false)
+  const [markedDone, setMarkedDone] = useState(false)
   
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -127,11 +130,22 @@ export default function TaskModal({ task, isOpen, onClose, initialStatus = 'TODO
     }
   }, [task, isOpen, initialStatus])
 
+  // Cancela o popup de conclusão e reverte o status para o último salvo
+  const cancelDoneSave = useCallback(() => {
+    setShowDonePopup(false)
+    setMarkedDone(false)
+    setStatus(localTask?.status ?? initialStatus)
+  }, [localTask, initialStatus])
+
   // Fechar o popup com a tecla ESC
   useEffect(() => {
     if (!isOpen) return
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
+      if (showDonePopup) {
+        cancelDoneSave()
+        return
+      }
       if (editingCheck) {
         editCancelledRef.current = true
         setEditingCheck(null)
@@ -149,7 +163,7 @@ export default function TaskModal({ task, isOpen, onClose, initialStatus = 'TODO
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [isOpen, editingCheck, previewAttachment, isDescriptionExpanded, onClose])
+  }, [isOpen, showDonePopup, editingCheck, previewAttachment, isDescriptionExpanded, onClose, cancelDoneSave])
 
   if (!isOpen) return null
 
@@ -385,6 +399,14 @@ export default function TaskModal({ task, isOpen, onClose, initialStatus = 'TODO
     setSavingTask(false)
   }
 
+  // Confirmou o popup de conclusão: salva (status DONE persistido só aqui)
+  const confirmDoneSave = async () => {
+    setShowDonePopup(false)
+    setMarkedDone(false)
+    if (isCreateMode) await handleCreateTask()
+    else await handleSaveAll()
+  }
+
   const formatLogDate = (dateStr: unknown) => {
     if (!dateStr) return ''
     const d = dateStr && typeof dateStr === 'object' && 'toDate' in dateStr && typeof (dateStr as { toDate: unknown }).toDate === 'function'
@@ -423,7 +445,14 @@ export default function TaskModal({ task, isOpen, onClose, initialStatus = 'TODO
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
-                onClick={isCreateMode ? handleCreateTask : handleSaveAll}
+                onClick={() => {
+                  if (markedDone && status === 'DONE') {
+                    setShowDonePopup(true)
+                    return
+                  }
+                  if (isCreateMode) handleCreateTask()
+                  else handleSaveAll()
+                }}
                 disabled={isCreateMode ? creatingTask : savingTask}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-70 text-white rounded-lg text-sm font-bold shadow-sm transition flex items-center gap-1.5"
               >
@@ -812,8 +841,15 @@ export default function TaskModal({ task, isOpen, onClose, initialStatus = 'TODO
               <select
                 value={status}
                 onChange={(e) => {
-                  setStatus(e.target.value)
-                  if (!isCreateMode) updateTaskField({ status: e.target.value })
+                  const value = e.target.value
+                  setStatus(value)
+                  if (value === 'DONE') {
+                    // Só persiste depois da confirmação no popup ao clicar em Salvar
+                    setMarkedDone(true)
+                  } else {
+                    setMarkedDone(false)
+                    if (!isCreateMode) updateTaskField({ status: value })
+                  }
                 }}
                 className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-800 dark:text-slate-200 font-bold shadow-sm"
               >
@@ -930,6 +966,11 @@ export default function TaskModal({ task, isOpen, onClose, initialStatus = 'TODO
         </div>
 
       </div>
+
+      {/* Popup: confirmação ao marcar Publicado/Concluído */}
+      {showDonePopup && (
+        <DoneConfirmPopup onConfirm={confirmDoneSave} onCancel={cancelDoneSave} />
+      )}
 
       {/* Preview Modal for file attachments */}
       {previewAttachment && (
