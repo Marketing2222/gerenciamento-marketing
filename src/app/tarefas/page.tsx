@@ -5,6 +5,7 @@ import { Plus, Search, Loader2, Calendar, Paperclip, MessageSquare } from 'lucid
 import TaskModal from '@/components/TaskModal'
 import Avatar from '@/components/Avatar'
 import { useData } from '@/context/DataContext'
+import { parseDateOnly, formatDateOnly } from '@/lib/dates'
 
 export default function TasksPage() {
   const { tasks, users, loaded } = useData()
@@ -167,7 +168,7 @@ export default function TasksPage() {
                   {filteredTasks.map((task) => {
                     const totalItems = task.checklist.length
                     const completedItems = task.checklist.filter(i => i.isCompleted).length
-                    const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'DONE'
+                const isOverdue = task.dueDate && parseDateOnly(task.dueDate) < new Date() && task.status !== 'DONE'
 
                     return (
                       <tr 
@@ -196,7 +197,7 @@ export default function TasksPage() {
                           {task.dueDate ? (
                             <span className={`text-xs font-semibold flex items-center gap-1 ${isOverdue ? 'text-red-500 font-bold' : 'text-slate-500 dark:text-slate-400'}`}>
                               <Calendar className="w-3.5 h-3.5" />
-                              {new Date(task.dueDate).toLocaleDateString('pt-BR')}
+                              {formatDateOnly(task.dueDate)}
                               {isOverdue && <span className="text-[9px] uppercase tracking-wider text-red-500 ml-1">Atrasada</span>}
                             </span>
                           ) : (
@@ -243,7 +244,7 @@ export default function TasksPage() {
               {filteredTasks.map((task) => {
                 const totalItems = task.checklist.length
                 const completedItems = task.checklist.filter(i => i.isCompleted).length
-                const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'DONE'
+                    const isOverdue = task.dueDate && parseDateOnly(task.dueDate) < new Date() && task.status !== 'DONE'
 
                 return (
                   <div
@@ -281,7 +282,7 @@ export default function TasksPage() {
                         {task.dueDate && (
                           <span className={`flex items-center gap-1 ${isOverdue ? 'text-red-500 font-bold' : ''}`}>
                             <Calendar className="w-3 h-3" />
-                            {new Date(task.dueDate).toLocaleDateString('pt-BR')}
+                            {formatDateOnly(task.dueDate)}
                           </span>
                         )}
                         {task.attachments.length > 0 && (

@@ -5,6 +5,7 @@ import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Plus, Loader2 } fr
 import TaskModal from '@/components/TaskModal'
 import Avatar from '@/components/Avatar'
 import { useData } from '@/context/DataContext'
+import { parseDateOnly } from '@/lib/dates'
 
 type ViewMode = 'MONTH' | 'WEEK' | 'DAY'
 
@@ -131,7 +132,7 @@ export default function CalendarPage() {
                 {/* Lista de Tarefas do Dia */}
                 <div className="flex-1 overflow-y-auto space-y-1 pr-0.5 scrollbar-thin">
                   {dayTasks.map(task => {
-                    const isOverdue = task.status !== 'DONE' && new Date(task.dueDate!) < new Date()
+                    const isOverdue = task.status !== 'DONE' && parseDateOnly(task.dueDate!) < new Date()
                     
                     return (
                       <button
@@ -205,7 +206,7 @@ export default function CalendarPage() {
                 {/* Tarefas na semana */}
                 <div className="flex-1 overflow-y-auto space-y-2 pr-0.5">
                   {dayTasks.map(task => {
-                    const isOverdue = task.status !== 'DONE' && new Date(task.dueDate!) < new Date()
+                    const isOverdue = task.status !== 'DONE' && parseDateOnly(task.dueDate!) < new Date()
                     
                     return (
                       <div
@@ -273,7 +274,7 @@ export default function CalendarPage() {
             </div>
           ) : (
             dayTasks.map(task => {
-              const isOverdue = task.status !== 'DONE' && new Date(task.dueDate!) < new Date()
+              const isOverdue = task.status !== 'DONE' && parseDateOnly(task.dueDate!) < new Date()
               return (
                 <div
                   key={task.id}

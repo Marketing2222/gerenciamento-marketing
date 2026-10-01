@@ -9,6 +9,7 @@ import Avatar from '@/components/Avatar'
 import { useColumns } from '@/context/ColumnsContext'
 import { useData } from '@/context/DataContext'
 import { useUser } from '@/context/UserContext'
+import { formatDateOnly } from '@/lib/dates'
 
 interface TaskCardProps {
   task: Task
@@ -90,8 +91,7 @@ export default function TaskCard({ task, index, onOpenDetail, columnColor }: Tas
   }
 
   const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr)
-    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
+    return formatDateOnly(dateStr, { day: '2-digit', month: 'short' })
   }
 
   return (
