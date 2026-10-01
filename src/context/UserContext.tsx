@@ -57,7 +57,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
 
     let unsub: (() => void) | null = null
-    void waitForConfig().then(async () => {
+    void (async () => {
+      waitForConfig()
       unsub = onSnapshot(
         doc(await db(), 'users', savedId),
         (snap) => {
@@ -83,7 +84,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         }
       )
       unsubRef.current = unsub
-    })
+    })()
     return () => { unsub?.() }
   }, [pathname, router])
 
@@ -120,7 +121,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         // Let refreshUser handle the session listener (no duplicate)
         setUser({ id: snap.id, name: data.name || '', role: data.role || '', avatarUrl: data.avatarUrl || '' })
         setLoading(false)
-        router.push('/')
+        router.push('/kanban')
         return { success: true }
       } catch (err: unknown) {
         console.error('Login error:', err)

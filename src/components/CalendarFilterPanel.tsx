@@ -28,19 +28,24 @@ function toLocalIsoDate(d: Date): string {
   return `${year}-${month}-${day}`
 }
 
+function getWeekOfMonthForGrid(year: number, month: number, day: number) {
+  const firstDay = new Date(year, month, 1).getDay()
+  return Math.ceil((day + firstDay) / 7)
+}
+
 export default function CalendarFilterPanel() {
-  const { isCalendarOpen, setIsCalendarOpen, weekFilter, setWeekFilter, dayFilter, setDayFilter } = useKanbanFilter()
+  const { isCalendarOpen, setIsCalendarOpen, weekFilter, setWeekFilter, dayFilter, setDayFilter, filterMonth, setFilterMonth, filterYear, setFilterYear, filterMonthActive, setFilterMonthActive } = useKanbanFilter()
   const ref = useRef<HTMLDivElement>(null)
 
   const now = new Date()
-  const [viewYear, setViewYear] = useState(now.getFullYear())
-  const [viewMonth, setViewMonth] = useState(now.getMonth())
+  const [viewYear, setViewYear] = useState(filterYear)
+  const [viewMonth, setViewMonth] = useState(filterMonth)
 
   // Reset view to current month when opening
   useEffect(() => {
     if (isCalendarOpen) {
-      setViewYear(now.getFullYear())
-      setViewMonth(now.getMonth())
+      setViewYear(filterYear)
+      setViewMonth(filterMonth)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isCalendarOpen])
@@ -70,28 +75,44 @@ export default function CalendarFilterPanel() {
   }
 
   const handleWeekClick = (w: number) => {
-    if (weekFilter === String(w)) { setWeekFilter('') }
-    else { setWeekFilter(String(w)); setDayFilter('') }
+    if (weekFilter === String(w)) { setWeekFilter(''); setFilterMonthActive(false) }
+    else { setWeekFilter(String(w)); setDayFilter(''); setFilterMonth(viewMonth); setFilterYear(viewYear); setFilterMonthActive(true) }
   }
 
   const handleDayClick = (d: Date) => {
     const iso = toLocalIsoDate(d)
-    if (dayFilter === iso) { setDayFilter('') }
-    else { setDayFilter(iso); setWeekFilter('') }
+    if (dayFilter === iso) { setDayFilter(''); setFilterMonthActive(false) }
+    else { setDayFilter(iso); setWeekFilter(''); setFilterMonth(viewMonth); setFilterYear(viewYear); setFilterMonthActive(true) }
   }
 
-  const clearFilters = () => { setWeekFilter(''); setDayFilter('') }
+  const handleTodosClick = () => {
+    if (weekFilter || dayFilter) {
+      setWeekFilter('')
+      setDayFilter('')
+      setFilterMonth(viewMonth)
+      setFilterYear(viewYear)
+      setFilterMonthActive(true)
+    } else if (filterMonthActive) {
+      setFilterMonthActive(false)
+    } else {
+      setFilterMonth(viewMonth)
+      setFilterYear(viewYear)
+      setFilterMonthActive(true)
+    }
+  }
 
-  // Group days by week
+  const clearFilters = () => { setWeekFilter(''); setDayFilter(''); setFilterMonthActive(false) }
+
+  // Group days by week (using viewed month for week calculation)
   const daysByWeek: Record<number, Date[]> = {}
   days.forEach(d => {
-    const w = getWeekOfMonth(d)
+    const w = getWeekOfMonthForGrid(viewYear, viewMonth, d.getDate())
     if (!daysByWeek[w]) daysByWeek[w] = []
     daysByWeek[w].push(d)
   })
 
   const weekKeys = Object.keys(daysByWeek).map(Number).sort((a, b) => a - b)
-  const hasFilter = weekFilter || dayFilter
+  const hasFilter = weekFilter || dayFilter || filterMonthActive
 
   return (
     <div className="fixed top-[68px] right-4 z-[75] w-[320px] animate-scale-up">
@@ -140,9 +161,9 @@ export default function CalendarFilterPanel() {
             </button>
           ))}
           <button
-            onClick={clearFilters}
+            onClick={handleTodosClick}
             className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition ${
-              !hasFilter
+              !weekFilter && !dayFilter && filterMonthActive
                 ? 'bg-blue-600 text-white shadow-sm'
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
             }`}
@@ -190,7 +211,9 @@ export default function CalendarFilterPanel() {
             <p className="text-[11px] text-blue-700 dark:text-blue-400 font-semibold">
               {dayFilter
                 ? `Filtrando: ${new Date(dayFilter + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}`
-                : `Filtrando: Semana ${weekFilter} de ${MONTH_PT[viewMonth]}`
+                : weekFilter
+                ? `Filtrando: Semana ${weekFilter} de ${MONTH_PT[viewMonth]}`
+                : `Filtrando: Todos de ${MONTH_PT[viewMonth]}`
               }
             </p>
           </div>

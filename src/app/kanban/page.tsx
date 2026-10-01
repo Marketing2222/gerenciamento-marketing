@@ -15,15 +15,24 @@ import type { Task } from '@/types'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const WEEKDAY_PT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+const MONTH_PT = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
 
-function getWeekOfMonth(dateStr: string) {
-  const date = new Date(dateStr + 'T12:00:00')
-  const firstDay = new Date(date.getFullYear(), date.getMonth(), 1).getDay()
-  return Math.ceil((date.getDate() + firstDay) / 7)
+function parseDateParts(dateStr: string) {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return { year: y, month: m - 1, day: d }
+}
+
+function getWeekOfMonth(dateStr: string, targetMonth?: number, targetYear?: number) {
+  const { year, month, day } = parseDateParts(dateStr)
+  const m = targetMonth ?? month
+  const y = targetYear ?? year
+  const firstDay = new Date(y, m, 1).getDay()
+  return Math.ceil((day + firstDay) / 7)
 }
 
 function formatDayHeader(dateStr: string) {
-  const d = new Date(dateStr + 'T12:00:00')
+  const { year, month, day } = parseDateParts(dateStr)
+  const d = new Date(year, month, day)
   return {
     weekday: WEEKDAY_PT[d.getDay()],
     date: d.getDate(),
@@ -32,13 +41,22 @@ function formatDayHeader(dateStr: string) {
 }
 
 // ─── Drag-to-scroll hook ─────────────────────────────────────────────────────
-function useDragScroll() {
+function useDragScroll(isDraggingCard: boolean) {
   const ref = useRef<HTMLDivElement>(null)
   const isDragging = useRef(false)
   const startX = useRef(0)
   const scrollLeft = useRef(0)
 
+  const onWheel = useCallback((e: React.WheelEvent) => {
+    if (!ref.current) return
+    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+      e.preventDefault()
+      ref.current.scrollLeft += e.deltaY
+    }
+  }, [])
+
   const onMouseDown = useCallback((e: React.MouseEvent) => {
+    if (isDraggingCard) return
     // Only trigger on the board background, not on cards/buttons
     const target = e.target as HTMLElement
     if (target.closest('[data-rfd-draggable-context-id]') || target.closest('button') || target.closest('a') || target.closest('input')) {
@@ -50,7 +68,7 @@ function useDragScroll() {
     scrollLeft.current = ref.current.scrollLeft
     ref.current.style.cursor = 'grabbing'
     ref.current.style.userSelect = 'none'
-  }, [])
+  }, [isDraggingCard])
 
   const onMouseMove = useCallback((e: React.MouseEvent) => {
     if (!isDragging.current || !ref.current) return
@@ -76,7 +94,7 @@ function useDragScroll() {
     }
   }, [])
 
-  return { ref, onMouseDown, onMouseMove, onMouseUp, onMouseLeave }
+  return { ref, onWheel, onMouseDown, onMouseMove, onMouseUp, onMouseLeave }
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -92,29 +110,52 @@ export default function KanbanPage() {
     priorityFilter,
     weekFilter,
     dayFilter,
+    filterMonth,
+    filterYear,
+    filterMonthActive,
     isCreateOpen,
     setIsCreateOpen,
   } = useKanbanFilter()
 
   const [selectedTaskId, setSelectedTaskId] = React.useState<string | null>(null)
+  const [isDraggingCard, setIsDraggingCard] = React.useState(false)
   const selectedTask = useMemo(() => tasks.find(t => t.id === selectedTaskId) || null, [tasks, selectedTaskId])
   const activeTasks = useMemo(() => tasks.filter(t => !t.deletedAt), [tasks])
 
-  const dragScroll = useDragScroll()
+  const dragScroll = useDragScroll(isDraggingCard)
 
   // Apply filters
   const filteredTasks = useMemo(() => {
     let list = activeTasks
-    if (assigneeFilter) list = list.filter(t => t.assigneeId === assigneeFilter)
-    if (priorityFilter) list = list.filter(t => t.priority === priorityFilter)
+    if (assigneeFilter) list = list.filter(t => t.isFixed || t.assigneeId === assigneeFilter)
+    if (priorityFilter) list = list.filter(t => t.isFixed || t.priority === priorityFilter)
     if (dayFilter) {
-      list = list.filter(t => t.dueDate && t.dueDate.startsWith(dayFilter))
+      list = list.filter(t => {
+        if (t.isFixed) return true
+        if (!t.dueDate) return false
+        const taskDate = t.dueDate.split('T')[0]
+        return taskDate === dayFilter
+      })
     } else if (weekFilter) {
       const w = Number(weekFilter)
-      list = list.filter(t => t.dueDate && getWeekOfMonth(t.dueDate) === w)
+      list = list.filter(t => {
+        if (t.isFixed) return true
+        if (!t.dueDate) return false
+        const taskDate = t.dueDate.split('T')[0]
+        const { month: taskMonth, year: taskYear } = parseDateParts(taskDate)
+        if (taskYear !== filterYear || taskMonth !== filterMonth) return false
+        return getWeekOfMonth(taskDate, filterMonth, filterYear) === w
+      })
+    } else if (filterMonthActive) {
+      list = list.filter(t => {
+        if (t.isFixed) return true
+        if (!t.dueDate) return false
+        const { month: taskMonth, year: taskYear } = parseDateParts(t.dueDate.split('T')[0])
+        return taskMonth === filterMonth && taskYear === filterYear
+      })
     }
     return list
-  }, [activeTasks, assigneeFilter, priorityFilter, weekFilter, dayFilter])
+  }, [activeTasks, assigneeFilter, priorityFilter, weekFilter, dayFilter, filterMonth, filterYear, filterMonthActive])
 
   // Open via URL params
   React.useEffect(() => {
@@ -270,7 +311,7 @@ export default function KanbanPage() {
     return result
   }, [filteredTasks, columns])
 
-  const hasActiveFilter = assigneeFilter || priorityFilter || weekFilter || dayFilter
+  const hasActiveFilter = assigneeFilter || priorityFilter || weekFilter || dayFilter || filterMonthActive
   // Column count for dynamic sizing: aim for 6 visible at 100% zoom
   const colCount = columns.length
 
@@ -282,8 +323,9 @@ export default function KanbanPage() {
           <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl px-3 py-1.5">
             <span className="text-[11px] font-semibold text-blue-700 dark:text-blue-400">
               Filtro ativo
-              {weekFilter && ` • Semana ${weekFilter}`}
               {dayFilter && ` • ${formatDayHeader(dayFilter).full}`}
+              {weekFilter && ` • Semana ${weekFilter}`}
+              {!dayFilter && !weekFilter && filterMonthActive && ` • ${MONTH_PT[filterMonth]}`}
               {assigneeFilter && ' • Responsável'}
               {priorityFilter && ' • Prioridade'}
             </span>
@@ -294,6 +336,7 @@ export default function KanbanPage() {
       {/* Kanban Board — drag to scroll */}
       <div
         ref={dragScroll.ref}
+        onWheel={dragScroll.onWheel}
         onMouseDown={dragScroll.onMouseDown}
         onMouseMove={dragScroll.onMouseMove}
         onMouseUp={dragScroll.onMouseUp}
@@ -307,7 +350,13 @@ export default function KanbanPage() {
             <p className="text-sm font-medium">Carregando tarefas...</p>
           </div>
         ) : (
-          <DragDropContext onDragEnd={handleDragEnd}>
+          <DragDropContext
+            onDragStart={() => setIsDraggingCard(true)}
+            onDragEnd={(result) => {
+              setIsDraggingCard(false)
+              handleDragEnd(result)
+            }}
+          >
             <div
               className="flex gap-2 h-full items-stretch select-none"
               style={{

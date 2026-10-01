@@ -12,7 +12,11 @@ import {
   Eye, 
   ExternalLink,
   Link2,
-  GripVertical
+  GripVertical,
+  Pencil,
+  Maximize2,
+  Minimize2,
+  Move
 } from 'lucide-react'
 import RichTextEditor from './RichTextEditor'
 import Avatar from './Avatar'
@@ -39,6 +43,7 @@ export default function TaskModal({ task, isOpen, onClose, initialStatus = 'TODO
     removeComment,
     addCheckItem, 
     toggleCheck, 
+    renameCheckItem,
     removeCheckItem, 
     reorderChecklist,
     addFileAttachment, 
@@ -68,6 +73,13 @@ export default function TaskModal({ task, isOpen, onClose, initialStatus = 'TODO
   const [savingTask, setSavingTask] = useState(false)
   const [isAddingLink, setIsAddingLink] = useState(false)
   const [previewAttachment, setPreviewAttachment] = useState<{ name: string; url: string } | null>(null)
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 })
+  const dragStartRef = useRef({ x: 0, y: 0 })
+  const [isFixed, setIsFixed] = useState(false)
+  const [editingCheck, setEditingCheck] = useState<{ id: string; value: string } | null>(null)
+  const editCancelledRef = useRef(false)
   
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -92,6 +104,7 @@ export default function TaskModal({ task, isOpen, onClose, initialStatus = 'TODO
         activityLogs: [],
         deletedAt: null,
         createdAt: '',
+        isFixed: false,
       })
       setTitle('')
       setDescription('')
@@ -99,6 +112,7 @@ export default function TaskModal({ task, isOpen, onClose, initialStatus = 'TODO
       setStatus(initialStatus)
       setDueDate('')
       setAssigneeId('')
+      setIsFixed(false)
       return
     }
     if (task && isOpen) {
@@ -109,8 +123,33 @@ export default function TaskModal({ task, isOpen, onClose, initialStatus = 'TODO
       setStatus(task.status)
       setDueDate(task.dueDate ? task.dueDate.split('T')[0] : '')
       setAssigneeId(task.assigneeId || '')
+      setIsFixed(task.isFixed || false)
     }
   }, [task, isOpen, initialStatus])
+
+  // Fechar o popup com a tecla ESC
+  useEffect(() => {
+    if (!isOpen) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      if (editingCheck) {
+        editCancelledRef.current = true
+        setEditingCheck(null)
+        return
+      }
+      if (previewAttachment) {
+        setPreviewAttachment(null)
+        return
+      }
+      if (isDescriptionExpanded) {
+        setIsDescriptionExpanded(false)
+        return
+      }
+      onClose()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [isOpen, editingCheck, previewAttachment, isDescriptionExpanded, onClose])
 
   if (!isOpen) return null
 
@@ -149,6 +188,7 @@ export default function TaskModal({ task, isOpen, onClose, initialStatus = 'TODO
         dueDate: dueDate || null,
         assigneeId: assigneeId || null,
         assignee,
+        isFixed,
         checklist: (localTask?.checklist || []).map((it) => ({
           title: it.title,
           isCompleted: it.isCompleted,
@@ -201,6 +241,33 @@ export default function TaskModal({ task, isOpen, onClose, initialStatus = 'TODO
     } catch (err) {
       console.error('Error deleting checklist item:', err)
       if (removed) setLocalTask((prev) => prev ? { ...prev, checklist: [...prev.checklist, removed] } : prev)
+    }
+  }
+
+  const startEditChecklist = (itemId: string, currentTitle: string) => {
+    editCancelledRef.current = false
+    setEditingCheck({ id: itemId, value: currentTitle })
+  }
+
+  const cancelEditChecklist = () => {
+    editCancelledRef.current = true
+    setEditingCheck(null)
+  }
+
+  const commitEditChecklist = async () => {
+    if (!editingCheck || !localTask) return
+    const { id, value } = editingCheck
+    const newTitle = value.trim()
+    const old = localTask.checklist.find((it) => it.id === id)
+    setEditingCheck(null)
+    if (!newTitle || !old || newTitle === old.title) return
+    setLocalTask((prev) => prev ? { ...prev, checklist: prev.checklist.map((it) => it.id === id ? { ...it, title: newTitle } : it) } : prev)
+    if (isCreateMode) return
+    try {
+      await renameCheckItem(localTask.id, id, newTitle)
+    } catch (err) {
+      console.error('Error renaming checklist item:', err)
+      setLocalTask((prev) => prev ? { ...prev, checklist: prev.checklist.map((it) => it.id === id ? { ...it, title: old.title } : it) } : prev)
     }
   }
 
@@ -314,7 +381,7 @@ export default function TaskModal({ task, isOpen, onClose, initialStatus = 'TODO
 
   const handleSaveAll = async () => {
     setSavingTask(true)
-    await updateTaskField({ title, description, priority, status, dueDate: dueDate || null, assigneeId: assigneeId || null })
+    await updateTaskField({ title, description, priority, status, dueDate: dueDate || null, assigneeId: assigneeId || null, isFixed })
     setSavingTask(false)
   }
 
@@ -343,7 +410,7 @@ export default function TaskModal({ task, isOpen, onClose, initialStatus = 'TODO
                 }
               }}
               placeholder={isCreateMode ? "NOVA TAREFA" : "NOME DA TAREFA"}
-              className="w-full text-2xl font-black uppercase text-slate-800 dark:text-slate-100 bg-transparent border-b border-transparent hover:border-slate-200 dark:hover:border-slate-800 focus:border-blue-500 outline-none py-1 transition duration-150 focus:ring-0 placeholder-slate-300 dark:placeholder-slate-700"
+              className="w-full text-2xl font-black text-slate-800 dark:text-slate-100 bg-transparent border-b border-transparent hover:border-slate-200 dark:hover:border-slate-800 focus:border-blue-500 outline-none py-1 transition duration-150 focus:ring-0 placeholder-slate-300 dark:placeholder-slate-700"
             />
           </div>
           
@@ -391,6 +458,14 @@ export default function TaskModal({ task, isOpen, onClose, initialStatus = 'TODO
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Descrição</label>
+                <button
+                  type="button"
+                  onClick={() => setIsDescriptionExpanded(true)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/20 transition"
+                  title="Expandir descrição"
+                >
+                  <Maximize2 className="w-4 h-4" />
+                </button>
               </div>
               <div className="max-h-[250px] overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-800 scrollbar-thin">
                 <RichTextEditor content={description} onChange={setDescription} />
@@ -529,19 +604,57 @@ export default function TaskModal({ task, isOpen, onClose, initialStatus = 'TODO
                                         onChange={(e) => handleToggleChecklist(item.id, e.target.checked)}
                                         className="w-4.5 h-4.5 rounded border-slate-300 dark:border-slate-700 focus:ring-blue-500 text-blue-600 bg-white dark:bg-slate-900 mt-0.5 cursor-pointer"
                                       />
-                                      <span className={`leading-relaxed ${item.isCompleted ? 'line-through text-slate-400 dark:text-slate-500' : 'font-medium'}`}>
-                                        {item.title}
-                                      </span>
+                                      {editingCheck?.id === item.id ? (
+                                        <input
+                                          autoFocus
+                                          type="text"
+                                          value={editingCheck.value}
+                                          onChange={(e) => setEditingCheck((prev) => prev ? { ...prev, value: e.target.value } : prev)}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                              e.preventDefault()
+                                              commitEditChecklist()
+                                            }
+                                            if (e.key === 'Escape') {
+                                              e.preventDefault()
+                                              cancelEditChecklist()
+                                            }
+                                          }}
+                                          onBlur={() => {
+                                            if (editCancelledRef.current) {
+                                              editCancelledRef.current = false
+                                              return
+                                            }
+                                            commitEditChecklist()
+                                          }}
+                                          className="w-full px-2 py-1 bg-white dark:bg-slate-900 border border-blue-500 rounded-lg text-sm font-medium text-slate-800 dark:text-slate-200 outline-none shadow-sm"
+                                        />
+                                      ) : (
+                                        <span className={`leading-relaxed ${item.isCompleted ? 'line-through text-slate-400 dark:text-slate-500' : 'font-medium'}`}>
+                                          {item.title}
+                                        </span>
+                                      )}
                                     </label>
                                   </div>
                                   
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteChecklist(item.id)}
-                                    className="text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition shrink-0 cursor-pointer mt-0.5"
-                                  >
-                                    <Trash className="w-4 h-4" />
-                                  </button>
+                                  <div className="flex items-center gap-1 shrink-0 mt-0.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => startEditChecklist(item.id, item.title)}
+                                      title="Editar"
+                                      className="text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/20 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition shrink-0 cursor-pointer"
+                                    >
+                                      <Pencil className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteChecklist(item.id)}
+                                      title="Excluir"
+                                      className="text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition shrink-0 cursor-pointer"
+                                    >
+                                      <Trash className="w-4 h-4" />
+                                    </button>
+                                  </div>
                                 </div>
                               )}
                             </Draggable>
@@ -729,12 +842,15 @@ export default function TaskModal({ task, isOpen, onClose, initialStatus = 'TODO
                 </select>
               </div>
               <div className="w-16 shrink-0 space-y-2 flex flex-col items-center">
-                <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-center">Visível</label>
+                <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-center">Fixo</label>
                 <div className="flex items-center justify-center h-[42px]">
                   <input 
                     type="checkbox" 
-                    checked={isVisible}
-                    onChange={(e) => setIsVisible(e.target.checked)}
+                    checked={isFixed}
+                    onChange={(e) => {
+                      setIsFixed(e.target.checked)
+                      if (!isCreateMode) updateTaskField({ isFixed: e.target.checked })
+                    }}
                     className="w-5 h-5 rounded border-slate-300 dark:border-slate-700 text-blue-600 focus:ring-blue-500 bg-white dark:bg-slate-900 cursor-pointer" 
                   />
                 </div>
@@ -841,6 +957,89 @@ export default function TaskModal({ task, isOpen, onClose, initialStatus = 'TODO
             </div>
           </div>
         </div>
+      )}
+
+      {/* Expanded Description Modal */}
+      {isDescriptionExpanded && (
+        <div 
+          className="fixed z-[100000] bg-white dark:bg-[#111625] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-scale-up"
+          style={{
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: '90vw',
+            maxWidth: '900px',
+            height: '80vh',
+            maxHeight: '700px',
+            cursor: isDragging ? 'grabbing' : 'default'
+          }}
+        >
+          {/* Draggable Header */}
+          <div 
+            className="flex items-center justify-between px-4 py-3 bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 shrink-0"
+            style={{ cursor: 'grab' }}
+            onMouseDown={(e) => {
+              setIsDragging(true)
+              dragStartRef.current = { x: e.clientX - dragPosition.x, y: e.clientY - dragPosition.y }
+            }}
+          >
+            <div className="flex items-center gap-2">
+              <Move className="w-4 h-4 text-slate-400" />
+              <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Descrição da Tarefa</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsDescriptionExpanded(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+                title="Minimizar"
+              >
+                <Minimize2 className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsDescriptionExpanded(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition"
+                title="Fechar"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+          
+          {/* Expanded Content */}
+          <div className="flex-1 overflow-y-auto p-4 bg-white dark:bg-[#111625]">
+            <RichTextEditor content={description} onChange={setDescription} />
+          </div>
+          
+          {/* Footer */}
+          <div className="flex items-center justify-end px-4 py-3 bg-slate-100 dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 shrink-0 gap-2">
+            <button
+              type="button"
+              onClick={() => setIsDescriptionExpanded(false)}
+              className="px-4 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Backdrop for expanded description */}
+      {isDescriptionExpanded && (
+        <div 
+          className="fixed inset-0 z-[99999] bg-black/40"
+          onClick={() => setIsDescriptionExpanded(false)}
+          onMouseMove={(e) => {
+            if (isDragging) {
+              setDragPosition({
+                x: e.clientX - dragStartRef.current.x,
+                y: e.clientY - dragStartRef.current.y
+              })
+            }
+          }}
+          onMouseUp={() => setIsDragging(false)}
+        />
       )}
     </div>
   )

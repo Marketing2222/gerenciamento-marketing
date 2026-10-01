@@ -109,7 +109,8 @@ export function ColumnsProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isFirebaseConfigured()) return
     let unsub: (() => void) | null = null
-    void waitForConfig().then(async () => {
+    void (async () => {
+      waitForConfig()
       const ref = doc(await db(), 'settings', 'kanban')
       unsub = onSnapshot(ref, (snap) => {
         if (snap.exists()) {
@@ -118,7 +119,7 @@ export function ColumnsProvider({ children }: { children: React.ReactNode }) {
           if (d.summary && typeof d.summary === 'object') setSummary(d.summary)
         }
       })
-    })
+    })()
     return () => { unsub?.() }
   }, [])
 

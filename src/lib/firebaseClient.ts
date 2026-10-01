@@ -11,23 +11,23 @@ interface FirebaseConfig {
 }
 
 let _config: FirebaseConfig | null = null
-let _configPromise: Promise<FirebaseConfig> | null = null
 
-function fetchConfig(): Promise<FirebaseConfig> {
-  if (_config) return Promise.resolve(_config)
-  if (!_configPromise) {
-    _configPromise = fetch('/api/firebase-config')
-      .then((r) => r.json())
-      .then((c: FirebaseConfig) => {
-        _config = c
-        return c
-      })
+function getConfig(): FirebaseConfig {
+  if (_config) return _config
+  _config = {
+    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || '',
+    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || '',
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || '',
+    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || '',
+    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '',
+    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || '',
   }
-  return _configPromise
+  return _config
 }
 
 export function isFirebaseConfigured(): boolean {
-  return !!(_config?.apiKey && _config?.projectId)
+  const c = getConfig()
+  return !!(c.apiKey && c.projectId)
 }
 
 let _app: FirebaseApp | null = null
@@ -54,7 +54,7 @@ function initSync(): Firestore {
 
 export async function db(): Promise<Firestore> {
   if (_db) return _db
-  await fetchConfig()
+  getConfig()
   return initSync()
 }
 
@@ -62,6 +62,6 @@ export function dbSync(): Firestore | null {
   return _db
 }
 
-export function waitForConfig(): Promise<FirebaseConfig> {
-  return fetchConfig()
+export function waitForConfig(): FirebaseConfig {
+  return getConfig()
 }

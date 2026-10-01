@@ -5,6 +5,9 @@ import { useUser } from '@/context/UserContext'
 import {
   subscribeUsers,
   subscribeTasks,
+  subscribeRoles,
+  subscribeQuickLinks,
+  subscribeQuickLinkCategories,
   createTask,
   updateTaskFields,
   updateTaskOrders as firestoreUpdateTaskOrders,
@@ -15,6 +18,7 @@ import {
   addComment,
   addChecklistItem,
   toggleChecklistItem,
+  renameChecklistItem,
   deleteChecklistItem,
   reorderChecklistItem,
   addAttachment,
@@ -24,9 +28,20 @@ import {
   deleteUser as firestoreDeleteUser,
   seedDatabase,
   deleteComment as firestoreDeleteComment,
+  addRole as firestoreAddRole,
+  updateRole as firestoreUpdateRole,
+  deleteRole as firestoreDeleteRole,
+  addQuickLink as firestoreAddQuickLink,
+  updateQuickLink as firestoreUpdateQuickLink,
+  deleteQuickLink as firestoreDeleteQuickLink,
+  reorderQuickLinks as firestoreReorderQuickLinks,
+  addQuickLinkCategory as firestoreAddQuickLinkCategory,
+  updateQuickLinkCategory as firestoreUpdateQuickLinkCategory,
+  deleteQuickLinkCategory as firestoreDeleteQuickLinkCategory,
 } from '@/lib/firestore'
 import { isFirebaseConfigured } from '@/lib/firebaseClient'
 import type { Task, User } from '@/types'
+import type { Role, QuickLink, QuickLinkCategory } from '@/lib/firestore'
 import { uploadFile, uploadAvatar, uploadLogo } from '@/lib/storage'
 
 interface NewTaskInput {
@@ -37,6 +52,7 @@ interface NewTaskInput {
   dueDate?: string | null
   assigneeId?: string | null
   assignee?: User | null
+  isFixed?: boolean
   checklist?: { title: string }[]
   attachments?: { name: string; type: string; url: string }[]
 }
@@ -44,6 +60,9 @@ interface NewTaskInput {
 interface DataContextType {
   tasks: Task[]
   users: User[]
+  roles: Role[]
+  quickLinks: QuickLink[]
+  quickLinkCategories: QuickLinkCategory[]
   loaded: boolean
   // CRUD
   addTask: (input: NewTaskInput) => Promise<void>
@@ -61,6 +80,7 @@ interface DataContextType {
   removeComment: (taskId: string, commentId: string) => Promise<void>
   addCheckItem: (id: string, title: string) => Promise<void>
   toggleCheck: (id: string, itemId: string, completed: boolean) => Promise<void>
+  renameCheckItem: (id: string, itemId: string, title: string) => Promise<void>
   removeCheckItem: (id: string, itemId: string) => Promise<void>
   reorderChecklist: (id: string, sourceIndex: number, destIndex: number) => Promise<void>
   addFileAttachment: (id: string, name: string, type: string, url: string) => Promise<void>
@@ -73,6 +93,16 @@ interface DataContextType {
   uploadGeneral: (file: File) => Promise<string>
   uploadLogo: (file: File) => Promise<string>
   seed: () => Promise<void>
+  addRole: (name: string) => Promise<void>
+  updateRole: (id: string, name: string) => Promise<void>
+  removeRole: (id: string) => Promise<void>
+  addQuickLink: (name: string, url: string, iconUrl: string, categoryId: string, username: string, password: string) => Promise<void>
+  updateQuickLink: (id: string, name: string, url: string, iconUrl: string, categoryId: string, username: string, password: string) => Promise<void>
+  removeQuickLink: (id: string) => Promise<void>
+  reorderQuickLinks: (orderedIds: string[]) => Promise<void>
+  addQuickLinkCategory: (name: string) => Promise<void>
+  updateQuickLinkCategory: (id: string, name: string) => Promise<void>
+  removeQuickLinkCategory: (id: string) => Promise<void>
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined)
@@ -81,6 +111,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const { user } = useUser()
   const [tasks, setTasks] = useState<Task[]>([])
   const [users, setUsers] = useState<User[]>([])
+  const [roles, setRoles] = useState<Role[]>([])
+  const [quickLinks, setQuickLinks] = useState<QuickLink[]>([])
+  const [quickLinkCategories, setQuickLinkCategories] = useState<QuickLinkCategory[]>([])
   const [loaded, setLoaded] = useState(false)
 
   // O usuário logado é capturado para ser usado dentro de callbacks.
@@ -100,10 +133,22 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setLoaded(true)
       }
     })
+    const unsubRoles = subscribeRoles((list) => {
+      if (active) setRoles(list)
+    })
+    const unsubQuickLinks = subscribeQuickLinks((list) => {
+      if (active) setQuickLinks(list)
+    })
+    const unsubQuickLinkCategories = subscribeQuickLinkCategories((list) => {
+      if (active) setQuickLinkCategories(list)
+    })
     return () => {
       active = false
       unsubUsers()
       unsubTasks()
+      unsubRoles()
+      unsubQuickLinks()
+      unsubQuickLinkCategories()
     }
   }, [])
 
@@ -130,7 +175,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [user])
 
   const updateTask = useCallback(
-    async (id: string, patch: Partial<Pick<Task, 'title' | 'description' | 'priority' | 'status' | 'dueDate' | 'assigneeId' | 'assignee'>>) => {
+    async (id: string, patch: Partial<Pick<Task, 'title' | 'description' | 'priority' | 'status' | 'dueDate' | 'assigneeId' | 'assignee' | 'isFixed'>>) => {
       let resolvedPatch: Parameters<typeof updateTaskFields>[1] = { ...patch }
       if (patch.assigneeId !== undefined) {
         const found = users.find((u) => u.id === patch.assigneeId)
@@ -180,6 +225,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
     await deleteChecklistItem(id, itemId)
   }, [])
 
+  const renameCheckItem = useCallback(async (id: string, itemId: string, title: string) => {
+    await renameChecklistItem(id, itemId, title)
+  }, [])
+
   const reorderChecklist = useCallback(async (id: string, sourceIndex: number, destIndex: number) => {
     await reorderChecklistItem(id, sourceIndex, destIndex)
   }, [])
@@ -212,9 +261,52 @@ export function DataProvider({ children }: { children: ReactNode }) {
     await seedDatabase(users, tasks)
   }, [users, tasks])
 
+  const addRole = useCallback(async (name: string) => {
+    await firestoreAddRole(name)
+  }, [])
+
+  const updateRole = useCallback(async (id: string, name: string) => {
+    await firestoreUpdateRole(id, name)
+  }, [])
+
+  const removeRole = useCallback(async (id: string) => {
+    await firestoreDeleteRole(id)
+  }, [])
+
+  const addQuickLink = useCallback(async (name: string, url: string, iconUrl: string, categoryId: string, username: string, password: string) => {
+    await firestoreAddQuickLink(name, url, iconUrl, categoryId, username, password)
+  }, [])
+
+  const updateQuickLink = useCallback(async (id: string, name: string, url: string, iconUrl: string, categoryId: string, username: string, password: string) => {
+    await firestoreUpdateQuickLink(id, name, url, iconUrl, categoryId, username, password)
+  }, [])
+
+  const removeQuickLink = useCallback(async (id: string) => {
+    await firestoreDeleteQuickLink(id)
+  }, [])
+
+  const reorderQuickLinks = useCallback(async (orderedIds: string[]) => {
+    await firestoreReorderQuickLinks(orderedIds)
+  }, [])
+
+  const addQuickLinkCategory = useCallback(async (name: string) => {
+    await firestoreAddQuickLinkCategory(name)
+  }, [])
+
+  const updateQuickLinkCategory = useCallback(async (id: string, name: string) => {
+    await firestoreUpdateQuickLinkCategory(id, name)
+  }, [])
+
+  const removeQuickLinkCategory = useCallback(async (id: string) => {
+    await firestoreDeleteQuickLinkCategory(id)
+  }, [])
+
   const value: DataContextType = {
     tasks: resolvedTasks,
     users,
+    roles,
+    quickLinks,
+    quickLinkCategories,
     loaded,
     addTask,
     updateTask,
@@ -227,6 +319,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     removeComment,
     addCheckItem,
     toggleCheck,
+    renameCheckItem,
     removeCheckItem,
     reorderChecklist,
     addFileAttachment: addAttachmentToTask,
@@ -238,6 +331,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
     uploadGeneral: (f) => uploadFile(f),
     uploadLogo: (f) => uploadLogo(f),
     seed,
+    addRole,
+    updateRole,
+    removeRole,
+    addQuickLink,
+    updateQuickLink,
+    removeQuickLink,
+    reorderQuickLinks,
+    addQuickLinkCategory,
+    updateQuickLinkCategory,
+    removeQuickLinkCategory,
   }
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

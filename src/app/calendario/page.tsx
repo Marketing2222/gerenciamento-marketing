@@ -20,7 +20,7 @@ export default function CalendarPage() {
   const selectedTask = useMemo(() => tasks.find((t) => t.id === selectedTaskId) || null, [tasks, selectedTaskId])
 
   const tasksWithDate = useMemo(
-    () => tasks.filter((t) => !t.deletedAt && t.dueDate !== null),
+    () => tasks.filter((t) => !t.deletedAt && t.dueDate),
     [tasks]
   )
 
@@ -100,7 +100,7 @@ export default function CalendarPage() {
         {/* Células dos Dias */}
         <div className="grid grid-cols-7 flex-1 min-h-0 divide-x divide-y divide-slate-100 dark:divide-slate-800">
           {daysArray.map((cell, idx) => {
-            const cellKey = cell.date.toISOString().split('T')[0]
+            const cellKey = `${cell.date.getFullYear()}-${String(cell.date.getMonth() + 1).padStart(2, '0')}-${String(cell.date.getDate()).padStart(2, '0')}`
             const dayTasks = tasksWithDate.filter(t => t.dueDate && t.dueDate.split('T')[0] === cellKey)
             
             const isToday = new Date().toDateString() === cell.date.toDateString()
@@ -180,7 +180,7 @@ export default function CalendarPage() {
       <div className="flex-1 flex flex-col min-h-0 bg-white dark:bg-[#151b2c] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
         <div className="flex md:grid md:grid-cols-7 overflow-x-auto md:overflow-visible flex-1 min-h-0 divide-x divide-slate-100 dark:divide-slate-800">
           {daysOfWeek.map((day, idx) => {
-            const dayKey = day.toISOString().split('T')[0]
+            const dayKey = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`
             const dayTasks = tasksWithDate.filter(t => t.dueDate && t.dueDate.split('T')[0] === dayKey)
             const isToday = new Date().toDateString() === day.toDateString()
 
@@ -243,7 +243,7 @@ export default function CalendarPage() {
 
   // RENDER DAY VIEW
   const renderDayView = () => {
-    const dayKey = currentDate.toISOString().split('T')[0]
+    const dayKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`
     const dayTasks = tasksWithDate.filter(t => t.dueDate && t.dueDate.split('T')[0] === dayKey)
     const weekdaysFull = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado-feira']
 

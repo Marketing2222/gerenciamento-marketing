@@ -101,13 +101,20 @@ export default function TaskCard({ task, index, onOpenDetail, columnColor }: Tas
           ref={provided.innerRef}
           {...provided.draggableProps}
           {...provided.dragHandleProps}
-          className={`rounded-xl bg-white dark:bg-[#151b2c] border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md group mb-2 select-none overflow-hidden
-            ${snapshot.isDragging ? 'dragging-card ring-2 ring-blue-400/40 relative z-[9999]' : 'transition-[box-shadow,border-color] duration-150 hover:border-slate-300 dark:hover:border-slate-700'}
-            ${columnColor ? 'border-l-[3px]' : ''}
+          className={`rounded-xl border shadow-sm hover:shadow-md group mb-2 select-none overflow-hidden
+            ${snapshot.isDragging ? 'dragging-card ring-2 ring-blue-400/40 relative z-[9999]' : 'transition-[box-shadow,border-color] duration-150'}
+            ${isDone
+              ? 'bg-emerald-100 dark:bg-emerald-900/40 border-emerald-300 dark:border-emerald-700 border-l-[4px] border-l-emerald-500'
+              : isPlaying
+              ? 'bg-blue-100 dark:bg-blue-900/40 border-blue-300 dark:border-blue-700 border-l-[4px] border-l-blue-500'
+              : columnColor
+              ? 'bg-white dark:bg-[#151b2c] border-slate-200 dark:border-slate-800 border-l-[3px] hover:border-slate-300 dark:hover:border-slate-700'
+              : 'bg-white dark:bg-[#151b2c] border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+            }
           `}
           style={{
             ...provided.draggableProps.style,
-            ...(columnColor ? { borderLeftColor: columnColor } : {}),
+            ...(columnColor && !isDone && !isPlaying ? { borderLeftColor: columnColor } : {}),
           }}
         >
           {/* Card Body */}

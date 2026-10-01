@@ -67,6 +67,7 @@ function toTaskData(d: FireDoc): Task {
     creatorId: docData.creatorId ? toStr(docData.creatorId) : null,
     assignee: toObj<User>(docData.assignee),
     creator: toObj<User>(docData.creator),
+    isFixed: docData.isFixed === true,
     checklist: toArray<ChecklistItem>(docData.checklist),
     attachments: toArray<Attachment>(docData.attachments),
     comments: toArray<Comment>(docData.comments),
@@ -102,12 +103,13 @@ export function subscribeUsers(callback: (users: User[]) => void): () => void {
     return () => {}
   }
   let unsub: (() => void) | null = null
-  void waitForConfig().then(async () => {
+  void (async () => {
+    waitForConfig()
     const q = query(await usersCol())
     unsub = onSnapshot(q, (snapshot) => {
       callback(snapshot.docs.map((d) => toUserData(d as unknown as FireDoc)))
     })
-  })
+  })()
   return () => { unsub?.() }
 }
 
@@ -117,12 +119,13 @@ export function subscribeTasks(callback: (tasks: Task[]) => void): () => void {
     return () => {}
   }
   let unsub: (() => void) | null = null
-  void waitForConfig().then(async () => {
+  void (async () => {
+    waitForConfig()
     const q = query(await tasksCol())
     unsub = onSnapshot(q, (snapshot) => {
       callback(snapshot.docs.map((d) => toTaskData(d as unknown as FireDoc)))
     })
-  })
+  })()
   return () => { unsub?.() }
 }
 
@@ -172,6 +175,7 @@ export async function createTask(input: {
   assigneeId?: string | null
   assignee?: User | null
   creator: User | null
+  isFixed?: boolean
   checklist?: { title: string }[]
   attachments?: { name: string; type: string; url: string }[]
 }): Promise<void> {
@@ -189,6 +193,7 @@ export async function createTask(input: {
     assigneeId: input.assigneeId || null,
     creatorId: input.creator?.id || null,
     assignee: input.assignee || null,
+    isFixed: input.isFixed || false,
     creator: input.creator
       ? { id: input.creator.id, name: input.creator.name, avatarUrl: input.creator.avatarUrl, role: input.creator.role }
       : null,
@@ -221,7 +226,7 @@ export async function createTask(input: {
 
 export async function updateTaskFields(
   taskId: string,
-  patch: Partial<Pick<Task, 'title' | 'description' | 'priority' | 'status' | 'order' | 'dueDate' | 'assigneeId' | 'assignee' | 'deletedAt'>>
+  patch: Partial<Pick<Task, 'title' | 'description' | 'priority' | 'status' | 'order' | 'dueDate' | 'assigneeId' | 'assignee' | 'deletedAt' | 'isFixed'>>
 ): Promise<void> {
   const partial: Record<string, unknown> = {}
   if (patch.title !== undefined) partial.title = patch.title
@@ -235,6 +240,7 @@ export async function updateTaskFields(
     partial.assignee = patch.assignee || null
   }
   if (patch.deletedAt !== undefined) partial.deletedAt = patch.deletedAt ? new Date(patch.deletedAt) : null
+  if (patch.isFixed !== undefined) partial.isFixed = patch.isFixed
   await updateDoc(await taskDoc(taskId), partial)
 }
 
@@ -315,6 +321,11 @@ export async function toggleChecklistItem(taskId: string, itemId: string, isComp
   const current = await readList<ChecklistItem>(taskId, 'checklist')
   const updated = current.map((it) => (it.id === itemId ? { ...it, isCompleted } : it))
   await writeList(taskId, 'checklist', updated)
+}
+
+export async function renameChecklistItem(taskId: string, itemId: string, title: string): Promise<void> {
+  const current = await readList<ChecklistItem>(taskId, 'checklist')
+  await writeList(taskId, 'checklist', current.map((it) => (it.id === itemId ? { ...it, title } : it)))
 }
 
 export async function deleteChecklistItem(taskId: string, itemId: string): Promise<void> {
@@ -444,4 +455,197 @@ export async function seedDatabase(currentUsers: User[], currentTasks: Task[]): 
   taskIds.push(t3)
 
   return { users: [designer, manager], tasks: taskIds }
+}
+
+// ===== Funções/Setores =====
+
+export interface Role {
+  id: string
+  name: string
+}
+
+async function settingsCol() {
+  return collection(await db(), 'settings')
+}
+
+export function subscribeRoles(callback: (roles: Role[]) => void): () => void {
+  if (!isFirebaseConfigured()) { callback([]); return () => {} }
+  let unsub: (() => void) | null = null
+  void (async () => {
+    waitForConfig()
+    const ref = doc(await settingsCol(), 'roles')
+    unsub = onSnapshot(ref, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data()
+        const roles = Array.isArray(data.list) ? data.list.map((r: { id: string; name: string }) => ({ id: r.id, name: r.name })) : []
+        callback(roles)
+      } else {
+        callback([])
+      }
+    })
+  })()
+  return () => { unsub?.() }
+}
+
+export async function addRole(name: string): Promise<Role> {
+  const id = generateId()
+  const ref = doc(await settingsCol(), 'roles')
+  const snap = await getDoc(ref)
+  const existing: Role[] = snap.exists() && Array.isArray(snap.data().list) ? snap.data().list : []
+  await setDoc(ref, { list: [...existing, { id, name }] })
+  return { id, name }
+}
+
+export async function updateRole(id: string, name: string): Promise<void> {
+  const ref = doc(await settingsCol(), 'roles')
+  const snap = await getDoc(ref)
+  const existing: Role[] = snap.exists() && Array.isArray(snap.data().list) ? snap.data().list : []
+  const updated = existing.map((r) => (r.id === id ? { ...r, name } : r))
+  await setDoc(ref, { list: updated })
+}
+
+export async function deleteRole(id: string): Promise<void> {
+  const ref = doc(await settingsCol(), 'roles')
+  const snap = await getDoc(ref)
+  const existing: Role[] = snap.exists() && Array.isArray(snap.data().list) ? snap.data().list : []
+  const updated = existing.filter((r) => r.id !== id)
+  await setDoc(ref, { list: updated })
+}
+
+// ===== Links Rápidos =====
+
+export interface QuickLinkCategory {
+  id: string
+  name: string
+  order: number
+}
+
+export interface QuickLink {
+  id: string
+  name: string
+  url: string
+  iconUrl: string
+  categoryId: string
+  username: string
+  password: string
+  createdAt: string
+}
+
+// -- Categorias --
+
+export function subscribeQuickLinkCategories(callback: (cats: QuickLinkCategory[]) => void): () => void {
+  if (!isFirebaseConfigured()) { callback([]); return () => {} }
+  let unsub: (() => void) | null = null
+  void (async () => {
+    waitForConfig()
+    const ref = doc(await settingsCol(), 'quickLinkCategories')
+    unsub = onSnapshot(ref, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data()
+        const list = Array.isArray(data.list)
+          ? data.list.map((c: { id: string; name: string; order: number }) => ({ id: c.id, name: c.name, order: c.order }))
+          : []
+        callback(list.sort((a, b) => a.order - b.order))
+      } else {
+        callback([])
+      }
+    })
+  })()
+  return () => { unsub?.() }
+}
+
+export async function addQuickLinkCategory(name: string): Promise<void> {
+  const ref = doc(await settingsCol(), 'quickLinkCategories')
+  const snap = await getDoc(ref)
+  const existing: QuickLinkCategory[] = snap.exists() && Array.isArray(snap.data().list) ? snap.data().list : []
+  const newCat: QuickLinkCategory = { id: generateId(), name, order: existing.length }
+  await setDoc(ref, { list: [...existing, newCat] })
+}
+
+export async function updateQuickLinkCategory(id: string, name: string): Promise<void> {
+  const ref = doc(await settingsCol(), 'quickLinkCategories')
+  const snap = await getDoc(ref)
+  const existing: QuickLinkCategory[] = snap.exists() && Array.isArray(snap.data().list) ? snap.data().list : []
+  const updated = existing.map((c) => (c.id === id ? { ...c, name } : c))
+  await setDoc(ref, { list: updated })
+}
+
+export async function deleteQuickLinkCategory(id: string): Promise<void> {
+  const ref = doc(await settingsCol(), 'quickLinkCategories')
+  const snap = await getDoc(ref)
+  const existing: QuickLinkCategory[] = snap.exists() && Array.isArray(snap.data().list) ? snap.data().list : []
+  const updated = existing.filter((c) => c.id !== id)
+  await setDoc(ref, { list: updated })
+  // Also remove categoryId from links in that category
+  const linksRef = doc(await settingsCol(), 'quickLinks')
+  const linksSnap = await getDoc(linksRef)
+  if (linksSnap.exists()) {
+    const links: QuickLink[] = Array.isArray(linksSnap.data().list) ? linksSnap.data().list : []
+    const updatedLinks = links.map((l) => l.categoryId === id ? { ...l, categoryId: '' } : l)
+    await setDoc(linksRef, { list: updatedLinks })
+  }
+}
+
+// -- Links --
+
+export function subscribeQuickLinks(callback: (links: QuickLink[]) => void): () => void {
+  if (!isFirebaseConfigured()) { callback([]); return () => {} }
+  let unsub: (() => void) | null = null
+  void (async () => {
+    waitForConfig()
+    const ref = doc(await settingsCol(), 'quickLinks')
+    unsub = onSnapshot(ref, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data()
+        const links = Array.isArray(data.list)
+          ? data.list.map((l: { id: string; name: string; url: string; iconUrl?: string; categoryId?: string; username?: string; password?: string; createdAt: unknown }) => ({
+              id: l.id,
+              name: l.name,
+              url: l.url,
+              iconUrl: l.iconUrl || '',
+              categoryId: l.categoryId || '',
+              username: l.username || '',
+              password: l.password || '',
+              createdAt: toIso(l.createdAt) || '',
+            }))
+          : []
+        callback(links)
+      } else {
+        callback([])
+      }
+    })
+  })()
+  return () => { unsub?.() }
+}
+
+export async function addQuickLink(name: string, url: string, iconUrl: string, categoryId: string, username: string, password: string): Promise<void> {
+  const ref = doc(await settingsCol(), 'quickLinks')
+  const snap = await getDoc(ref)
+  const existing: QuickLink[] = snap.exists() && Array.isArray(snap.data().list) ? snap.data().list : []
+  const newLink: QuickLink = { id: generateId(), name, url, iconUrl, categoryId, username, password, createdAt: new Date().toISOString() }
+  await setDoc(ref, { list: [newLink, ...existing] })
+}
+
+export async function updateQuickLink(id: string, name: string, url: string, iconUrl: string, categoryId: string, username: string, password: string): Promise<void> {
+  const ref = doc(await settingsCol(), 'quickLinks')
+  const snap = await getDoc(ref)
+  const existing: QuickLink[] = snap.exists() && Array.isArray(snap.data().list) ? snap.data().list : []
+  const updated = existing.map((l) => (l.id === id ? { ...l, name, url, iconUrl, categoryId, username, password } : l))
+  await setDoc(ref, { list: updated })
+}
+
+export async function deleteQuickLink(id: string): Promise<void> {
+  const ref = doc(await settingsCol(), 'quickLinks')
+  const snap = await getDoc(ref)
+  const existing: QuickLink[] = snap.exists() && Array.isArray(snap.data().list) ? snap.data().list : []
+  const updated = existing.filter((l) => l.id !== id)
+  await setDoc(ref, { list: updated })
+}
+
+export async function reorderQuickLinks(orderedIds: string[]): Promise<void> {
+  const ref = doc(await settingsCol(), 'quickLinks')
+  const snap = await getDoc(ref)
+  const existing: QuickLink[] = snap.exists() && Array.isArray(snap.data().list) ? snap.data().list : []
+  const reordered = orderedIds.map((id) => existing.find((l) => l.id === id)).filter(Boolean) as QuickLink[]
+  await setDoc(ref, { list: reordered })
 }

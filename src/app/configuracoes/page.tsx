@@ -5,7 +5,7 @@ import { useUser } from '@/context/UserContext'
 import { useBrand } from '@/context/BrandContext'
 import { useData } from '@/context/DataContext'
 import { useColumns, CardSummaryConfig } from '@/context/ColumnsContext'
-import { User, Shield, Camera, Loader2, Sparkles, Globe, Upload, X, Check, Columns3, Plus, Pencil, Trash2, Users, GripVertical } from 'lucide-react'
+import { User, Shield, Camera, Loader2, Sparkles, Globe, Upload, X, Check, Columns3, Plus, Pencil, Trash2, Users, GripVertical, Briefcase } from 'lucide-react'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 import Avatar from '@/components/Avatar'
 
@@ -30,7 +30,7 @@ const EMPTY_USER_FORM: UserFormData = { name: '', role: 'DESIGNER', pin: '', ava
 export default function SettingsPage() {
   const { user, refreshUser } = useUser()
   const { siteName, logoUrl, applyBrand } = useBrand()
-  const { saveProfile, uploadAvatar, uploadLogo, users, addUser, removeUser, tasks, updateTask } = useData()
+  const { saveProfile, uploadAvatar, uploadLogo, users, addUser, removeUser, tasks, updateTask, roles, addRole, updateRole, removeRole } = useData()
   const { columns, summary, updateColumn, updateSummary, addColumn, removeColumn, reorderColumns } = useColumns()
   
   const [name, setName] = useState('')
@@ -58,6 +58,11 @@ export default function SettingsPage() {
   const [newColumnTitle, setNewColumnTitle] = useState('')
   const [newColumnColor, setNewColumnColor] = useState('#6366f1')
   const [addingColumn, setAddingColumn] = useState(false)
+
+  const [showRoleModal, setShowRoleModal] = useState(false)
+  const [editingRole, setEditingRole] = useState<string | null>(null)
+  const [roleName, setRoleName] = useState('')
+  const [savingRole, setSavingRole] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const logoInputRef = useRef<HTMLInputElement>(null)
@@ -232,6 +237,52 @@ export default function SettingsPage() {
     reorderColumns(result.source.index, result.destination.index)
   }
 
+  const openCreateRole = () => {
+    setEditingRole(null)
+    setRoleName('')
+    setShowRoleModal(true)
+  }
+
+  const openEditRole = (r: { id: string; name: string }) => {
+    setEditingRole(r.id)
+    setRoleName(r.name)
+    setShowRoleModal(true)
+  }
+
+  const handleSaveRole = async () => {
+    if (!roleName.trim()) { setError('Nome da função é obrigatório'); return }
+    setSavingRole(true)
+    setError('')
+    try {
+      if (editingRole) {
+        await updateRole(editingRole, roleName.trim())
+        setSuccess('Função atualizada!')
+      } else {
+        await addRole(roleName.trim())
+        setSuccess('Função criada!')
+      }
+      setShowRoleModal(false)
+    } catch (err) {
+      setError(`Erro: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setSavingRole(false)
+    }
+  }
+
+  const handleDeleteRole = async (id: string, name: string) => {
+    const usersWithRole = users.filter(u => u.role === id)
+    const orphanMsg = usersWithRole.length > 0
+      ? `\n\nExistem ${usersWithRole.length} usuário(s) com esta função que perderão a referência.`
+      : ''
+    if (!confirm(`Excluir a função "${name}"?${orphanMsg}`)) return
+    try {
+      await removeRole(id)
+      setSuccess('Função excluída!')
+    } catch (err) {
+      setError(`Erro: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
   return (
     <div className="max-w-3xl mx-auto space-y-6 animate-fade-in select-none">
       <div>
@@ -345,6 +396,33 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* Funções/Setores */}
+      <div className="bg-white dark:bg-[#151b2c] border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2"><Briefcase className="w-5 h-5 text-amber-500" /><h3 className="text-base font-bold text-slate-800 dark:text-slate-200">Funções / Setores</h3></div>
+          <button onClick={openCreateRole} className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold transition cursor-pointer"><Plus className="w-3.5 h-3.5" />Nova Função</button>
+        </div>
+        <p className="text-xs text-slate-500 dark:text-slate-400">Gerencie as funções/setores disponíveis para atribuir aos usuários.</p>
+        {roles.length === 0 ? (
+          <p className="text-xs text-slate-400 dark:text-slate-500 text-center py-4">Nenhuma função cadastrada. Crie uma para começar.</p>
+        ) : (
+          <div className="space-y-2">
+            {roles.map((r) => (
+              <div key={r.id} className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-200 dark:border-slate-800">
+                <div className="w-8 h-8 bg-amber-100 dark:bg-amber-950/30 rounded-lg flex items-center justify-center">
+                  <Briefcase className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                </div>
+                <span className="flex-1 text-sm font-semibold text-slate-800 dark:text-slate-200">{r.name}</span>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button onClick={() => openEditRole(r)} className="p-2 rounded-lg text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/20 transition cursor-pointer" title="Editar"><Pencil className="w-4 h-4" /></button>
+                  <button onClick={() => handleDeleteRole(r.id, r.name)} className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition cursor-pointer" title="Excluir"><Trash2 className="w-4 h-4" /></button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Usuários */}
       <div className="bg-white dark:bg-[#151b2c] border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm space-y-4">
         <div className="flex items-center justify-between">
@@ -357,7 +435,7 @@ export default function SettingsPage() {
               <Avatar name={u.name} url={u.avatarUrl} size="lg" />
               <div className="flex-1 min-w-0">
                 <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">{u.name}</h4>
-                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">{u.role === 'DESIGNER' ? 'Designer' : 'Gestor de Tráfego'}</span>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">{roles.find(r => r.id === u.role)?.name || u.role}</span>
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 <button onClick={() => openEditUser(u)} className="p-2 rounded-lg text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/20 transition cursor-pointer" title="Editar"><Pencil className="w-4 h-4" /></button>
@@ -391,8 +469,14 @@ export default function SettingsPage() {
             <div className="space-y-1.5">
               <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Função / Setor</label>
               <select value={role} onChange={(e) => setRole(e.target.value)} className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-700 dark:text-slate-300 font-semibold">
-                <option value="DESIGNER">Designer (Artes & Audiovisual)</option>
-                <option value="TRAFFIC_MANAGER">Gestor de Tráfego (Campanhas & Ads)</option>
+                {roles.length === 0 ? (
+                  <>
+                    <option value="DESIGNER">Designer (Artes & Audiovisual)</option>
+                    <option value="TRAFFIC_MANAGER">Gestor de Tráfego (Campanhas & Ads)</option>
+                  </>
+                ) : (
+                  roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)
+                )}
               </select>
             </div>
           </div>
@@ -445,8 +529,14 @@ export default function SettingsPage() {
               <div className="space-y-1.5">
                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Função / Setor</label>
                 <select value={userForm.role} onChange={(e) => setUserForm((f) => ({ ...f, role: e.target.value }))} className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-700 dark:text-slate-300 font-semibold">
-                  <option value="DESIGNER">Designer</option>
-                  <option value="TRAFFIC_MANAGER">Gestor de Tráfego</option>
+                  {roles.length === 0 ? (
+                    <>
+                      <option value="DESIGNER">Designer</option>
+                      <option value="TRAFFIC_MANAGER">Gestor de Tráfego</option>
+                    </>
+                  ) : (
+                    roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)
+                  )}
                 </select>
               </div>
               <div className="space-y-1.5">
@@ -495,6 +585,30 @@ export default function SettingsPage() {
                 <button type="button" onClick={() => setShowColumnModal(false)} className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-sm font-semibold transition cursor-pointer">Cancelar</button>
                 <button type="button" onClick={handleAddColumn} disabled={addingColumn || !newColumnTitle.trim()} className="px-4 py-2 bg-violet-600 hover:bg-violet-700 disabled:bg-violet-800 text-white rounded-xl text-sm font-semibold transition cursor-pointer flex items-center gap-2">
                   {addingColumn ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}Criar Coluna
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Role Modal */}
+      {showRoleModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-white dark:bg-[#111625] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
+              <h3 className="font-bold text-slate-800 dark:text-white">{editingRole ? 'Editar Função' : 'Nova Função'}</h3>
+              <button onClick={() => setShowRoleModal(false)} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Nome da Função / Setor</label>
+                <input type="text" value={roleName} onChange={(e) => setRoleName(e.target.value)} placeholder="Ex: Designer, Gestor de Tráfego, Social Media..." className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-800 dark:text-slate-200 font-semibold" autoFocus />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setShowRoleModal(false)} className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-sm font-semibold transition cursor-pointer">Cancelar</button>
+                <button type="button" onClick={handleSaveRole} disabled={savingRole || !roleName.trim()} className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-800 text-white rounded-xl text-sm font-semibold transition cursor-pointer flex items-center gap-2">
+                  {savingRole ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}{editingRole ? 'Salvar' : 'Criar'}
                 </button>
               </div>
             </div>

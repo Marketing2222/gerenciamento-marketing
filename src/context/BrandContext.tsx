@@ -30,7 +30,8 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
       return
     }
     let unsub: (() => void) | null = null
-    void waitForConfig().then(async () => {
+    void (async () => {
+      waitForConfig()
       const brandRef = doc(await db(), 'settings', 'brand')
       unsub = onSnapshot(brandRef, (snap) => {
         if (snap.exists()) {
@@ -42,7 +43,7 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
           setLogoUrlState(DEFAULT_LOGO)
         }
       })
-    })
+    })()
     return () => { unsub?.() }
   }, [])
 

@@ -8,13 +8,18 @@ import Avatar from '@/components/Avatar'
 
 export default function LoginPage() {
   const { login } = useUser()
-  const { users, loaded, seed } = useData()
+  const { users, loaded, seed, roles } = useData()
   const [selectedUser, setSelectedUser] = useState<(typeof users)[number] | null>(null)
   const [pin, setPin] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [seeding, setSeeding] = useState(false)
   const [seedSuccess, setSeedSuccess] = useState('')
+
+  const getRoleName = (roleId: string) => {
+    const found = roles.find(r => r.id === roleId)
+    return found ? found.name : roleId
+  }
 
   const handleSeed = async () => {
     if (!confirm('Isso irá apagar todos os dados existentes e criar dados de exemplo. Deseja continuar?')) return
@@ -117,7 +122,7 @@ export default function LoginPage() {
                   {u.name}
                 </h3>
                 <p className="text-slate-500 text-xs mt-1">
-                  {u.role === 'DESIGNER' ? 'Designer' : 'Gestor de Tráfego'}
+                  {getRoleName(u.role)}
                 </p>
               </button>
             ))}
@@ -131,7 +136,7 @@ export default function LoginPage() {
                   {selectedUser.name}
                 </h3>
                 <p className="text-slate-400 text-xs truncate">
-                  {selectedUser.role === 'DESIGNER' ? 'Designer' : 'Gestor de Tráfego'}
+                  {getRoleName(selectedUser.role)}
                 </p>
               </div>
               <button

@@ -38,6 +38,7 @@ export interface ActivityLog {
 }
 
 export interface Task {
+  isFixed: boolean
   id: string
   title: string
   description: string

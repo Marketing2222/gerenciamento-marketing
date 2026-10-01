@@ -10,6 +10,7 @@ import { useData } from '@/context/DataContext'
 import Avatar from '@/components/Avatar'
 import TrashModal from '@/components/TrashModal'
 import VideoScheduleModal from '@/components/VideoScheduleModal'
+import LinksPanel from '@/components/LinksPanel'
 import {
   Kanban,
   FolderOpen,
@@ -28,6 +29,7 @@ import {
   Tag,
   CalendarDays,
   ChevronRight,
+  Link2,
 } from 'lucide-react'
 
 interface HeaderProps {
@@ -52,10 +54,11 @@ export default function Header({
   const { user, logout } = useUser()
   const { theme, toggleTheme } = useTheme()
   const { siteName, logoUrl } = useBrand()
-  const { users } = useData()
+  const { users, roles } = useData()
 
   const [isTrashOpen, setIsTrashOpen] = useState(false)
   const [isVideoScheduleOpen, setIsVideoScheduleOpen] = useState(false)
+  const [isLinksOpen, setIsLinksOpen] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -70,6 +73,7 @@ export default function Header({
     { name: 'Arquivos', href: '/arquivos', icon: FolderOpen },
     { name: 'Configurações', href: '/configuracoes', icon: Settings },
     { name: 'Cronograma de Vídeos', href: null, icon: Video, isAction: true, action: () => setIsVideoScheduleOpen(true) },
+    { name: 'Links', href: null, icon: Link2, isAction: true, action: () => setIsLinksOpen(true) },
   ]
 
   useEffect(() => {
@@ -86,6 +90,11 @@ export default function Header({
   }, [])
 
   if (!user) return null
+
+  const getRoleName = (roleId: string) => {
+    const found = roles.find(r => r.id === roleId)
+    return found ? found.name : roleId
+  }
 
   const isKanban = pathname === '/kanban'
 
@@ -198,7 +207,7 @@ export default function Header({
             <Avatar name={user.name} url={user.avatarUrl} size="lg" />
             <div className="min-w-0">
               <p className="font-semibold text-slate-800 dark:text-slate-200 text-sm truncate">{user.name}</p>
-              <p className="text-xs text-slate-500 truncate">{user.role === 'DESIGNER' ? 'Designer' : 'Gestor'}</p>
+              <p className="text-xs text-slate-500 truncate">{getRoleName(user.role)}</p>
             </div>
           </div>
           <button
@@ -326,7 +335,7 @@ export default function Header({
               <div className="hidden lg:block min-w-0">
                 <h4 className="font-semibold text-slate-800 dark:text-slate-200 text-xs truncate leading-tight">{user.name}</h4>
                 <span className="text-[10px] text-slate-500 dark:text-slate-400 block truncate font-medium">
-                  {user.role === 'DESIGNER' ? 'Designer' : 'Gestor de Tráfego'}
+                  {getRoleName(user.role)}
                 </span>
               </div>
             </button>
@@ -336,7 +345,7 @@ export default function Header({
                 <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800">
                   <p className="font-semibold text-slate-800 dark:text-slate-200 text-sm">{user.name}</p>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    {user.role === 'DESIGNER' ? 'Designer' : 'Gestor de Tráfego'}
+                    {getRoleName(user.role)}
                   </p>
                 </div>
                 <button
@@ -370,6 +379,8 @@ export default function Header({
         <TrashModal isOpen={isTrashOpen} onClose={() => setIsTrashOpen(false)} />
         <VideoScheduleModal isOpen={isVideoScheduleOpen} onClose={() => setIsVideoScheduleOpen(false)} />
       </header>
+
+      <LinksPanel isOpen={isLinksOpen} onClose={() => setIsLinksOpen(false)} />
     </>
   )
 }
