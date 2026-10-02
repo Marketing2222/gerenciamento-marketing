@@ -280,6 +280,26 @@ export async function recordConclusion(input: ConclusionInput): Promise<void> {
 
 // ===== Backfill (rodar 1x para tarefas já concluídas) =====
 
+/**
+ * Converte campos de data do Firestore cru para ISO: aceita string, número
+ * (epoch ms) ou Firestore Timestamp (duck-typed via toDate()). As tarefas
+ * gravam createdAt/dueDate como Timestamp, não string.
+ */
+function toIsoVal(v: unknown): string | null {
+  if (!v) return null
+  if (typeof v === 'string') return v
+  if (typeof v === 'number') return Number.isFinite(v) ? new Date(v).toISOString() : null
+  if (typeof v === 'object') {
+    const cand = v as { toDate?: unknown }
+    if (typeof cand.toDate === 'function') {
+      const d = (cand.toDate as () => Date)()
+      const t = d?.getTime?.()
+      return Number.isFinite(t) ? new Date(t as number).toISOString() : null
+    }
+  }
+  return null
+}
+
 interface RawTask {
   id: string
   title: string
@@ -309,8 +329,8 @@ export async function runBackfillIfNeeded(): Promise<void> {
         title: typeof raw.title === 'string' ? raw.title : '',
         status: typeof raw.status === 'string' ? raw.status : '',
         priority: typeof raw.priority === 'string' ? raw.priority : 'MEDIUM',
-        dueDate: typeof raw.dueDate === 'string' ? raw.dueDate : null,
-        createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : nowIso(),
+        dueDate: toIsoVal(raw.dueDate),
+        createdAt: toIsoVal(raw.createdAt) ?? nowIso(),
         assigneeId: typeof raw.assigneeId === 'string' ? raw.assigneeId : null,
         creatorId: typeof raw.creatorId === 'string' ? raw.creatorId : null,
         checklist: Array.isArray(raw.checklist)
