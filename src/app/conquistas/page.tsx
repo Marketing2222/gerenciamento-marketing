@@ -308,7 +308,7 @@ export default function ConquistasPage() {
                     <div className="flex items-center justify-between gap-2">
                       <h3
                         title={lockedSecret ? undefined : a.name}
-                        className="min-w-0 text-base xl:text-lg font-extrabold uppercase tracking-wide text-slate-900 dark:text-slate-100 leading-tight truncate"
+                        className="min-w-0 text-sm font-bold uppercase tracking-wide text-slate-900 dark:text-slate-100 leading-tight truncate"
                       >
                         {lockedSecret ? '???' : a.name}
                       </h3>
