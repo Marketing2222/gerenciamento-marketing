@@ -11,7 +11,7 @@ import { uploadFile } from '@/lib/storage'
 import RankGallery from '@/components/gamification/RankGallery'
 import SeasonPopup from '@/components/gamification/SeasonPopup'
 import { buildSeasonSummaries, currentSeason } from '@/lib/gamification/seasons'
-import { Loader2, Lock, Moon, Pencil, Sun, Trophy, Upload, Trash2, Filter, Calendar } from 'lucide-react'
+import { Loader2, Lock, Moon, Pencil, Sun, Trophy, Upload, Trash2, Filter, Calendar, Gem } from 'lucide-react'
 
 type StatusFilter = 'todas' | 'desbloqueadas' | 'pendentes'
 
@@ -38,6 +38,8 @@ export default function ConquistasPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('todas')
   const [catFilter, setCatFilter] = useState<AchCategory | 'todas'>('todas')
   const [catMenu, setCatMenu] = useState(false)
+  const [rarFilter, setRarFilter] = useState<Rarity | 'todas'>('todas')
+  const [rarMenu, setRarMenu] = useState(false)
   const [seasonOpen, setSeasonOpen] = useState(false)
   const [rankOpen, setRankOpen] = useState(false)
   const [coverMenu, setCoverMenu] = useState(false)
@@ -90,9 +92,10 @@ export default function ConquistasPage() {
       if (statusFilter === 'desbloqueadas' && !unlocked) return false
       if (statusFilter === 'pendentes' && unlocked) return false
       if (catFilter !== 'todas' && a.category !== catFilter) return false
+      if (rarFilter !== 'todas' && a.rarity !== rarFilter) return false
       return true
     })
-  }, [unlocks, statusFilter, catFilter])
+  }, [unlocks, statusFilter, catFilter, rarFilter])
 
   const seasonSummaries = useMemo(() => buildSeasonSummaries(events, allUnlocks), [events, allUnlocks])
   const seasonNumberNow = seasonSummaries[seasonSummaries.length - 1]?.info.number ?? currentSeason().number
@@ -154,6 +157,9 @@ export default function ConquistasPage() {
             )}
           </button>
             <div>
+              <span className="inline-flex items-center mb-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                T{seasonNumberNow}
+              </span>
               <p className="text-[11px] font-bold uppercase tracking-widest text-amber-500">
                 Nível {level?.level ?? 1}
               </p>
@@ -322,6 +328,47 @@ export default function ConquistasPage() {
                       }`}
                     >
                       {c.label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Filtro de raridade (dropdown) */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setRarMenu((v) => !v)}
+              style={rarFilter !== 'todas' ? grad : undefined}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition cursor-pointer ${
+                rarFilter !== 'todas'
+                  ? 'text-white shadow-md'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+              }`}
+            >
+              <Gem className="w-3.5 h-3.5" />
+              {rarFilter === 'todas' ? 'Raridade' : RARITY_META[rarFilter].label}
+            </button>
+            {rarMenu && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setRarMenu(false)} />
+                <div className="absolute z-20 mt-2 w-44 p-2 rounded-xl bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-700 shadow-xl flex flex-col gap-1.5">
+                  {(['todas', 'comum', 'rara', 'epica', 'lendaria'] as const).map((r) => (
+                    <button
+                      key={r}
+                      onClick={() => {
+                        setRarFilter(r)
+                        setRarMenu(false)
+                      }}
+                      style={rarFilter === r ? grad : undefined}
+                      className={`px-3 py-1.5 rounded-full text-xs font-semibold transition text-left cursor-pointer ${
+                        rarFilter === r
+                          ? 'text-white shadow-md shadow-slate-500/20'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                      }`}
+                    >
+                      {r === 'todas' ? 'Todas' : RARITY_META[r].label}
                     </button>
                   ))}
                 </div>

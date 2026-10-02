@@ -115,10 +115,6 @@ export function buildSeasonSummaries(
     unls.push({ ms, xp: reward, unlock: u })
   }
 
-  const xpAt = (ms: number): number =>
-    evs.reduce((s, e) => (e.ms <= ms ? s + e.xp : s), 0) +
-    unls.reduce((s, u) => (u.ms <= ms ? s + u.xp : s), 0)
-
   const cur = currentSeason(now)
   const months: SeasonInfo[] = []
   let y = SEASON_EPOCH.year
@@ -136,13 +132,18 @@ export function buildSeasonSummaries(
     const inRange = (ms: number) => ms >= info.startMs && ms <= info.endMs
     const seasonEvs = evs.filter((e) => inRange(e.ms))
     const seasonUnls = unls.filter((u) => inRange(u.ms))
+    const xpEarned =
+      seasonEvs.reduce((s, e) => s + e.xp, 0) +
+      seasonUnls.reduce((s, u) => s + u.xp, 0)
     return {
       info,
-      xpEarned: seasonEvs.reduce((s, e) => s + e.xp, 0),
+      xpEarned,
       tasksCompleted: seasonEvs.length,
       achievements: seasonUnls.map((u) => u.unlock),
-      levelStart: levelFromXp(xpAt(info.startMs - 1)),
-      levelEnd: levelFromXp(xpAt(info.endMs)),
+      // Com o reset mensal, toda temporada começa no nível 1 e fecha com o
+      // XP ganho na própria temporada (não acumula carreira).
+      levelStart: 1,
+      levelEnd: levelFromXp(xpEarned),
     }
   })
 

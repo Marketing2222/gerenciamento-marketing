@@ -4,6 +4,7 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import { useUser } from '@/context/UserContext'
 import {
   resetNewAchievements,
+  reconcileSeasonUnlocks,
   runBackfillIfNeeded,
   saveCoverUrl,
   subscribeEvents,
@@ -83,6 +84,7 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
   const [loading, setLoading] = useState(true)
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const toastSeq = useRef(0)
+  const reconciledRef = useRef(false)
   const userId = user?.id ?? null
 
   useEffect(() => {
@@ -92,15 +94,29 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
       setUnlockDocs({})
       setEvents([])
       setLoading(true)
+      reconciledRef.current = false
       return
     }
     setLoading(true)
+    reconciledRef.current = false
     const unsubProgress = subscribeProgress(userId, (p) => {
       setProgress(p)
       setLoading(false)
     })
     const unsubUnlocks = subscribeUnlocks(userId, setUnlockDocs)
-    const unsubEvents = subscribeEvents(userId, setEvents)
+    const unsubEvents = subscribeEvents(userId, (evs) => {
+      setEvents(evs)
+      // 1ª carga: reavalia conquistas da temporada (cobre conclusões
+      // anteriores ao reset/deploy e a virada do mês).
+      if (!reconciledRef.current) {
+        reconciledRef.current = true
+        const seasonNow = currentSeason()
+        void reconcileSeasonUnlocks(
+          userId,
+          evs.filter((e) => eventInSeason(e, seasonNow))
+        ).catch((err) => console.error('[gamification] reconcile', err))
+      }
+    })
     void runBackfillIfNeeded().catch((err) => console.error('[gamification] backfill', err))
     return () => {
       unsubProgress()

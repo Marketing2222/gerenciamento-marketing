@@ -302,6 +302,84 @@ export async function recordConclusion(input: ConclusionInput): Promise<void> {
   }
 }
 
+// ===== Reconciliação de conquistas da temporada =====
+
+/**
+ * Reavalia as conquistas da temporada atual contra os eventos já existentes.
+ * Roda 1x ao carregar a página: cobre conclusões feitas antes do deploy/reset,
+ * a virada do mês (eventos do dia 1º antes de qualquer nova conclusão) e
+ * desbloqueios cujo doc legado pertence a outra temporada.
+ * Emite toast para cada conquista escrita. Idempotente (transação re-checa).
+ */
+export async function reconcileSeasonUnlocks(uid: string, seasonEvents: XpEvent[]): Promise<void> {
+  if (!isFirebaseConfigured() || !uid) return
+  waitForConfig()
+
+  const season = currentSeason()
+  const counters = computeCounters(seasonEvents)
+
+  const unlocksSnap = await getDocs(await unlocksCol(uid))
+  const freshIds = new Set<string>()
+  unlocksSnap.docs.forEach((d) => {
+    const raw = d.data()
+    const unlockedAt = typeof raw.unlockedAt === 'string' ? raw.unlockedAt : ''
+    if (isUnlockInSeason(d.id, unlockedAt, season)) freshIds.add(parseUnlockDocId(d.id).achievementId)
+  })
+
+  const pending = evaluateAchievements([...freshIds], counters)
+  if (pending.length === 0) return
+
+  const uRef = await userRef(uid)
+  const holder: { written: typeof pending } = { written: [] }
+
+  await runTransaction(await db(), async (tx) => {
+    // TODAS as leituras antes de qualquer escrita (regra do Firestore).
+    const uSnap = await tx.get(uRef)
+    const toWrite: typeof pending = []
+    for (const a of pending) {
+      const aRef = await unlockRef(uid, unlockDocId(season.key, a.id))
+      const snap = await tx.get(aRef)
+      if (!snap.exists()) toWrite.push(a)
+    }
+    if (toWrite.length === 0) return
+
+    const now = nowIso()
+    for (const a of toWrite) {
+      const aRef = await unlockRef(uid, unlockDocId(season.key, a.id))
+      tx.set(aRef, {
+        achievementId: a.id,
+        unlockedAt: now,
+        progress: achievementProgress(a, counters, [...freshIds]),
+      })
+      freshIds.add(a.id)
+    }
+
+    const seasonXp =
+      seasonEvents.reduce((sum, e) => sum + e.xp, 0) +
+      [...freshIds].reduce((sum, id) => sum + (ACHIEVEMENTS_BY_ID[id]?.xpReward ?? 0), 0)
+    const xpSum = toWrite.reduce((sum, a) => sum + a.xpReward, 0)
+
+    const prev = uSnap.exists() ? uSnap.data() : null
+    const prevTotal = typeof prev?.totalXp === 'number' ? prev.totalXp : 0
+    const prevNew = typeof prev?.newAchievements === 'number' ? prev.newAchievements : 0
+    tx.set(
+      uRef,
+      {
+        totalXp: prevTotal + xpSum,
+        level: levelFromXp(seasonXp),
+        newAchievements: prevNew + toWrite.length,
+        updatedAt: now,
+      },
+      { merge: true }
+    )
+    holder.written = toWrite
+  })
+
+  for (const a of holder.written) {
+    gamificationBus.emit({ kind: 'achievement', achievement: a })
+  }
+}
+
 // ===== Backfill (rodar 1x para tarefas já concluídas) =====
 
 /**
