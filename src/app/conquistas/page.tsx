@@ -9,7 +9,9 @@ import { iconKeys } from '@/lib/gamification/settings'
 import type { AchCategory, Rarity } from '@/lib/gamification/types'
 import { uploadFile } from '@/lib/storage'
 import RankGallery from '@/components/gamification/RankGallery'
-import { Loader2, Lock, Moon, Pencil, Sun, Trophy, Upload, Trash2, Filter } from 'lucide-react'
+import SeasonPopup from '@/components/gamification/SeasonPopup'
+import { buildSeasonSummaries, currentSeason } from '@/lib/gamification/seasons'
+import { Loader2, Lock, Moon, Pencil, Sun, Trophy, Upload, Trash2, Filter, Calendar } from 'lucide-react'
 
 type StatusFilter = 'todas' | 'desbloqueadas' | 'pendentes'
 
@@ -32,10 +34,11 @@ const CATEGORY_LABELS: { id: AchCategory | 'todas'; label: string }[] = [
 ]
 
 export default function ConquistasPage() {
-  const { progress, unlocks, counters, unlockedCount, totalAchievements, loading, level, resetNew, settings, saveCover } = useGamification()
+  const { progress, unlocks, events, counters, unlockedCount, totalAchievements, loading, level, resetNew, settings, saveCover } = useGamification()
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('todas')
   const [catFilter, setCatFilter] = useState<AchCategory | 'todas'>('todas')
   const [catMenu, setCatMenu] = useState(false)
+  const [seasonOpen, setSeasonOpen] = useState(false)
   const [rankOpen, setRankOpen] = useState(false)
   const [coverMenu, setCoverMenu] = useState(false)
   const [savingCover, setSavingCover] = useState(false)
@@ -90,6 +93,9 @@ export default function ConquistasPage() {
       return true
     })
   }, [unlocks, statusFilter, catFilter])
+
+  const seasonSummaries = useMemo(() => buildSeasonSummaries(events, unlocks), [events, unlocks])
+  const seasonNumberNow = seasonSummaries[seasonSummaries.length - 1]?.info.number ?? currentSeason().number
 
   if (loading) {
     return (
@@ -262,6 +268,25 @@ export default function ConquistasPage() {
               {s}
             </button>
           ))}
+
+          {/* Temporada */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setSeasonOpen((v) => !v)}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition cursor-pointer bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800 hover:bg-amber-200 dark:hover:bg-amber-950/70"
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              TEMPORADA {seasonNumberNow}
+            </button>
+            {seasonOpen && (
+              <SeasonPopup
+                summaries={seasonSummaries}
+                icons={settings.icons}
+                onClose={() => setSeasonOpen(false)}
+              />
+            )}
+          </div>
 
           {/* Filtro de categorias (dropdown) */}
           <div className="relative">
