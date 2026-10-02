@@ -267,7 +267,7 @@ export default function ConquistasPage() {
           <p className="text-sm font-medium">Nenhuma conquista neste filtro.</p>
         </div>
       ) : (
-        <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filtered.map((a) => {
             const unlocked = Boolean(unlocks[a.id])
             const lockedSecret = a.secret && !unlocked
@@ -282,22 +282,22 @@ export default function ConquistasPage() {
             return (
               <article
                 key={a.id}
-                className={`rounded-2xl border p-4 transition relative ${
+                className={`rounded-2xl border p-5 transition relative ${
                   unlocked
                     ? `${rarity.border} bg-white dark:bg-[#0c1220] shadow-lg ${rarity.ring}`
                     : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 opacity-80'
                 }`}
               >
-                <div className="flex items-start gap-3">
+                <div className="flex items-center gap-4">
                   <div
-                    className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0 overflow-hidden ${
+                    className={`w-24 h-24 md:w-28 md:h-28 xl:w-32 xl:h-32 rounded-2xl flex items-center justify-center text-4xl xl:text-5xl shrink-0 overflow-hidden ${
                       unlocked
                         ? 'bg-gradient-to-br from-amber-400/20 to-orange-500/20 border border-amber-400/30'
                         : 'bg-slate-200 dark:bg-slate-800 grayscale'
                     }`}
                   >
                     {lockedSecret ? (
-                      <Lock className="w-5 h-5 text-slate-400" />
+                      <Lock className="w-8 h-8 text-slate-400" />
                     ) : customIcon ? (
                       <img src={customIcon} alt={a.name} className="w-full h-full object-cover" />
                     ) : (
@@ -306,30 +306,33 @@ export default function ConquistasPage() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
-                      <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">
+                      <h3
+                        title={lockedSecret ? undefined : a.name}
+                        className="min-w-0 text-base xl:text-lg font-extrabold uppercase tracking-wide text-slate-900 dark:text-slate-100 leading-tight truncate"
+                      >
                         {lockedSecret ? '???' : a.name}
                       </h3>
                       {customRarity ? (
                         <img src={customRarity} alt={rarity.label} className="shrink-0 h-5 max-w-[84px] object-contain" />
                       ) : (
-                        <span className={`shrink-0 px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase border ${rarity.pill}`}>
+                        <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${rarity.pill}`}>
                           {rarity.label}
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-snug mt-0.5">
+                    <p className="text-sm text-slate-500 dark:text-slate-400 leading-snug mt-1">
                       {lockedSecret ? 'Conquista secreta — continue jogando para descobrir.' : a.description}
                     </p>
 
                     {showProgress && (
-                      <div className="mt-2.5">
-                        <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 mb-1">
+                      <div className="mt-3">
+                        <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 mb-1">
                           <span>
                             {Math.min(progressValue, a.requirement.value)}/{a.requirement.value}
                           </span>
                           <span>{percent}%</span>
                         </div>
-                        <div className="h-1.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                        <div className="h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
                           <div
                             className={`h-full rounded-full transition-all duration-500 ${
                               unlocked ? '' : 'bg-slate-400 dark:bg-slate-600'
@@ -340,10 +343,10 @@ export default function ConquistasPage() {
                       </div>
                     )}
 
-                    <div className="flex items-center justify-between mt-2.5">
-                      <span className="text-[11px] font-bold text-emerald-500">+{a.xpReward} XP</span>
+                    <div className="flex items-center justify-between mt-3">
+                      <span className="text-sm font-extrabold text-emerald-500">+{a.xpReward} XP</span>
                       {unlocked && unlockedAt ? (
-                        <span className="text-[10px] font-semibold text-slate-400">
+                        <span className="text-xs font-semibold text-slate-400">
                           {new Date(unlockedAt).toLocaleDateString('pt-BR')}
                         </span>
                       ) : null}
