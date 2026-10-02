@@ -12,7 +12,7 @@ import {
 import type { AchievementUnlock, ContentCategory, UserProgress, XpEvent } from './types'
 import { ACHIEVEMENTS, ACHIEVEMENTS_BY_ID } from './achievements'
 import { computeCounters, dueResultFor, isUnlocked, requirementProgress, resolveContentCategory } from './engine'
-import { backfillXp, completionXp } from './xp'
+import { backfillXp, completionXpDetails } from './xp'
 import { levelFromXp, titleForLevel, iconForLevel } from './levels'
 import { gamificationBus } from './bus'
 
@@ -191,7 +191,7 @@ export async function recordConclusion(input: ConclusionInput): Promise<void> {
     (e) => !e.backfilled && localDayKey(new Date(e.completedAt)) === todayKey
   ).length
 
-  const xp = completionXp(input.priority, { alreadyToday, dueResult })
+  const { xp, details } = completionXpDetails(input.priority, { alreadyToday, dueResult })
   const event: XpEvent = {
     id: input.taskId,
     taskId: input.taskId,
@@ -257,7 +257,7 @@ export async function recordConclusion(input: ConclusionInput): Promise<void> {
   const res = outcome.value
   if (!res) return
 
-  gamificationBus.emit({ kind: 'xp', amount: xp, totalXp: res.totalXp })
+  gamificationBus.emit({ kind: 'xp', amount: xp, totalXp: res.totalXp, details })
   for (const a of newlyUnlocked) {
     gamificationBus.emit({ kind: 'achievement', achievement: a })
   }

@@ -21,16 +21,46 @@ export interface DailyBonusContext {
   dueResult: 'early' | 'ontime' | 'late' | 'none'
 }
 
+const PRIORITY_LABELS: Record<string, string> = {
+  LOW: 'Baixa',
+  MEDIUM: 'Média',
+  HIGH: 'Alta',
+  URGENT: 'Urgente',
+}
+
+export function completionXpDetails(
+  priority: string,
+  ctx: DailyBonusContext
+): { xp: number; details: { label: string; amount: number }[] } {
+  const details: { label: string; amount: number }[] = [
+    { label: `Base ${PRIORITY_LABELS[priority] ?? 'Média'}`, amount: baseXpForPriority(priority) },
+  ]
+  let total = baseXpForPriority(priority)
+
+  if (ctx.dueResult === 'early') {
+    details.push({ label: 'Antes do prazo', amount: XP_EARLY })
+    total += XP_EARLY
+  } else if (ctx.dueResult === 'ontime') {
+    details.push({ label: 'No prazo', amount: XP_ON_TIME })
+    total += XP_ON_TIME
+  }
+  if (ctx.alreadyToday === 2) {
+    details.push({ label: '3ª conclusão do dia', amount: XP_THIRD_OF_DAY })
+    total += XP_THIRD_OF_DAY
+  }
+  if (ctx.alreadyToday === 4) {
+    details.push({ label: '5ª conclusão do dia', amount: XP_FIFTH_OF_DAY })
+    total += XP_FIFTH_OF_DAY
+  }
+
+  return { xp: Math.min(total, MAX_XP_PER_TASK), details }
+}
+
 /**
  * XP da conclusão ao vivo. O teto evita valores absurdos em dados corrompidos.
  */
 export function completionXp(priority: string, ctx: DailyBonusContext): number {
-  let xp = baseXpForPriority(priority)
-  if (ctx.dueResult === 'early') xp += XP_EARLY
-  else if (ctx.dueResult === 'ontime') xp += XP_ON_TIME
-  if (ctx.alreadyToday === 2) xp += XP_THIRD_OF_DAY
-  if (ctx.alreadyToday === 4) xp += XP_FIFTH_OF_DAY
-  return Math.min(xp, MAX_XP_PER_TASK)
+  return completionXpDetails(priority, ctx).xp
 }
 
 /**

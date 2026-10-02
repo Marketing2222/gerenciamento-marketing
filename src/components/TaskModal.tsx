@@ -871,10 +871,10 @@ export default function TaskModal({ task, isOpen, onClose, initialStatus = 'TODO
                   }}
                   className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-800 dark:text-slate-200 font-bold shadow-sm"
                 >
-                  <option value="LOW">Baixa</option>
-                  <option value="MEDIUM">Média</option>
-                  <option value="HIGH">Alta</option>
-                  <option value="URGENT">Urgente</option>
+                  <option value="LOW">Baixa +10 XP</option>
+                  <option value="MEDIUM">Média +20 XP</option>
+                  <option value="HIGH">Alta +35 XP</option>
+                  <option value="URGENT">Urgente +50 XP</option>
                 </select>
               </div>
               <div className="w-16 shrink-0 space-y-2 flex flex-col items-center">

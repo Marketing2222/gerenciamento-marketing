@@ -89,7 +89,12 @@ export interface UserProgress {
   updatedAt: string
 }
 
+export interface XpLine {
+  label: string
+  amount: number
+}
+
 export type GamificationMessage =
-  | { kind: 'xp'; amount: number; totalXp: number }
+  | { kind: 'xp'; amount: number; totalXp: number; details: XpLine[] }
   | { kind: 'achievement'; achievement: Achievement }
   | { kind: 'levelup'; from: number; to: number; title: string; icon: string }

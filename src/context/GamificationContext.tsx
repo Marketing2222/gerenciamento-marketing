@@ -108,7 +108,7 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
       if (msg.kind === 'xp' && msg.amount <= 0) return
       const id = ++toastSeq.current
       setToasts((t) => [...t.slice(-3), { id, msg }])
-      const ttl = msg.kind === 'achievement' || msg.kind === 'levelup' ? 6000 : 3000
+      const ttl = msg.kind === 'xp' ? 8000 : 6000
       window.setTimeout(() => {
         setToasts((t) => t.filter((x) => x.id !== id))
       }, ttl)
@@ -167,7 +167,11 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
   return (
     <GamificationContext.Provider value={value}>
       {children}
-      <GamificationToasts toasts={toasts} onDismiss={dismissToast} />
+      <GamificationToasts
+        toasts={toasts}
+        onDismiss={dismissToast}
+        gradient={{ from: settings.gradientFrom, to: settings.gradientTo }}
+      />
     </GamificationContext.Provider>
   )
 }

@@ -1,7 +1,8 @@
 'use client'
 
-import React from 'react'
+import { useState } from 'react'
 import type { ToastItem } from '@/context/GamificationContext'
+import type { XpLine } from '@/lib/gamification/types'
 
 const RARITY_STYLE: Record<string, { border: string; glow: string }> = {
   comum: { border: 'border-slate-500/60', glow: 'shadow-slate-500/20' },
@@ -10,12 +11,77 @@ const RARITY_STYLE: Record<string, { border: string; glow: string }> = {
   lendaria: { border: 'border-amber-400/70', glow: 'shadow-amber-500/30' },
 }
 
+function XpCard({
+  amount,
+  details,
+  gradient,
+  onDismiss,
+}: {
+  amount: number
+  details: XpLine[]
+  gradient: { from: string; to: string }
+  onDismiss: () => void
+}) {
+  const [showDetails, setShowDetails] = useState(false)
+
+  return (
+    <button
+      onClick={onDismiss}
+      className="pointer-events-auto animate-scale-up w-[280px] text-left rounded-2xl px-4 py-3 bg-[#0f172a] dark:bg-[#111827] text-slate-100 shadow-2xl shadow-blue-600/25 border border-blue-500/40 cursor-pointer overflow-hidden"
+    >
+      <div
+        className="absolute inset-x-0 top-0 h-1"
+        style={{ backgroundImage: `linear-gradient(90deg, ${gradient.from}, ${gradient.to})` }}
+      />
+      <div className="flex items-center gap-3">
+        <span
+          className="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0 shadow-md"
+          style={{ backgroundImage: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})` }}
+        >
+          ⚡
+        </span>
+        <div className="min-w-0">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-blue-300">XP ganho</p>
+          <p className="text-xl font-extrabold leading-tight">+{amount} XP</p>
+        </div>
+      </div>
+
+      {showDetails ? (
+        <div className="mt-2.5 pt-2.5 border-t border-slate-700/70 space-y-1" onClick={(e) => e.stopPropagation()}>
+          {details.map((line) => (
+            <div key={line.label} className="flex items-center justify-between text-[11px]">
+              <span className="text-slate-400">{line.label}</span>
+              <span className="font-bold text-emerald-400">+{line.amount}</span>
+            </div>
+          ))}
+          <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-700/50">
+            <span className="font-bold text-slate-300">Total</span>
+            <span className="font-extrabold text-emerald-400">+{amount} XP</span>
+          </div>
+        </div>
+      ) : (
+        <span
+          className="mt-2 inline-block text-[11px] font-bold text-blue-300 underline underline-offset-2"
+          onClick={(e) => {
+            e.stopPropagation()
+            setShowDetails(true)
+          }}
+        >
+          Detalhes
+        </span>
+      )}
+    </button>
+  )
+}
+
 export default function GamificationToasts({
   toasts,
   onDismiss,
+  gradient,
 }: {
   toasts: ToastItem[]
   onDismiss: (id: number) => void
+  gradient: { from: string; to: string }
 }) {
   if (toasts.length === 0) return null
 
@@ -23,15 +89,7 @@ export default function GamificationToasts({
     <div className="fixed bottom-4 right-4 z-[100001] flex flex-col gap-2 items-end pointer-events-none">
       {toasts.map(({ id, msg }) => {
         if (msg.kind === 'xp') {
-          return (
-            <button
-              key={id}
-              onClick={() => onDismiss(id)}
-              className="pointer-events-auto animate-scale-up px-3 py-1.5 rounded-full text-xs font-bold bg-blue-600 text-white shadow-lg shadow-blue-600/30 border border-blue-400/40 cursor-pointer"
-            >
-              +{msg.amount} XP ⚡
-            </button>
-          )
+          return <XpCard key={id} amount={msg.amount} details={msg.details} gradient={gradient} onDismiss={() => onDismiss(id)} />
         }
         if (msg.kind === 'levelup') {
           return (
