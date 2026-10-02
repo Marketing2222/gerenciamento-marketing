@@ -1,5 +1,6 @@
 import type { Achievement, Counters, ContentCategory, XpEvent } from './types'
 import { parseDateOnly } from '@/lib/dates'
+import { ACHIEVEMENTS } from './achievements'
 
 const VIDEO_KEYS = ['vídeo', 'video', 'reels', 'reel', 'youtube', 'tiktok', 'short', 'gravação', 'gravacao', 'roteiro de vídeo', 'roteiro de video', 'edicao', 'edição']
 const POST_KEYS = ['post', 'legenda', 'carrossel', 'copy', 'blog', 'artigo', 'conteúdo', 'conteudo', 'instagram post', 'publicação', 'publicacao']
@@ -135,11 +136,50 @@ export function requirementProgress(a: Achievement, c: Counters): number {
     case 'same_day_create': return c.sameDayCreate
     case 'perfect_checklist': return c.perfectChecklist
     case 'rapid': return c.rapid ? 1 : 0
+    case 'all': return 0 // depende do estado de desbloqueio, não dos contadores de eventos
   }
 }
 
 export function isUnlocked(a: Achievement, c: Counters): boolean {
   return requirementProgress(a, c) >= a.requirement.value
+}
+
+/**
+ * Avalia quais conquistas devem ser desbloqueadas dado o conjunto atual de
+ * desbloqueios + contadores de eventos. Trata a conquista "all" (platina)
+ * separadamente: só libera quando TODAS as outras estiverem desbloqueadas.
+ */
+export function evaluateAchievements(alreadyUnlockedIds: string[], counters: Counters): Achievement[] {
+  const allIds = new Set(alreadyUnlockedIds)
+  const pending = ACHIEVEMENTS.filter((a) => !allIds.has(a.id))
+  const unlockedNow: Achievement[] = []
+
+  for (const a of pending) {
+    if (a.requirement.type === 'all') continue
+    if (isUnlocked(a, counters)) {
+      unlockedNow.push(a)
+      allIds.add(a.id)
+    }
+  }
+
+  const meta = pending.find((a) => a.requirement.type === 'all')
+  if (meta) {
+    const others = [...allIds].filter((id) => id !== meta.id).length
+    if (others >= meta.requirement.value) {
+      unlockedNow.push(meta)
+      allIds.add(meta.id)
+    }
+  }
+
+  return unlockedNow
+}
+
+/** Progresso para exibição (a platina conta as outras desbloqueadas). */
+export function achievementProgress(a: Achievement, c: Counters, unlockedIds: string[]): number {
+  if (a.requirement.type === 'all') {
+    return unlockedIds.filter((id) => id !== a.id).length
+  }
+  return requirementProgress(a, c)
 }
 
 /** Comparação de datas de prazo sem depender de fuso (usa apenas a parte de data). */

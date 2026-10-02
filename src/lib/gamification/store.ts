@@ -10,8 +10,14 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import type { AchievementUnlock, ContentCategory, UserProgress, XpEvent } from './types'
-import { ACHIEVEMENTS, ACHIEVEMENTS_BY_ID } from './achievements'
-import { computeCounters, dueResultFor, isUnlocked, requirementProgress, resolveContentCategory } from './engine'
+import { ACHIEVEMENTS_BY_ID } from './achievements'
+import {
+  achievementProgress,
+  computeCounters,
+  dueResultFor,
+  evaluateAchievements,
+  resolveContentCategory,
+} from './engine'
 import { backfillXp, completionXpDetails } from './xp'
 import { levelFromXp, titleForLevel, iconForLevel } from './levels'
 import { gamificationBus } from './bus'
@@ -210,8 +216,8 @@ export async function recordConclusion(input: ConclusionInput): Promise<void> {
 
   const counters = computeCounters([...existing, event])
   const unlocksSnap = await getDocs(await unlocksCol(input.userId))
-  const unlockedIds = new Set(unlocksSnap.docs.map((d) => d.id))
-  const newlyUnlocked = ACHIEVEMENTS.filter((a) => !unlockedIds.has(a.id) && isUnlocked(a, counters))
+  const unlockedIdList = unlocksSnap.docs.map((d) => d.id)
+  const newlyUnlocked = evaluateAchievements(unlockedIdList, counters)
   const achievementXp = newlyUnlocked.reduce((sum, a) => sum + a.xpReward, 0)
 
   // Holder (e não `let`) para que o TS não estreite para `never` após a transação.
@@ -248,7 +254,7 @@ export async function recordConclusion(input: ConclusionInput): Promise<void> {
       tx.set(aRef, {
         achievementId: a.id,
         unlockedAt: nowIso(),
-        progress: requirementProgress(a, counters),
+        progress: achievementProgress(a, counters, unlockedIdList),
       })
     }
     outcome.value = { totalXp, levelBefore, levelAfter }
@@ -349,9 +355,9 @@ export async function runBackfillIfNeeded(): Promise<void> {
 
     const counters = computeCounters(allEvents)
     const unlocksSnap = await getDocs(await unlocksCol(uid))
-    const unlockedIds = new Set(unlocksSnap.docs.map((d) => d.id))
-    const newlyUnlocked = ACHIEVEMENTS.filter((a) => !unlockedIds.has(a.id) && isUnlocked(a, counters))
-    const allUnlockedIds = [...unlockedIds, ...newlyUnlocked.map((a) => a.id)]
+    const unlockedIdList = unlocksSnap.docs.map((d) => d.id)
+    const newlyUnlocked = evaluateAchievements(unlockedIdList, counters)
+    const allUnlockedIds = [...unlockedIdList, ...newlyUnlocked.map((a) => a.id)]
 
     const eventsXp = allEvents.reduce((sum, e) => sum + e.xp, 0)
     const rewardsXp = allUnlockedIds.reduce((sum, id) => sum + (ACHIEVEMENTS_BY_ID[id]?.xpReward ?? 0), 0)
@@ -366,7 +372,7 @@ export async function runBackfillIfNeeded(): Promise<void> {
       batch.set(await unlockRef(uid, a.id), {
         achievementId: a.id,
         unlockedAt: nowIso(),
-        progress: requirementProgress(a, counters),
+        progress: achievementProgress(a, counters, unlockedIdList),
       })
     }
     batch.set(

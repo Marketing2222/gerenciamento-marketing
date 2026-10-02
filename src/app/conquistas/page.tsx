@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGamification } from '@/context/GamificationContext'
 import { ACHIEVEMENTS } from '@/lib/gamification/achievements'
-import { requirementProgress } from '@/lib/gamification/engine'
+import { achievementProgress } from '@/lib/gamification/engine'
 import { iconKeys } from '@/lib/gamification/settings'
 import type { AchCategory, Rarity } from '@/lib/gamification/types'
 import { uploadFile } from '@/lib/storage'
@@ -272,7 +272,7 @@ export default function ConquistasPage() {
             const unlocked = Boolean(unlocks[a.id])
             const lockedSecret = a.secret && !unlocked
             const rarity = RARITY_META[a.rarity]
-            const progressValue = requirementProgress(a, counters)
+            const progressValue = achievementProgress(a, counters, Object.keys(unlocks))
             const showProgress = !lockedSecret && a.requirement.value > 1 && a.requirement.type !== 'rapid'
             const percent = Math.min(100, Math.round((progressValue / a.requirement.value) * 100))
             const unlockedAt = unlocks[a.id]?.unlockedAt

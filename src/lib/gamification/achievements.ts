@@ -118,6 +118,10 @@ export const ACHIEVEMENTS: Achievement[] = [
     { type: 'perfect_checklist', value: 1 }, true),
   ach('streak_60', 'Combo Infinito', 'Concluir tarefas por 60 dias consecutivos.', '💫', 'lendaria', 'secretas', 500,
     { type: 'streak', value: 60 }, true),
+
+  // ===== Platina: conquista-mãe (exige as outras 45) =====
+  ach('completionist', 'Complecionista', 'Desbloquear todas as outras conquistas.', '🏆', 'lendaria', 'secretas', 1000,
+    { type: 'all', value: 45 }, false),
 ]
 
 export const ACHIEVEMENTS_BY_ID: Record<string, Achievement> = Object.fromEntries(

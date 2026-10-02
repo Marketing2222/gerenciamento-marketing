@@ -21,6 +21,7 @@ import {
 import { gamificationBus } from '@/lib/gamification/bus'
 import { TOTAL_ACHIEVEMENTS } from '@/lib/gamification/achievements'
 import { computeCounters } from '@/lib/gamification/engine'
+import { playAchievementSound, playLevelUpSound, playXpSound } from '@/lib/gamification/sound'
 import { levelProgress } from '@/lib/gamification/levels'
 import type {
   Achievement,
@@ -108,6 +109,9 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
       if (msg.kind === 'xp' && msg.amount <= 0) return
       const id = ++toastSeq.current
       setToasts((t) => [...t.slice(-3), { id, msg }])
+      if (msg.kind === 'xp') playXpSound()
+      else if (msg.kind === 'achievement') playAchievementSound()
+      else playLevelUpSound()
       const ttl = msg.kind === 'xp' ? 8000 : 6000
       window.setTimeout(() => {
         setToasts((t) => t.filter((x) => x.id !== id))

@@ -25,6 +25,7 @@ export type RequirementType =
   | 'same_day_create'
   | 'perfect_checklist'
   | 'rapid'
+  | 'all'
 
 export interface Achievement {
   id: string
