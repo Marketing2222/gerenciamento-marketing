@@ -50,9 +50,9 @@ export default function ConquistasPage() {
     resetNew()
   }, [resetNew])
 
-  // A página de conquistas sempre começa escura.
+  // A página de conquistas sempre começa no tema claro.
   useEffect(() => {
-    if (theme === 'light') setTheme('dark')
+    if (theme === 'dark') setTheme('light')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

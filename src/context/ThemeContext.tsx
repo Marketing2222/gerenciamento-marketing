@@ -13,12 +13,8 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
 function getInitialTheme(): Theme {
-  if (typeof window === 'undefined') return 'dark'
-  try {
-    const saved = localStorage.getItem('mktflow-theme')
-    if (saved === 'light' || saved === 'dark') return saved
-  } catch {}
-  return 'dark'
+  // Sempre começa pelo tema claro; o usuário pode alternar durante a sessão.
+  return 'light'
 }
 
 function applyTheme(theme: Theme) {
@@ -37,7 +33,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     applyTheme(theme)
-    localStorage.setItem('mktflow-theme', theme)
   }, [theme])
 
   const toggleTheme = useCallback(() => {
