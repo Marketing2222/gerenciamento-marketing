@@ -5,9 +5,22 @@ import { useUser } from '@/context/UserContext'
 import { useBrand } from '@/context/BrandContext'
 import { useData } from '@/context/DataContext'
 import { useColumns, CardSummaryConfig } from '@/context/ColumnsContext'
-import { User, Shield, Camera, Loader2, Sparkles, Globe, Upload, X, Check, Columns3, Plus, Pencil, Trash2, Users, GripVertical, Briefcase } from 'lucide-react'
+import { User, Shield, Camera, Loader2, Sparkles, Globe, Upload, X, Check, Columns3, Plus, Pencil, Trash2, Users, GripVertical, Briefcase, Trophy } from 'lucide-react'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 import Avatar from '@/components/Avatar'
+import { useGamification } from '@/context/GamificationContext'
+import { ACHIEVEMENTS } from '@/lib/gamification/achievements'
+import { iconKeys, RANK_LEVELS } from '@/lib/gamification/settings'
+import { iconForLevel, titleForLevel } from '@/lib/gamification/levels'
+import type { Rarity } from '@/lib/gamification/types'
+import { uploadFile } from '@/lib/storage'
+
+const RARITY_LABELS: { id: Rarity; label: string; pill: string }[] = [
+  { id: 'comum', label: 'Comum', pill: 'bg-slate-500/15 text-slate-600 dark:text-slate-300 border-slate-500/30' },
+  { id: 'rara', label: 'Rara', pill: 'bg-blue-500/15 text-blue-600 dark:text-blue-300 border-blue-500/30' },
+  { id: 'epica', label: 'Épica', pill: 'bg-purple-500/15 text-purple-600 dark:text-purple-300 border-purple-500/30' },
+  { id: 'lendaria', label: 'Lendária', pill: 'bg-amber-500/15 text-amber-600 dark:text-amber-300 border-amber-500/40' },
+]
 
 const SUMMARY_OPTIONS: { key: keyof CardSummaryConfig; label: string }[] = [
   { key: 'showPriority', label: 'Prioridade' },
@@ -27,11 +40,56 @@ interface UserFormData {
 
 const EMPTY_USER_FORM: UserFormData = { name: '', role: 'DESIGNER', pin: '', avatarUrl: '' }
 
+function GamIconCell({
+  cellKey,
+  label,
+  fallback,
+  url,
+  busy,
+  onUpload,
+  onRemove,
+}: {
+  cellKey: string
+  label: string
+  fallback: React.ReactNode
+  url?: string
+  busy?: boolean
+  onUpload: (key: string, e: React.ChangeEvent<HTMLInputElement>) => void
+  onRemove: (key: string) => void
+}) {
+  return (
+    <div className="flex flex-col items-center gap-1.5 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 text-center">
+      <div className="w-12 h-12 rounded-lg overflow-hidden flex items-center justify-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-2xl shrink-0">
+        {url ? <img src={url} alt="" className="w-full h-full object-cover" /> : fallback}
+      </div>
+      <p className="text-[10px] font-bold text-slate-600 dark:text-slate-300 leading-tight w-full truncate" title={label}>{label}</p>
+      <div className="flex gap-1">
+        <label className="p-1.5 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 transition cursor-pointer" title="Enviar imagem">
+          {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+          <input type="file" accept="image/*" className="hidden" onChange={(e) => onUpload(cellKey, e)} />
+        </label>
+        {url && (
+          <button
+            type="button"
+            onClick={() => onRemove(cellKey)}
+            disabled={busy}
+            title="Remover — volta ao padrão"
+            className="p-1.5 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-500 text-slate-500 transition cursor-pointer disabled:opacity-50"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function SettingsPage() {
   const { user, refreshUser } = useUser()
   const { siteName, logoUrl, applyBrand } = useBrand()
   const { saveProfile, uploadAvatar, uploadLogo, users, addUser, removeUser, tasks, updateTask, roles, addRole, updateRole, removeRole } = useData()
   const { columns, summary, updateColumn, updateSummary, addColumn, removeColumn, reorderColumns } = useColumns()
+  const { settings, saveIcon, clearIcon, saveGradient } = useGamification()
   
   const [name, setName] = useState('')
   const [role, setRole] = useState('DESIGNER')
@@ -45,6 +103,8 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [uploadingIconKey, setUploadingIconKey] = useState<string | null>(null)
+  const [gradDraft, setGradDraft] = useState<{ from: string; to: string } | null>(null)
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
 
@@ -139,6 +199,50 @@ export default function SettingsPage() {
   const handleSaveBrand = () => {
     applyBrand(brandName, brandLogo)
     setSuccess('Aparência atualizada!')
+  }
+
+  const handleGamIconUpload = async (key: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setUploadingIconKey(key)
+    setError('')
+    setSuccess('')
+    try {
+      const url = await uploadFile(file)
+      await saveIcon(key, url)
+      setSuccess('Ícone atualizado!')
+    } catch (err) {
+      setError(`Erro ao upload: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setUploadingIconKey(null)
+    }
+  }
+
+  const handleGamIconRemove = async (key: string) => {
+    setUploadingIconKey(key)
+    setError('')
+    setSuccess('')
+    try {
+      await clearIcon(key)
+      setSuccess('Ícone removido — usando o padrão novamente.')
+    } catch (err) {
+      setError(`Erro ao remover: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setUploadingIconKey(null)
+    }
+  }
+
+  const handleSaveGradient = async () => {
+    if (!gradDraft) return
+    setError('')
+    try {
+      await saveGradient(gradDraft.from, gradDraft.to)
+      setGradDraft(null)
+      setSuccess('Degradê aplicado na tela de conquistas!')
+    } catch (err) {
+      setError(`Erro ao salvar degradê: ${err instanceof Error ? err.message : String(err)}`)
+    }
   }
 
   const openCreateUser = () => {
@@ -328,6 +432,136 @@ export default function SettingsPage() {
           </div>
           <div className="flex-1" />
           <button type="button" onClick={handleSaveBrand} className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition cursor-pointer">Aplicar Aparência</button>
+        </div>
+      </div>
+
+      {/* Gamificação */}
+      <div className="bg-white dark:bg-[#151b2c] border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm space-y-5">
+        <div className="flex items-center gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
+          <Trophy className="w-5 h-5 text-amber-500" />
+          <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">Gamificação</h3>
+        </div>
+
+        {/* Degradê */}
+        <div className="space-y-2">
+          <p className="text-xs font-bold text-slate-600 dark:text-slate-300">Degradê das barras e botões <span className="font-medium text-slate-400">(tela de conquistas)</span></p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+            <div className="space-y-1">
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Cor inicial</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={gradDraft?.from ?? settings.gradientFrom}
+                  onChange={(e) => setGradDraft({ from: e.target.value, to: gradDraft?.to ?? settings.gradientTo })}
+                  className="w-9 h-9 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer bg-transparent"
+                />
+                <input
+                  type="text"
+                  value={gradDraft?.from ?? settings.gradientFrom}
+                  onChange={(e) => setGradDraft({ from: e.target.value, to: gradDraft?.to ?? settings.gradientTo })}
+                  className="flex-1 px-2 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[11px] font-mono text-slate-600 dark:text-slate-400 outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Cor final</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={gradDraft?.to ?? settings.gradientTo}
+                  onChange={(e) => setGradDraft({ from: gradDraft?.from ?? settings.gradientFrom, to: e.target.value })}
+                  className="w-9 h-9 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer bg-transparent"
+                />
+                <input
+                  type="text"
+                  value={gradDraft?.to ?? settings.gradientTo}
+                  onChange={(e) => setGradDraft({ from: gradDraft?.from ?? settings.gradientFrom, to: e.target.value })}
+                  className="flex-1 px-2 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[11px] font-mono text-slate-600 dark:text-slate-400 outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Preview</label>
+              <div
+                className="h-4 rounded-full mb-1.5 border border-slate-200 dark:border-slate-700"
+                style={{ backgroundImage: `linear-gradient(90deg, ${gradDraft?.from ?? settings.gradientFrom}, ${gradDraft?.to ?? settings.gradientTo})` }}
+              />
+              <button
+                type="button"
+                onClick={handleSaveGradient}
+                disabled={!gradDraft}
+                className="w-full px-4 py-1.5 bg-amber-600 hover:bg-amber-700 disabled:bg-slate-200 disabled:dark:bg-slate-800 disabled:text-slate-400 text-white rounded-xl text-xs font-semibold transition cursor-pointer disabled:cursor-not-allowed"
+              >
+                {gradDraft ? 'Aplicar degradê' : 'Degradê salvo'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Patentes */}
+        <div className="space-y-2 border-t border-slate-100 dark:border-slate-800 pt-4">
+          <p className="text-xs font-bold text-slate-600 dark:text-slate-300">Ícones das Patentes <span className="font-medium text-slate-400">(níveis 1–15)</span></p>
+          <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-8 gap-2">
+            {Array.from({ length: RANK_LEVELS }, (_, i) => i + 1).map((lvl) => {
+              const key = iconKeys.rank(lvl)
+              return (
+                <GamIconCell
+                  key={key}
+                  cellKey={key}
+                  label={`${lvl} · ${titleForLevel(lvl)}`}
+                  fallback={<span>{iconForLevel(lvl)}</span>}
+                  url={settings.icons[key]}
+                  busy={uploadingIconKey === key}
+                  onUpload={handleGamIconUpload}
+                  onRemove={handleGamIconRemove}
+                />
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Raridades */}
+        <div className="space-y-2 border-t border-slate-100 dark:border-slate-800 pt-4">
+          <p className="text-xs font-bold text-slate-600 dark:text-slate-300">Imagens das Raridades <span className="font-medium text-slate-400">(selo no card da conquista)</span></p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {RARITY_LABELS.map((r) => {
+              const key = iconKeys.rarity(r.id)
+              return (
+                <GamIconCell
+                  key={key}
+                  cellKey={key}
+                  label={r.label}
+                  fallback={<span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${r.pill}`}>{r.label}</span>}
+                  url={settings.icons[key]}
+                  busy={uploadingIconKey === key}
+                  onUpload={handleGamIconUpload}
+                  onRemove={handleGamIconRemove}
+                />
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Conquistas */}
+        <div className="space-y-2 border-t border-slate-100 dark:border-slate-800 pt-4">
+          <p className="text-xs font-bold text-slate-600 dark:text-slate-300">Ícones das Conquistas <span className="font-medium text-slate-400">({ACHIEVEMENTS.length} — sem imagem usa o emoji padrão)</span></p>
+          <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-8 gap-2">
+            {ACHIEVEMENTS.map((a) => {
+              const key = iconKeys.achievement(a.id)
+              return (
+                <GamIconCell
+                  key={key}
+                  cellKey={key}
+                  label={a.name}
+                  fallback={<span>{a.icon}</span>}
+                  url={settings.icons[key]}
+                  busy={uploadingIconKey === key}
+                  onUpload={handleGamIconUpload}
+                  onRemove={handleGamIconRemove}
+                />
+              )
+            })}
+          </div>
         </div>
       </div>
 

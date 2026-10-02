@@ -47,6 +47,7 @@ function toProgress(uid: string, raw: Record<string, unknown>): UserProgress {
     totalXp: typeof raw.totalXp === 'number' ? raw.totalXp : 0,
     level: typeof raw.level === 'number' ? raw.level : 1,
     newAchievements: typeof raw.newAchievements === 'number' ? raw.newAchievements : 0,
+    coverUrl: typeof raw.coverUrl === 'string' && raw.coverUrl ? raw.coverUrl : null,
     updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : '',
   }
 }
@@ -122,6 +123,13 @@ export async function resetNewAchievements(uid: string): Promise<void> {
   if (snap.exists() && (snap.data().newAchievements ?? 0) > 0) {
     await setDoc(ref, { newAchievements: 0, updatedAt: nowIso() }, { merge: true })
   }
+}
+
+/** Salva (ou remove, com null) a foto de capa do card de perfil do usuário. */
+export async function saveCoverUrl(uid: string, url: string | null): Promise<void> {
+  if (!isFirebaseConfigured()) return
+  waitForConfig()
+  await setDoc(await userRef(uid), { coverUrl: url, updatedAt: nowIso() }, { merge: true })
 }
 
 export function subscribeEvents(uid: string, callback: (events: XpEvent[]) => void): () => void {

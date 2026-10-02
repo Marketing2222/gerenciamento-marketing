@@ -85,6 +85,7 @@ export interface UserProgress {
   totalXp: number
   level: number
   newAchievements: number
+  coverUrl: string | null
   updatedAt: string
 }
 

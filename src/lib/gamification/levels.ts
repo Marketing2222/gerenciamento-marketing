@@ -15,6 +15,8 @@ const PAST_10_TITLES: Record<number, string> = {
   11: 'Mítico',
   12: 'Celestial',
   13: 'Ascendente',
+  14: 'Transcendente',
+  15: 'Supremo',
 }
 
 /** XP necessário para atingir cada nível (nível 1 = 0 XP). */
@@ -49,15 +51,18 @@ export function levelFromXp(xp: number): number {
 
 export function titleForLevel(level: number): string {
   if (level <= LEVEL_TITLES.length) return LEVEL_TITLES[level - 1]
-  return PAST_10_TITLES[level] ?? 'Lendário'
+  return PAST_10_TITLES[level] ?? 'Supremo'
 }
 
 export function iconForLevel(level: number): string {
   if (level <= 3) return '🌱'
   if (level <= 6) return '⚔️'
   if (level <= 9) return '🛡️'
-  if (level <= 10) return '👑'
-  if (level <= 13) return '🌟'
+  if (level === 10) return '👑'
+  if (level === 11) return '🌟'
+  if (level === 12) return '💠'
+  if (level === 13) return '🔮'
+  if (level === 14) return '⚜️'
   return '💫'
 }
 

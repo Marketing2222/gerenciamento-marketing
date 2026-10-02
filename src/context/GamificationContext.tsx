@@ -5,10 +5,19 @@ import { useUser } from '@/context/UserContext'
 import {
   resetNewAchievements,
   runBackfillIfNeeded,
+  saveCoverUrl,
   subscribeEvents,
   subscribeProgress,
   subscribeUnlocks,
 } from '@/lib/gamification/store'
+import {
+  DEFAULT_GRADIENT,
+  clearIcon as clearSettingsIcon,
+  saveGradient,
+  saveIcon as saveSettingsIcon,
+  subscribeSettings,
+  type GamificationSettings,
+} from '@/lib/gamification/settings'
 import { gamificationBus } from '@/lib/gamification/bus'
 import { TOTAL_ACHIEVEMENTS } from '@/lib/gamification/achievements'
 import { computeCounters } from '@/lib/gamification/engine'
@@ -41,6 +50,11 @@ interface GamificationContextType {
   toasts: ToastItem[]
   dismissToast: (id: number) => void
   resetNew: () => void
+  settings: GamificationSettings
+  saveIcon: (key: string, url: string) => Promise<void>
+  clearIcon: (key: string) => Promise<void>
+  saveGradient: (from: string, to: string) => Promise<void>
+  saveCover: (url: string | null) => Promise<void>
 }
 
 const GamificationContext = createContext<GamificationContextType | undefined>(undefined)
@@ -50,6 +64,11 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
   const [progress, setProgress] = useState<UserProgress | null>(null)
   const [unlocks, setUnlocks] = useState<Record<string, AchievementUnlock>>({})
   const [events, setEvents] = useState<XpEvent[]>([])
+  const [settings, setSettings] = useState<GamificationSettings>({
+    gradientFrom: DEFAULT_GRADIENT.from,
+    gradientTo: DEFAULT_GRADIENT.to,
+    icons: {},
+  })
   const [loading, setLoading] = useState(true)
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const toastSeq = useRef(0)
@@ -80,6 +99,11 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
   }, [userId])
 
   useEffect(() => {
+    const unsub = subscribeSettings(setSettings)
+    return unsub
+  }, [])
+
+  useEffect(() => {
     const unsub = gamificationBus.subscribe((msg) => {
       if (msg.kind === 'xp' && msg.amount <= 0) return
       const id = ++toastSeq.current
@@ -100,6 +124,22 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
     if (userId) void resetNewAchievements(userId).catch(() => {})
   }, [userId])
 
+  const doSaveIcon = useCallback(async (key: string, url: string) => {
+    await saveSettingsIcon(key, url)
+  }, [])
+
+  const doClearIcon = useCallback(async (key: string) => {
+    await clearSettingsIcon(key)
+  }, [])
+
+  const doSaveGradient = useCallback(async (from: string, to: string) => {
+    await saveGradient(from, to)
+  }, [])
+
+  const doSaveCover = useCallback(async (url: string | null) => {
+    if (userId) await saveCoverUrl(userId, url)
+  }, [userId])
+
   const unlockedCount = Object.keys(unlocks).length
   const level = progress ? levelProgress(progress.totalXp) : null
   const counters = React.useMemo(() => computeCounters(events), [events])
@@ -117,6 +157,11 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
     toasts,
     dismissToast,
     resetNew,
+    settings,
+    saveIcon: doSaveIcon,
+    clearIcon: doClearIcon,
+    saveGradient: doSaveGradient,
+    saveCover: doSaveCover,
   }
 
   return (
