@@ -49,9 +49,28 @@ export function levelFromXp(xp: number): number {
   return level
 }
 
+/** Algarismos romanos para os níveis "Supremo II, III, IV, ...". */
+function toRoman(num: number): string {
+  const table: [number, string][] = [
+    [1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'],
+    [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'],
+    [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I'],
+  ]
+  let n = num
+  let out = ''
+  for (const [value, symbol] of table) {
+    while (n >= value) {
+      out += symbol
+      n -= value
+    }
+  }
+  return out
+}
+
 export function titleForLevel(level: number): string {
   if (level <= LEVEL_TITLES.length) return LEVEL_TITLES[level - 1]
-  return PAST_10_TITLES[level] ?? 'Supremo'
+  if (level <= 15) return PAST_10_TITLES[level] ?? 'Supremo'
+  return `Supremo ${toRoman(level - 14)}`
 }
 
 export function iconForLevel(level: number): string {
