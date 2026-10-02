@@ -56,6 +56,42 @@ function ts(iso: string): number {
   return Number.isFinite(v) ? v : NaN
 }
 
+// ===== Docs de desbloqueio com reset por temporada =====
+
+/**
+ * Doc novo: id "{YYYY-MM}_{achId}" (ex.: "2026-11_first_task").
+ * Doc legado (sem prefixo): id puro = achievementId.
+ */
+const UNLOCK_DOC_RE = /^(\d{4}-\d{2})_(.+)$/
+
+export function parseUnlockDocId(docId: string): { seasonKey: string | null; achievementId: string } {
+  const m = UNLOCK_DOC_RE.exec(docId)
+  return m ? { seasonKey: m[1], achievementId: m[2] } : { seasonKey: null, achievementId: docId }
+}
+
+export function unlockDocId(seasonKey: string, achievementId: string): string {
+  return `${seasonKey}_${achievementId}`
+}
+
+export function inSeasonMs(ms: number, season: SeasonInfo): boolean {
+  return Number.isFinite(ms) && ms >= season.startMs && ms <= season.endMs
+}
+
+export function eventInSeason(e: XpEvent, season: SeasonInfo): boolean {
+  return inSeasonMs(ts(e.completedAt), season)
+}
+
+/**
+ * O desbloqueio conta para a temporada atual?
+ * - Doc prefixado: vale a temporada do prefixo (histórico imutável).
+ * - Doc legado: conta se `unlockedAt` cair dentro da temporada.
+ */
+export function isUnlockInSeason(docId: string, unlockedAt: string, season: SeasonInfo): boolean {
+  const { seasonKey } = parseUnlockDocId(docId)
+  if (seasonKey) return seasonKey === season.key
+  return inSeasonMs(ts(unlockedAt), season)
+}
+
 /**
  * Resumo de todas as temporadas com atividade, da época (Jan/2026) até a
  * temporada atual (inclusive — sempre presente, mesmo sem dados).

@@ -1,15 +1,16 @@
 const BASE_XP: Record<string, number> = {
-  LOW: 10,
-  MEDIUM: 20,
-  HIGH: 35,
-  URGENT: 50,
+  LOW: 30,
+  MEDIUM: 50,
+  HIGH: 100,
+  URGENT: 150,
 }
 
 export const XP_ON_TIME = 10
 export const XP_EARLY = 15
 export const XP_THIRD_OF_DAY = 20
 export const XP_FIFTH_OF_DAY = 40
-export const MAX_XP_PER_TASK = 150
+/** Base máx. 150 + bônus máx. 55 = 205; teto folgado para o futuro. */
+export const MAX_XP_PER_TASK = 250
 
 export function baseXpForPriority(priority: string): number {
   return BASE_XP[priority] ?? BASE_XP.MEDIUM

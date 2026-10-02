@@ -19,24 +19,28 @@ const PAST_10_TITLES: Record<number, string> = {
   15: 'Supremo',
 }
 
-/** XP necessário para atingir cada nível (nível 1 = 0 XP). */
+/**
+ * XP necessário para cada nível (nível 1 = 0 XP) até o nível 15 (Supremo).
+ * Curva mensal: mês fraco ~1.500 = nv 7, mês bom ~4.000 = nv 11,
+ * mês forte ~7.500 = nv 15, mês perfeito ~8.500 = nv 16.
+ */
 export const LEVEL_THRESHOLDS: number[] = [
-  0, 100, 250, 450, 700, 1000, 1350, 1750, 2200, 2700,
+  0, 100, 260, 470, 730, 1050, 1430, 1880, 2400, 3000, 3700, 4500, 5400, 6400, 7500,
 ]
 
-/** Após o nível 10 o limiar cresce: +550, +600, +650, ... (progressão ilimitada). */
-function thresholdAfter10(level: number): number {
-  let xp = LEVEL_THRESHOLDS[9]
-  for (let l = 11; l <= level; l++) {
-    xp += 550 + 50 * (l - 11)
+/** Após o nível 15 o limiar cresce: +1200, +1300, +1400, ... (progressão ilimitada). */
+function thresholdAfter15(level: number): number {
+  let xp = LEVEL_THRESHOLDS[14]
+  for (let l = 16; l <= level; l++) {
+    xp += 1200 + 100 * (l - 16)
   }
   return xp
 }
 
 export function levelThreshold(level: number): number {
   if (level <= 1) return 0
-  if (level <= 10) return LEVEL_THRESHOLDS[level - 1]
-  return thresholdAfter10(level)
+  if (level <= 15) return LEVEL_THRESHOLDS[level - 1]
+  return thresholdAfter15(level)
 }
 
 export function levelFromXp(xp: number): number {

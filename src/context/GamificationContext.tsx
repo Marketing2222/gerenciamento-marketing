@@ -21,8 +21,9 @@ import {
   type GamificationSettings,
 } from '@/lib/gamification/settings'
 import { gamificationBus } from '@/lib/gamification/bus'
-import { TOTAL_ACHIEVEMENTS } from '@/lib/gamification/achievements'
+import { ACHIEVEMENTS_BY_ID, TOTAL_ACHIEVEMENTS } from '@/lib/gamification/achievements'
 import { computeCounters } from '@/lib/gamification/engine'
+import { currentSeason, eventInSeason, isUnlockInSeason } from '@/lib/gamification/seasons'
 import { playAchievementSound, playLevelUpSound, playXpSound } from '@/lib/gamification/sound'
 import { levelProgress } from '@/lib/gamification/levels'
 import type {
@@ -42,7 +43,10 @@ export interface ToastItem {
 
 interface GamificationContextType {
   progress: UserProgress | null
+  /** Desbloqueios da TEMPORADA ATUAL, chave = achievementId (reset mensal). */
   unlocks: Record<string, AchievementUnlock>
+  /** Todos os docs de desbloqueio (chave = docId) — histórico dos resumos. */
+  allUnlocks: Record<string, AchievementUnlock>
   events: XpEvent[]
   counters: Counters
   unlockedCount: number
@@ -50,6 +54,8 @@ interface GamificationContextType {
   newAchievements: number
   loading: boolean
   level: ReturnType<typeof levelProgress> | null
+  /** XP (eventos + recompensas) da temporada atual. */
+  seasonXp: number
   toasts: ToastItem[]
   dismissToast: (id: number) => void
   resetNew: () => void
@@ -66,7 +72,7 @@ const GamificationContext = createContext<GamificationContextType | undefined>(u
 export function GamificationProvider({ children }: { children: React.ReactNode }) {
   const { user } = useUser()
   const [progress, setProgress] = useState<UserProgress | null>(null)
-  const [unlocks, setUnlocks] = useState<Record<string, AchievementUnlock>>({})
+  const [unlockDocs, setUnlockDocs] = useState<Record<string, AchievementUnlock>>({})
   const [events, setEvents] = useState<XpEvent[]>([])
   const [settings, setSettings] = useState<GamificationSettings>({
     gradientFrom: DEFAULT_GRADIENT.from,
@@ -83,7 +89,7 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
     if (!userId) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setProgress(null)
-      setUnlocks({})
+      setUnlockDocs({})
       setEvents([])
       setLoading(true)
       return
@@ -93,7 +99,7 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
       setProgress(p)
       setLoading(false)
     })
-    const unsubUnlocks = subscribeUnlocks(userId, setUnlocks)
+    const unsubUnlocks = subscribeUnlocks(userId, setUnlockDocs)
     const unsubEvents = subscribeEvents(userId, setEvents)
     void runBackfillIfNeeded().catch((err) => console.error('[gamification] backfill', err))
     return () => {
@@ -152,13 +158,43 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
     if (userId) await saveCoverUrl(userId, url)
   }, [userId])
 
+  // ===== Progresso da temporada atual (reset mensal) =====
+  // Temporada fixada na montagem: cruzar a virada do mês exige recarregar.
+  const season = React.useMemo(() => currentSeason(), [])
+
+  const unlocks = React.useMemo(() => {
+    const map: Record<string, AchievementUnlock> = {}
+    for (const [docId, u] of Object.entries(unlockDocs)) {
+      if (!isUnlockInSeason(docId, u.unlockedAt, season)) continue
+      const prev = map[u.achievementId]
+      if (!prev || prev.unlockedAt < u.unlockedAt) map[u.achievementId] = u
+    }
+    return map
+  }, [unlockDocs, season])
+
+  const seasonEvents = React.useMemo(
+    () => events.filter((e) => eventInSeason(e, season)),
+    [events, season]
+  )
+
+  const counters = React.useMemo(() => computeCounters(seasonEvents), [seasonEvents])
+
+  const seasonXp = React.useMemo(() => {
+    const eventsXp = seasonEvents.reduce((sum, e) => sum + e.xp, 0)
+    const rewardsXp = Object.keys(unlocks).reduce(
+      (sum, id) => sum + (ACHIEVEMENTS_BY_ID[id]?.xpReward ?? 0),
+      0
+    )
+    return eventsXp + rewardsXp
+  }, [seasonEvents, unlocks])
+
   const unlockedCount = Object.keys(unlocks).length
-  const level = progress ? levelProgress(progress.totalXp) : null
-  const counters = React.useMemo(() => computeCounters(events), [events])
+  const level = React.useMemo(() => levelProgress(seasonXp), [seasonXp])
 
   const value: GamificationContextType = {
     progress,
     unlocks,
+    allUnlocks: unlockDocs,
     events,
     counters,
     unlockedCount,
@@ -166,6 +202,7 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
     newAchievements: progress?.newAchievements ?? 0,
     loading,
     level,
+    seasonXp,
     toasts,
     dismissToast,
     resetNew,

@@ -34,7 +34,7 @@ const CATEGORY_LABELS: { id: AchCategory | 'todas'; label: string }[] = [
 ]
 
 export default function ConquistasPage() {
-  const { progress, unlocks, events, counters, unlockedCount, totalAchievements, loading, level, resetNew, settings, saveCover } = useGamification()
+  const { progress, unlocks, allUnlocks, events, counters, unlockedCount, totalAchievements, loading, level, seasonXp, resetNew, settings, saveCover } = useGamification()
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('todas')
   const [catFilter, setCatFilter] = useState<AchCategory | 'todas'>('todas')
   const [catMenu, setCatMenu] = useState(false)
@@ -94,7 +94,7 @@ export default function ConquistasPage() {
     })
   }, [unlocks, statusFilter, catFilter])
 
-  const seasonSummaries = useMemo(() => buildSeasonSummaries(events, unlocks), [events, unlocks])
+  const seasonSummaries = useMemo(() => buildSeasonSummaries(events, allUnlocks), [events, allUnlocks])
   const seasonNumberNow = seasonSummaries[seasonSummaries.length - 1]?.info.number ?? currentSeason().number
 
   if (loading) {
@@ -106,7 +106,7 @@ export default function ConquistasPage() {
     )
   }
 
-  const totalXp = progress?.totalXp ?? 0
+  const totalXp = seasonXp
   const completionPercent = Math.round((unlockedCount / Math.max(1, totalAchievements)) * 100)
 
   return (
@@ -160,7 +160,7 @@ export default function ConquistasPage() {
               <h1 className="text-3xl font-extrabold text-[color:var(--gm-fg)] leading-tight">
                 {level?.title ?? 'Recruta'}
               </h1>
-              <p className="text-sm text-[color:var(--gm-muted)]">{totalXp.toLocaleString('pt-BR')} XP acumulado</p>
+              <p className="text-sm text-[color:var(--gm-muted)]">{totalXp.toLocaleString('pt-BR')} XP na temporada</p>
             </div>
           </div>
 
@@ -443,7 +443,7 @@ export default function ConquistasPage() {
       {rankOpen && (
         <RankGallery
           currentLevel={level?.level ?? 1}
-          currentXp={progress?.totalXp ?? 0}
+          currentXp={totalXp}
           icons={settings.icons}
           onClose={() => setRankOpen(false)}
         />

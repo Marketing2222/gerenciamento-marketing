@@ -20,6 +20,13 @@ import {
 } from './engine'
 import { backfillXp, completionXpDetails } from './xp'
 import { levelFromXp, titleForLevel, iconForLevel } from './levels'
+import {
+  currentSeason,
+  eventInSeason,
+  isUnlockInSeason,
+  parseUnlockDocId,
+  unlockDocId,
+} from './seasons'
 import { gamificationBus } from './bus'
 
 const USERS = 'gamification_users'
@@ -108,7 +115,8 @@ export function subscribeUnlocks(uid: string, callback: (map: Record<string, Ach
       snap.docs.forEach((d) => {
         const raw = d.data()
         map[d.id] = {
-          achievementId: d.id,
+          // Doc prefixado "{2026-10}_{achId}" → achievementId normalizado.
+          achievementId: parseUnlockDocId(d.id).achievementId,
           unlockedAt: typeof raw.unlockedAt === 'string' ? raw.unlockedAt : '',
           progress: typeof raw.progress === 'number' ? raw.progress : 0,
         }
@@ -190,10 +198,12 @@ export async function recordConclusion(input: ConclusionInput): Promise<void> {
   const existing = await listEvents(input.userId)
   if (existing.some((e) => e.id === input.taskId)) return
 
+  const season = currentSeason()
+  const seasonEvents = existing.filter((e) => eventInSeason(e, season))
   const completedAt = nowIso()
   const dueResult = dueResultFor(input.dueDate, completedAt)
   const todayKey = localDayKey(new Date())
-  const alreadyToday = existing.filter(
+  const alreadyToday = seasonEvents.filter(
     (e) => !e.backfilled && localDayKey(new Date(e.completedAt)) === todayKey
   ).length
 
@@ -214,14 +224,29 @@ export async function recordConclusion(input: ConclusionInput): Promise<void> {
     backfilled: false,
   }
 
-  const counters = computeCounters([...existing, event])
+  // Progresso da TEMPORADA atual: contadores, conquistas e nível zeram todo mês.
+  const counters = computeCounters([...seasonEvents, event])
   const unlocksSnap = await getDocs(await unlocksCol(input.userId))
-  const unlockedIdList = unlocksSnap.docs.map((d) => d.id)
+  const currentUnlockIds = new Set<string>()
+  unlocksSnap.docs.forEach((d) => {
+    const unlockedAt = typeof d.data().unlockedAt === 'string' ? d.data().unlockedAt : ''
+    if (isUnlockInSeason(d.id, unlockedAt, season)) {
+      currentUnlockIds.add(parseUnlockDocId(d.id).achievementId)
+    }
+  })
+  const unlockedIdList = [...currentUnlockIds]
   const newlyUnlocked = evaluateAchievements(unlockedIdList, counters)
   const achievementXp = newlyUnlocked.reduce((sum, a) => sum + a.xpReward, 0)
 
+  // Nível da temporada: XP (eventos + recompensas) do mês atual.
+  const seasonEventsXp = seasonEvents.reduce((sum, e) => sum + e.xp, 0)
+  const seasonRewardsXp = unlockedIdList.reduce((sum, id) => sum + (ACHIEVEMENTS_BY_ID[id]?.xpReward ?? 0), 0)
+  const seasonXpAfter = seasonEventsXp + seasonRewardsXp + xp + achievementXp
+  const levelBefore = levelFromXp(seasonEventsXp + seasonRewardsXp)
+  const levelAfter = levelFromXp(seasonXpAfter)
+
   // Holder (e não `let`) para que o TS não estreite para `never` após a transação.
-  const outcome: { value: { totalXp: number; levelBefore: number; levelAfter: number } | null } = { value: null }
+  const outcome: { value: { seasonXp: number; levelBefore: number; levelAfter: number } | null } = { value: null }
   const evRef = await eventRef(input.userId, input.taskId)
   const uRef = await userRef(input.userId)
 
@@ -234,8 +259,6 @@ export async function recordConclusion(input: ConclusionInput): Promise<void> {
     const prevTotal = typeof prev?.totalXp === 'number' ? prev.totalXp : 0
     const prevNew = typeof prev?.newAchievements === 'number' ? prev.newAchievements : 0
     const totalXp = prevTotal + xp + achievementXp
-    const levelBefore = typeof prev?.level === 'number' ? prev.level : levelFromXp(prevTotal)
-    const levelAfter = levelFromXp(totalXp)
 
     tx.set(evRef, { ...event })
     tx.set(
@@ -250,20 +273,21 @@ export async function recordConclusion(input: ConclusionInput): Promise<void> {
       { merge: true }
     )
     for (const a of newlyUnlocked) {
-      const aRef = await unlockRef(input.userId, a.id)
+      // Doc prefixado pela temporada → o mesmo desbloqueio pode recorrer em meses seguintes.
+      const aRef = await unlockRef(input.userId, unlockDocId(season.key, a.id))
       tx.set(aRef, {
         achievementId: a.id,
         unlockedAt: nowIso(),
         progress: achievementProgress(a, counters, unlockedIdList),
       })
     }
-    outcome.value = { totalXp, levelBefore, levelAfter }
+    outcome.value = { seasonXp: seasonXpAfter, levelBefore, levelAfter }
   })
 
   const res = outcome.value
   if (!res) return
 
-  gamificationBus.emit({ kind: 'xp', amount: xp, totalXp: res.totalXp, details })
+  gamificationBus.emit({ kind: 'xp', amount: xp, totalXp: res.seasonXp, details })
   for (const a of newlyUnlocked) {
     gamificationBus.emit({ kind: 'achievement', achievement: a })
   }
@@ -375,7 +399,7 @@ export async function runBackfillIfNeeded(): Promise<void> {
 
     const counters = computeCounters(allEvents)
     const unlocksSnap = await getDocs(await unlocksCol(uid))
-    const unlockedIdList = unlocksSnap.docs.map((d) => d.id)
+    const unlockedIdList = unlocksSnap.docs.map((d) => parseUnlockDocId(d.id).achievementId)
     const newlyUnlocked = evaluateAchievements(unlockedIdList, counters)
     const allUnlockedIds = [...unlockedIdList, ...newlyUnlocked.map((a) => a.id)]
 
