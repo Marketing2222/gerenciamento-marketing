@@ -97,7 +97,7 @@ export default function ConquistasPage() {
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       {/* Perfil */}
-      <section className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c1220] p-6 shadow-sm overflow-hidden relative">
+      <section className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c1220] p-6 md:p-8 shadow-sm overflow-hidden relative">
         {progress?.coverUrl && (
           <img src={progress.coverUrl} alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" />
         )}
@@ -114,7 +114,7 @@ export default function ConquistasPage() {
             type="button"
             onClick={() => setRankOpen(true)}
             title="Ver patentes"
-            className="w-20 h-20 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center text-4xl shadow-lg shadow-amber-500/30 shrink-0 overflow-hidden cursor-pointer transition hover:scale-105"
+            className="w-24 h-24 md:w-28 md:h-28 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center text-5xl shadow-lg shadow-amber-500/30 shrink-0 overflow-hidden cursor-pointer transition hover:scale-105"
           >
             {settings.icons[iconKeys.rank(level?.level ?? 1)] ? (
               <img
@@ -130,7 +130,7 @@ export default function ConquistasPage() {
               <p className="text-[11px] font-bold uppercase tracking-widest text-amber-500">
                 Nível {level?.level ?? 1}
               </p>
-              <h1 className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 leading-tight">
+              <h1 className="text-3xl font-extrabold text-slate-900 dark:text-slate-100 leading-tight">
                 {level?.title ?? 'Recruta'}
               </h1>
               <p className="text-sm text-slate-500 dark:text-slate-400">{totalXp.toLocaleString('pt-BR')} XP acumulado</p>
@@ -151,18 +151,18 @@ export default function ConquistasPage() {
               />
             </div>
             <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <div className="rounded-xl bg-slate-50 dark:bg-slate-800/50 px-3 py-2">
-                <p className="text-lg font-extrabold text-slate-900 dark:text-slate-100">
+              <div className="rounded-xl bg-slate-50 dark:bg-slate-800/50 px-4 py-3">
+                <p className="text-xl font-extrabold text-slate-900 dark:text-slate-100">
                   {unlockedCount}/{totalAchievements}
                 </p>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Conquistas</p>
               </div>
-              <div className="rounded-xl bg-slate-50 dark:bg-slate-800/50 px-3 py-2">
-                <p className="text-lg font-extrabold text-slate-900 dark:text-slate-100">{completionPercent}%</p>
+              <div className="rounded-xl bg-slate-50 dark:bg-slate-800/50 px-4 py-3">
+                <p className="text-xl font-extrabold text-slate-900 dark:text-slate-100">{completionPercent}%</p>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Completo</p>
               </div>
-              <div className="rounded-xl bg-slate-50 dark:bg-slate-800/50 px-3 py-2">
-                <p className="text-lg font-extrabold text-slate-900 dark:text-slate-100">{counters.total}</p>
+              <div className="rounded-xl bg-slate-50 dark:bg-slate-800/50 px-4 py-3">
+                <p className="text-xl font-extrabold text-slate-900 dark:text-slate-100">{counters.total}</p>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Tarefas concluídas</p>
               </div>
             </div>
@@ -267,7 +267,7 @@ export default function ConquistasPage() {
           <p className="text-sm font-medium">Nenhuma conquista neste filtro.</p>
         </div>
       ) : (
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filtered.map((a) => {
             const unlocked = Boolean(unlocks[a.id])
             const lockedSecret = a.secret && !unlocked
@@ -290,7 +290,7 @@ export default function ConquistasPage() {
               >
                 <div className="flex items-center gap-4">
                   <div
-                    className={`w-24 h-24 md:w-28 md:h-28 xl:w-32 xl:h-32 rounded-2xl flex items-center justify-center text-4xl xl:text-5xl shrink-0 overflow-hidden ${
+                    className={`w-24 h-24 md:w-28 md:h-28 rounded-2xl flex items-center justify-center text-4xl shrink-0 overflow-hidden ${
                       unlocked
                         ? 'bg-gradient-to-br from-amber-400/20 to-orange-500/20 border border-amber-400/30'
                         : 'bg-slate-200 dark:bg-slate-800 grayscale'
