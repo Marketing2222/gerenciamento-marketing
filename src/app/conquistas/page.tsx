@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGamification } from '@/context/GamificationContext'
+import { useTheme } from '@/context/ThemeContext'
 import { ACHIEVEMENTS } from '@/lib/gamification/achievements'
 import { achievementProgress } from '@/lib/gamification/engine'
 import { iconKeys } from '@/lib/gamification/settings'
 import type { AchCategory, Rarity } from '@/lib/gamification/types'
 import { uploadFile } from '@/lib/storage'
 import RankGallery from '@/components/gamification/RankGallery'
-import { Loader2, Lock, Pencil, Trophy, Upload, Trash2 } from 'lucide-react'
+import { Loader2, Lock, Moon, Pencil, Sun, Trophy, Upload, Trash2, Filter } from 'lucide-react'
 
 type StatusFilter = 'todas' | 'desbloqueadas' | 'pendentes'
 
@@ -34,15 +35,23 @@ export default function ConquistasPage() {
   const { progress, unlocks, counters, unlockedCount, totalAchievements, loading, level, resetNew, settings, saveCover } = useGamification()
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('todas')
   const [catFilter, setCatFilter] = useState<AchCategory | 'todas'>('todas')
+  const [catMenu, setCatMenu] = useState(false)
   const [rankOpen, setRankOpen] = useState(false)
   const [coverMenu, setCoverMenu] = useState(false)
   const [savingCover, setSavingCover] = useState(false)
   const [coverError, setCoverError] = useState('')
   const coverInputRef = useRef<HTMLInputElement>(null)
+  const { theme, setTheme } = useTheme()
 
   useEffect(() => {
     resetNew()
   }, [resetNew])
+
+  // A página de conquistas sempre começa escura.
+  useEffect(() => {
+    if (theme === 'light') setTheme('dark')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const grad: React.CSSProperties = {
     backgroundImage: `linear-gradient(90deg, ${settings.gradientFrom}, ${settings.gradientTo})`,
@@ -84,7 +93,7 @@ export default function ConquistasPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-slate-500 dark:text-slate-400">
+      <div className="flex flex-col items-center justify-center py-24 text-[color:var(--gm-muted)]">
         <Loader2 className="w-8 h-8 animate-spin mb-3 text-amber-500" />
         <p className="text-sm font-medium">Carregando conquistas...</p>
       </div>
@@ -95,19 +104,31 @@ export default function ConquistasPage() {
   const completionPercent = Math.round((unlockedCount / Math.max(1, totalAchievements)) * 100)
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div
+      className="gm-page -mx-4 sm:-mx-6 lg:-mx-8 -mt-4 sm:-mt-6 -mb-24 md:-mb-6 p-4 sm:p-6 pb-24 md:pb-6"
+      style={{
+        backgroundColor: settings.pageBg || undefined,
+        ...(settings.pageText
+          ? ({ '--gm-fg': settings.pageText, '--gm-muted': settings.pageText } as React.CSSProperties)
+          : {}),
+      }}
+    >
+      <div className="max-w-6xl mx-auto space-y-6">
       {/* Perfil */}
       <section className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c1220] p-6 md:p-8 shadow-sm overflow-hidden relative">
         {progress?.coverUrl && (
           <img src={progress.coverUrl} alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" />
         )}
-        <div
-          className={`absolute inset-0 pointer-events-none ${
-            progress?.coverUrl
-              ? 'bg-white/60 dark:bg-[#0c1220]/60'
-              : 'bg-gradient-to-br from-amber-500/10 via-transparent to-purple-500/10'
-          }`}
-        />
+        {progress?.coverUrl ? (
+          settings.transparencyEnabled ? (
+            <div
+              className="absolute inset-0 pointer-events-none opacity-60"
+              style={{ backgroundColor: settings.transparencyColor }}
+            />
+          ) : null
+        ) : (
+          <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-amber-500/10 via-transparent to-purple-500/10" />
+        )}
         <div className="relative flex flex-col md:flex-row md:items-center gap-6">
           <div className="flex items-center gap-4">
           <button
@@ -130,15 +151,15 @@ export default function ConquistasPage() {
               <p className="text-[11px] font-bold uppercase tracking-widest text-amber-500">
                 Nível {level?.level ?? 1}
               </p>
-              <h1 className="text-3xl font-extrabold text-slate-900 dark:text-slate-100 leading-tight">
+              <h1 className="text-3xl font-extrabold text-[color:var(--gm-fg)] leading-tight">
                 {level?.title ?? 'Recruta'}
               </h1>
-              <p className="text-sm text-slate-500 dark:text-slate-400">{totalXp.toLocaleString('pt-BR')} XP acumulado</p>
+              <p className="text-sm text-[color:var(--gm-muted)]">{totalXp.toLocaleString('pt-BR')} XP acumulado</p>
             </div>
           </div>
 
           <div className="flex-1 md:pl-6 md:border-l border-slate-200 dark:border-slate-800">
-            <div className="flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
+            <div className="flex items-center justify-between text-xs font-semibold text-[color:var(--gm-muted)] mb-1.5">
               <span>
                 {level?.intoLevel ?? 0} / {Math.max(1, (level?.nextLevelXp ?? 1) - (level?.currentLevelXp ?? 0))} XP
               </span>
@@ -152,17 +173,17 @@ export default function ConquistasPage() {
             </div>
             <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
               <div className="rounded-xl bg-slate-50 dark:bg-slate-800/50 px-4 py-3">
-                <p className="text-xl font-extrabold text-slate-900 dark:text-slate-100">
+                <p className="text-xl font-extrabold text-[color:var(--gm-fg)]">
                   {unlockedCount}/{totalAchievements}
                 </p>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Conquistas</p>
               </div>
               <div className="rounded-xl bg-slate-50 dark:bg-slate-800/50 px-4 py-3">
-                <p className="text-xl font-extrabold text-slate-900 dark:text-slate-100">{completionPercent}%</p>
+                <p className="text-xl font-extrabold text-[color:var(--gm-fg)]">{completionPercent}%</p>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Completo</p>
               </div>
               <div className="rounded-xl bg-slate-50 dark:bg-slate-800/50 px-4 py-3">
-                <p className="text-xl font-extrabold text-slate-900 dark:text-slate-100">{counters.total}</p>
+                <p className="text-xl font-extrabold text-[color:var(--gm-fg)]">{counters.total}</p>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Tarefas concluídas</p>
               </div>
             </div>
@@ -176,7 +197,7 @@ export default function ConquistasPage() {
             onClick={() => setCoverMenu((v) => !v)}
             disabled={savingCover}
             title="Editar capa"
-            className="w-9 h-9 rounded-full bg-white/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700 shadow-md flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 transition cursor-pointer disabled:opacity-60"
+            className="w-9 h-9 rounded-full bg-white/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700 shadow-md flex items-center justify-center text-[color:var(--gm-muted)] hover:text-amber-600 dark:hover:text-amber-400 transition cursor-pointer disabled:opacity-60"
           >
             {savingCover ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pencil className="w-4 h-4" />}
           </button>
@@ -226,7 +247,7 @@ export default function ConquistasPage() {
 
       {/* Filtros */}
       <section className="space-y-3">
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 items-center">
           {(['todas', 'desbloqueadas', 'pendentes'] as StatusFilter[]).map((s) => (
             <button
               key={s}
@@ -241,22 +262,57 @@ export default function ConquistasPage() {
               {s}
             </button>
           ))}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {CATEGORY_LABELS.map((c) => (
+
+          {/* Filtro de categorias (dropdown) */}
+          <div className="relative">
             <button
-              key={c.id}
-              onClick={() => setCatFilter(c.id)}
-              style={catFilter === c.id ? grad : undefined}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer ${
-                catFilter === c.id
-                  ? 'text-white shadow-md shadow-slate-500/20'
+              type="button"
+              onClick={() => setCatMenu((v) => !v)}
+              style={catFilter !== 'todas' ? grad : undefined}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition cursor-pointer ${
+                catFilter !== 'todas'
+                  ? 'text-white shadow-md'
                   : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
               }`}
             >
-              {c.label}
+              <Filter className="w-3.5 h-3.5" />
+              {catFilter === 'todas' ? 'Filtro' : CATEGORY_LABELS.find((c) => c.id === catFilter)?.label}
             </button>
-          ))}
+            {catMenu && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setCatMenu(false)} />
+                <div className="absolute z-20 mt-2 w-44 p-2 rounded-xl bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-700 shadow-xl flex flex-wrap gap-1.5">
+                  {CATEGORY_LABELS.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => {
+                        setCatFilter(c.id)
+                        setCatMenu(false)
+                      }}
+                      style={catFilter === c.id ? grad : undefined}
+                      className={`px-3 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer ${
+                        catFilter === c.id
+                          ? 'text-white shadow-md shadow-slate-500/20'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                      }`}
+                    >
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Tema claro/escuro da página */}
+          <button
+            type="button"
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            title={theme === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
+            className="flex items-center justify-center w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer"
+          >
+            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </button>
         </div>
       </section>
 
@@ -308,7 +364,7 @@ export default function ConquistasPage() {
                     <div className="flex items-center justify-between gap-2">
                       <h3
                         title={lockedSecret ? undefined : a.name}
-                        className="min-w-0 text-sm font-bold uppercase tracking-wide text-slate-900 dark:text-slate-100 leading-tight truncate"
+                        className="min-w-0 text-sm font-bold uppercase tracking-wide text-[color:var(--gm-fg)] leading-tight truncate"
                       >
                         {lockedSecret ? '???' : a.name}
                       </h3>
@@ -320,7 +376,7 @@ export default function ConquistasPage() {
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 leading-snug mt-1">
+                    <p className="text-sm text-[color:var(--gm-muted)] leading-snug mt-1">
                       {lockedSecret ? 'Conquista secreta — continue jogando para descobrir.' : a.description}
                     </p>
 
@@ -367,6 +423,7 @@ export default function ConquistasPage() {
           onClose={() => setRankOpen(false)}
         />
       )}
+      </div>
     </div>
   )
 }

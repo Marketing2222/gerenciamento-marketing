@@ -12,9 +12,11 @@ import {
 } from '@/lib/gamification/store'
 import {
   DEFAULT_GRADIENT,
+  DEFAULT_PAGE_THEME,
   clearIcon as clearSettingsIcon,
   saveGradient,
   saveIcon as saveSettingsIcon,
+  savePageTheme,
   subscribeSettings,
   type GamificationSettings,
 } from '@/lib/gamification/settings'
@@ -55,6 +57,7 @@ interface GamificationContextType {
   saveIcon: (key: string, url: string) => Promise<void>
   clearIcon: (key: string) => Promise<void>
   saveGradient: (from: string, to: string) => Promise<void>
+  savePageTheme: (patch: import('@/lib/gamification/settings').PageThemePatch) => Promise<void>
   saveCover: (url: string | null) => Promise<void>
 }
 
@@ -69,6 +72,7 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
     gradientFrom: DEFAULT_GRADIENT.from,
     gradientTo: DEFAULT_GRADIENT.to,
     icons: {},
+    ...DEFAULT_PAGE_THEME,
   })
   const [loading, setLoading] = useState(true)
   const [toasts, setToasts] = useState<ToastItem[]>([])
@@ -140,6 +144,10 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
     await saveGradient(from, to)
   }, [])
 
+  const doSavePageTheme = useCallback(async (patch: import('@/lib/gamification/settings').PageThemePatch) => {
+    await savePageTheme(patch)
+  }, [])
+
   const doSaveCover = useCallback(async (url: string | null) => {
     if (userId) await saveCoverUrl(userId, url)
   }, [userId])
@@ -165,6 +173,7 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
     saveIcon: doSaveIcon,
     clearIcon: doClearIcon,
     saveGradient: doSaveGradient,
+    savePageTheme: doSavePageTheme,
     saveCover: doSaveCover,
   }
 

@@ -58,6 +58,18 @@
   --ring: #3b82f6;
 }
 
+/* Tema da página de conquistas: cores padrão por tema; podem ser
+   sobrescritas em inline style (--gm-fg / --gm-muted / background). */
+.gm-page {
+  --gm-fg: #0f172a;
+  --gm-muted: #64748b;
+}
+
+.dark .gm-page {
+  --gm-fg: #f1f5f9;
+  --gm-muted: #94a3b8;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

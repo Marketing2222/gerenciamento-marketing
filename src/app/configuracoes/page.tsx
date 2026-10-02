@@ -89,7 +89,7 @@ export default function SettingsPage() {
   const { siteName, logoUrl, applyBrand } = useBrand()
   const { saveProfile, uploadAvatar, uploadLogo, users, addUser, removeUser, tasks, updateTask, roles, addRole, updateRole, removeRole } = useData()
   const { columns, summary, updateColumn, updateSummary, addColumn, removeColumn, reorderColumns } = useColumns()
-  const { settings, saveIcon, clearIcon, saveGradient } = useGamification()
+  const { settings, saveIcon, clearIcon, saveGradient, savePageTheme } = useGamification()
   
   const [name, setName] = useState('')
   const [role, setRole] = useState('DESIGNER')
@@ -105,6 +105,7 @@ export default function SettingsPage() {
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [uploadingIconKey, setUploadingIconKey] = useState<string | null>(null)
   const [gradDraft, setGradDraft] = useState<{ from: string; to: string } | null>(null)
+  const [appearDraft, setAppearDraft] = useState<{ enabled: boolean; color: string; bg: string; text: string } | null>(null)
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
 
@@ -242,6 +243,31 @@ export default function SettingsPage() {
       setSuccess('Degradê aplicado na tela de conquistas!')
     } catch (err) {
       setError(`Erro ao salvar degradê: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
+  const appear = appearDraft ?? {
+    enabled: settings.transparencyEnabled,
+    color: settings.transparencyColor,
+    bg: settings.pageBg,
+    text: settings.pageText,
+  }
+  const setAppear = (patch: Partial<typeof appear>) => setAppearDraft({ ...appear, ...patch })
+
+  const handleSaveAppearance = async () => {
+    if (!appearDraft) return
+    setError('')
+    try {
+      await savePageTheme({
+        transparencyEnabled: appearDraft.enabled,
+        transparencyColor: appearDraft.color,
+        pageBg: appearDraft.bg,
+        pageText: appearDraft.text,
+      })
+      setAppearDraft(null)
+      setSuccess('Aparência da página de conquistas aplicada!')
+    } catch (err) {
+      setError(`Erro ao salvar aparência: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
@@ -493,6 +519,101 @@ export default function SettingsPage() {
                 className="w-full px-4 py-1.5 bg-amber-600 hover:bg-amber-700 disabled:bg-slate-200 disabled:dark:bg-slate-800 disabled:text-slate-400 text-white rounded-xl text-xs font-semibold transition cursor-pointer disabled:cursor-not-allowed"
               >
                 {gradDraft ? 'Aplicar degradê' : 'Degradê salvo'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Aparência da página de conquistas */}
+        <div className="space-y-2 border-t border-slate-100 dark:border-slate-800 pt-4">
+          <p className="text-xs font-bold text-slate-600 dark:text-slate-300">Aparência da página de conquistas <span className="font-medium text-slate-400">(transparência, fundo e textos)</span></p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+            {/* Transparência */}
+            <div className="space-y-1">
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Transparência (sobre a capa)</label>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAppear({ enabled: !appear.enabled })}
+                  title={appear.enabled ? 'Desativar transparência' : 'Ativar transparência'}
+                  className={`relative w-11 h-6 rounded-full transition cursor-pointer shrink-0 ${appear.enabled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'}`}
+                >
+                  <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all ${appear.enabled ? 'left-6' : 'left-1'}`} />
+                </button>
+                <input
+                  type="color"
+                  value={appear.color}
+                  disabled={!appear.enabled}
+                  onChange={(e) => setAppear({ color: e.target.value })}
+                  title="Cor da transparência"
+                  className="w-9 h-9 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer bg-transparent disabled:opacity-40"
+                />
+                <span className="text-[10px] font-mono text-slate-400">{appear.color}</span>
+              </div>
+            </div>
+
+            {/* Fundo */}
+            <div className="space-y-1">
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Cor do fundo</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={appear.bg || '#f8fafc'}
+                  onChange={(e) => setAppear({ bg: e.target.value })}
+                  title="Cor de fundo da página"
+                  className="w-9 h-9 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer bg-transparent"
+                />
+                <button
+                  type="button"
+                  onClick={() => setAppear({ bg: '' })}
+                  disabled={!appear.bg}
+                  className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Padrão
+                </button>
+                <span className="text-[10px] font-mono text-slate-400 truncate">{appear.bg || 'tema'}</span>
+              </div>
+            </div>
+
+            {/* Textos */}
+            <div className="space-y-1">
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Cor dos textos</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={appear.text || '#0f172a'}
+                  onChange={(e) => setAppear({ text: e.target.value })}
+                  title="Cor dos textos da página"
+                  className="w-9 h-9 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer bg-transparent"
+                />
+                <button
+                  type="button"
+                  onClick={() => setAppear({ text: '' })}
+                  disabled={!appear.text}
+                  className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Padrão
+                </button>
+                <span className="text-[10px] font-mono text-slate-400 truncate">{appear.text || 'tema'}</span>
+              </div>
+            </div>
+
+            {/* Preview + salvar */}
+            <div className="space-y-1">
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Preview / Salvar</label>
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <span className="flex-1 h-6 rounded border border-slate-200 dark:border-slate-700 flex items-center justify-center text-[10px] font-bold" style={{ backgroundColor: appear.bg || undefined, color: appear.text || undefined }}>
+                  Aa
+                </span>
+                <span className="w-6 h-6 rounded border border-slate-200 dark:border-slate-700" style={{ backgroundColor: appear.enabled ? appear.color : 'transparent' }} />
+              </div>
+              <button
+                type="button"
+                onClick={handleSaveAppearance}
+                disabled={!appearDraft}
+                className="w-full px-4 py-1.5 bg-amber-600 hover:bg-amber-700 disabled:bg-slate-200 disabled:dark:bg-slate-800 disabled:text-slate-400 text-white rounded-xl text-xs font-semibold transition cursor-pointer disabled:cursor-not-allowed"
+              >
+                {appearDraft ? 'Aplicar aparência' : 'Aparência salva'}
               </button>
             </div>
           </div>
