@@ -313,9 +313,9 @@ export default function ConquistasPage() {
                         {lockedSecret ? '???' : a.name}
                       </h3>
                       {customRarity ? (
-                        <img src={customRarity} alt={rarity.label} className="shrink-0 h-5 max-w-[84px] object-contain" />
+                        <img src={customRarity} alt={rarity.label} className="shrink-0 h-6 max-w-[100px] object-contain" />
                       ) : (
-                        <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${rarity.pill}`}>
+                        <span className={`shrink-0 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase border ${rarity.pill}`}>
                           {rarity.label}
                         </span>
                       )}
