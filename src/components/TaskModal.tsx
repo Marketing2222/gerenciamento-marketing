@@ -27,6 +27,7 @@ import { useUser } from '@/context/UserContext'
 import { useColumns } from '@/context/ColumnsContext'
 import { Task } from '@/types'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
+import { baseXpForPriority } from '@/lib/gamification/xp'
 
 interface TaskModalProps {
   task: Task | null
@@ -871,10 +872,10 @@ export default function TaskModal({ task, isOpen, onClose, initialStatus = 'TODO
                   }}
                   className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:border-blue-500 outline-none text-sm text-slate-800 dark:text-slate-200 font-bold shadow-sm"
                 >
-                  <option value="LOW">Baixa +10 XP</option>
-                  <option value="MEDIUM">Média +20 XP</option>
-                  <option value="HIGH">Alta +35 XP</option>
-                  <option value="URGENT">Urgente +50 XP</option>
+                  <option value="LOW">Baixa +{baseXpForPriority('LOW')} XP</option>
+                  <option value="MEDIUM">Média +{baseXpForPriority('MEDIUM')} XP</option>
+                  <option value="HIGH">Alta +{baseXpForPriority('HIGH')} XP</option>
+                  <option value="URGENT">Urgente +{baseXpForPriority('URGENT')} XP</option>
                 </select>
               </div>
               <div className="w-16 shrink-0 space-y-2 flex flex-col items-center">
