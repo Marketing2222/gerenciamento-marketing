@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import type { ToastItem } from '@/context/GamificationContext'
 import type { XpLine } from '@/lib/gamification/types'
+import { iconKeys } from '@/lib/gamification/settings'
 
 const RARITY_STYLE: Record<string, { border: string; glow: string }> = {
   comum: { border: 'border-slate-500/60', glow: 'shadow-slate-500/20' },
@@ -78,10 +79,12 @@ export default function GamificationToasts({
   toasts,
   onDismiss,
   gradient,
+  icons,
 }: {
   toasts: ToastItem[]
   onDismiss: (id: number) => void
   gradient: { from: string; to: string }
+  icons: Record<string, string>
 }) {
   if (toasts.length === 0) return null
 
@@ -116,6 +119,7 @@ export default function GamificationToasts({
           )
         }
         const r = RARITY_STYLE[msg.achievement.rarity] ?? RARITY_STYLE.comum
+        const customIcon = icons[iconKeys.achievement(msg.achievement.id)]
         return (
           <button
             key={id}
@@ -123,7 +127,15 @@ export default function GamificationToasts({
             className={`pointer-events-auto animate-scale-up w-[300px] text-left rounded-2xl px-4 py-3 bg-[#0f172a] dark:bg-[#111827] text-slate-100 shadow-2xl ${r.glow} border ${r.border} cursor-pointer`}
           >
             <div className="flex items-start gap-3">
-              <span className="text-3xl leading-none mt-0.5">{msg.achievement.icon}</span>
+              {customIcon ? (
+                <img
+                  src={customIcon}
+                  alt={msg.achievement.name}
+                  className="w-9 h-9 rounded-xl object-cover shrink-0 mt-0.5 shadow-md"
+                />
+              ) : (
+                <span className="text-3xl leading-none mt-0.5">{msg.achievement.icon}</span>
+              )}
               <div className="min-w-0">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400">
                   🏆 Conquista desbloqueada

@@ -237,6 +237,7 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
         toasts={toasts}
         onDismiss={dismissToast}
         gradient={{ from: settings.gradientFrom, to: settings.gradientTo }}
+        icons={settings.icons}
       />
     </GamificationContext.Provider>
   )

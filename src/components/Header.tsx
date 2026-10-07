@@ -34,6 +34,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useGamification } from '@/context/GamificationContext'
+import { iconKeys } from '@/lib/gamification/settings'
 
 interface HeaderProps {
   onOpenCalendarFilter?: () => void
@@ -58,7 +59,8 @@ export default function Header({
   const { theme, toggleTheme } = useTheme()
   const { siteName, logoUrl } = useBrand()
   const { users, roles } = useData()
-  const { unlockedCount, totalAchievements, newAchievements, loading: gamLoading } = useGamification()
+  const { unlockedCount, totalAchievements, newAchievements, loading: gamLoading, level, settings } =
+    useGamification()
 
   const [isTrashOpen, setIsTrashOpen] = useState(false)
   const [isVideoScheduleOpen, setIsVideoScheduleOpen] = useState(false)
@@ -78,12 +80,13 @@ export default function Header({
     isAction?: boolean
     action?: () => void
     highlight?: boolean
+    hideOnDesktop?: boolean
     badge?: React.ReactNode
   }
   const navItems: NavItem[] = [
     { name: 'Nova Tarefa', href: null, icon: Plus, isAction: true, action: () => onCreateTask?.(), highlight: true },
     { name: 'Kanban', href: '/kanban', icon: Kanban },
-    { name: 'Conquistas', href: '/conquistas', icon: Trophy, badge: gamLoading ? null : (
+    { name: 'Conquistas', href: '/conquistas', icon: Trophy, hideOnDesktop: true, badge: gamLoading ? null : (
         <span className="flex items-center gap-1">
           <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
             {unlockedCount}/{totalAchievements}
@@ -122,6 +125,7 @@ export default function Header({
   }
 
   const isKanban = pathname === '/kanban'
+  const rankIcon = level ? settings.icons[iconKeys.rank(level.level)] : undefined
 
   return (
     <>
@@ -275,7 +279,9 @@ export default function Header({
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-1 flex-1 min-w-0 ml-2">
-          {navItems.map((item) => {
+          {navItems
+            .filter((item) => !item.hideOnDesktop)
+            .map((item) => {
             const Icon = item.icon
             const isActive = item.href ? (pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))) : false
 
@@ -312,6 +318,16 @@ export default function Header({
               </Link>
             )
           })}
+          {/* Calendar filter — only visible on Kanban */}
+          {isKanban && onOpenCalendarFilter && (
+            <button
+              onClick={onOpenCalendarFilter}
+              title="Filtrar por semana/dia"
+              className="ml-2 p-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-500/20 transition cursor-pointer shrink-0"
+            >
+              <CalendarDays className="w-4 h-4" />
+            </button>
+          )}
         </nav>
 
         {/* Mobile Navigation Dropdown */}
@@ -340,16 +356,45 @@ export default function Header({
 
         {/* Right side */}
         <div className="hidden md:flex items-center gap-2 shrink-0 ml-auto">
-          {/* Calendar filter — only visible on Kanban */}
-          {isKanban && onOpenCalendarFilter && (
-            <button
-              onClick={onOpenCalendarFilter}
-              title="Filtrar por semana/dia"
-              className="p-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-500/20 transition cursor-pointer"
+          {/* Patente (nível atual) */}
+          {!gamLoading && level && (
+            <div
+              className="flex items-center gap-2 pr-1"
+              title={`Nível ${level.level} — ${level.title}`}
             >
-              <CalendarDays className="w-4 h-4" />
-            </button>
+              {rankIcon ? (
+                <img src={rankIcon} alt="" className="w-7 h-7 rounded-lg object-cover shadow-sm" />
+              ) : (
+                <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center text-sm shadow-sm shadow-amber-500/20">
+                  {level.icon}
+                </span>
+              )}
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                {level.title}
+              </span>
+            </div>
           )}
+
+          {/* Conquistas + contador */}
+          <Link
+            href="/conquistas"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200 transition duration-200 whitespace-nowrap"
+          >
+            <Trophy className="w-3.5 h-3.5" />
+            <span>Conquistas</span>
+            {!gamLoading && (
+              <span className="flex items-center gap-1">
+                <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                  {unlockedCount}/{totalAchievements}
+                </span>
+                {newAchievements > 0 && (
+                  <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-orange-600 text-white shadow-sm shadow-orange-600/40">
+                    {newAchievements} novas
+                  </span>
+                )}
+              </span>
+            )}
+          </Link>
 
           <div className="w-px h-6 bg-slate-200 dark:bg-slate-800" />
 
