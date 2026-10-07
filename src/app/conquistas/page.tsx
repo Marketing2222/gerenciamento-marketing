@@ -11,7 +11,7 @@ import { uploadFile } from '@/lib/storage'
 import RankGallery from '@/components/gamification/RankGallery'
 import SeasonPopup from '@/components/gamification/SeasonPopup'
 import { buildSeasonSummaries, currentSeason } from '@/lib/gamification/seasons'
-import { Loader2, Lock, Moon, Pencil, Sun, Trophy, Upload, Trash2, Filter, Calendar, Gem } from 'lucide-react'
+import { Loader2, Moon, Pencil, Sun, Trophy, Upload, Trash2, Filter, Calendar, Gem } from 'lucide-react'
 
 type StatusFilter = 'todas' | 'desbloqueadas' | 'pendentes'
 
@@ -398,10 +398,9 @@ export default function ConquistasPage() {
         <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filtered.map((a) => {
             const unlocked = Boolean(unlocks[a.id])
-            const lockedSecret = a.secret && !unlocked
             const rarity = RARITY_META[a.rarity]
             const progressValue = achievementProgress(a, counters, Object.keys(unlocks))
-            const showProgress = !lockedSecret && a.requirement.value > 1 && a.requirement.type !== 'rapid'
+            const showProgress = a.requirement.value > 1 && a.requirement.type !== 'rapid'
             const percent = Math.min(100, Math.round((progressValue / a.requirement.value) * 100))
             const unlockedAt = unlocks[a.id]?.unlockedAt
             const customIcon = settings.icons[iconKeys.achievement(a.id)]
@@ -424,9 +423,7 @@ export default function ConquistasPage() {
                         : 'bg-slate-200 dark:bg-slate-800 grayscale'
                     }`}
                   >
-                    {lockedSecret ? (
-                      <Lock className="w-8 h-8 text-slate-400" />
-                    ) : customIcon ? (
+                    {customIcon ? (
                       <img src={customIcon} alt={a.name} className="w-full h-full object-cover" />
                     ) : (
                       a.icon
@@ -435,10 +432,10 @@ export default function ConquistasPage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
                       <h3
-                        title={lockedSecret ? undefined : a.name}
+                        title={a.name}
                         className="min-w-0 text-sm font-bold uppercase tracking-wide text-[color:var(--gm-fg)] leading-tight truncate"
                       >
-                        {lockedSecret ? '???' : a.name}
+                        {a.name}
                       </h3>
                       {customRarity ? (
                         <img src={customRarity} alt={rarity.label} className="shrink-0 h-6 max-w-[100px] object-contain" />
@@ -449,7 +446,7 @@ export default function ConquistasPage() {
                       )}
                     </div>
                     <p className="text-sm text-[color:var(--gm-muted)] leading-snug mt-1">
-                      {lockedSecret ? 'Conquista secreta — continue jogando para descobrir.' : a.description}
+                      {a.description}
                     </p>
 
                     {showProgress && (

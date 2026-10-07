@@ -77,7 +77,8 @@ export function computeCounters(events: XpEvent[]): Counters {
 
   for (const e of events) {
     category[e.contentCategory]++
-    if (e.dueResult === 'early') {
+    // "No prazo" (mesmo dia) também progride os selos de prazo — só "late" fica de fora.
+    if (e.dueResult === 'early' || e.dueResult === 'ontime') {
       early++
       if (e.priority === 'URGENT') urgentEarly++
     }
