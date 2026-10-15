@@ -55,13 +55,13 @@ export const ACHIEVEMENTS: Achievement[] = [
     { type: 'per_day', value: 15 }),
 
   // ===== Consistência =====
-  ach('streak_3', 'Combo x3', 'Concluir tarefas por 3 dias consecutivos.', '🔗', 'comum', 'consistencia', 35,
+  ach('streak_3', 'Combo x3', 'Concluir tarefas em 3 dias. Perder 1 dia não quebra o combo.', '🔗', 'comum', 'consistencia', 35,
     { type: 'streak', value: 3 }),
-  ach('streak_7', 'Combo x7', 'Concluir tarefas por 7 dias consecutivos.', '🔥', 'rara', 'consistencia', 70,
+  ach('streak_7', 'Combo x7', 'Concluir tarefas em 7 dias. Perder 1 dia não quebra o combo.', '🔥', 'rara', 'consistencia', 70,
     { type: 'streak', value: 7 }),
-  ach('streak_14', 'Combo x14', 'Concluir tarefas por 14 dias consecutivos.', '💪', 'epica', 'consistencia', 130,
+  ach('streak_14', 'Combo x14', 'Concluir tarefas em 14 dias. Perder 1 dia não quebra o combo.', '💪', 'epica', 'consistencia', 130,
     { type: 'streak', value: 14 }),
-  ach('streak_30', 'Combo x20', 'Concluir tarefas por 20 dias consecutivos.', '🌟', 'lendaria', 'consistencia', 260,
+  ach('streak_30', 'Combo x20', 'Concluir tarefas em 20 dias. Perder 1 dia não quebra o combo.', '🌟', 'lendaria', 'consistencia', 260,
     { type: 'streak', value: 20 }),
 
   // ===== Vídeos =====
@@ -93,13 +93,13 @@ export const ACHIEVEMENTS: Achievement[] = [
     { type: 'category', value: 5, contentCategory: 'trafego' }),
 
   // ===== Outros =====
-  ach('no_deadline_10', 'Livre como o Vento', 'Concluir 10 tarefas sem prazo definido.', '🕊️', 'comum', 'produtividade', 45,
-    { type: 'no_deadline', value: 10 }),
+  ach('no_deadline_10', 'Livre como o Vento', 'Concluir 5 tarefas criadas por outra pessoa.', '🕊️', 'comum', 'produtividade', 45,
+    { type: 'other_creator', value: 5 }),
 
   // ===== Secretas =====
-  ach('ghost', 'Fantasma', 'Concluir 10 tarefas sem responsável atribuído.', '👻', 'rara', 'secretas', 70,
-    { type: 'no_assignee', value: 10 }, true),
-  ach('night_owl', 'Madrugador', 'Concluir uma tarefa entre 0h e 5h da manhã.', '🌙', 'epica', 'secretas', 120,
+  ach('ghost', 'Fantasma', 'Concluir 5 tarefas sem responsável atribuído.', '👻', 'rara', 'secretas', 70,
+    { type: 'no_assignee', value: 5 }, true),
+  ach('night_owl', 'Madrugador', 'Concluir uma tarefa entre 18h30 e 07h30.', '🌙', 'epica', 'secretas', 120,
     { type: 'night', value: 1 }, true),
   ach('rapid_3', 'Relâmpago', 'Concluir 3 tarefas em menos de 30 minutos.', '⚡', 'rara', 'secretas', 65,
     { type: 'rapid', value: 1 }, true),
@@ -109,8 +109,8 @@ export const ACHIEVEMENTS: Achievement[] = [
     { type: 'same_day_create', value: 1 }, true),
   ach('perfect_checklist', 'Perfeccionista', 'Concluir uma tarefa com o checklist 100% completo.', '✅', 'rara', 'secretas', 70,
     { type: 'perfect_checklist', value: 1 }, true),
-  ach('streak_60', 'Combo Infinito', 'Concluir tarefas por 30 dias consecutivos.', '💫', 'lendaria', 'secretas', 280,
-    { type: 'streak', value: 30 }, true),
+  ach('streak_60', 'Combo Infinito', 'Concluir tarefas em 20 dias. Perder 1 dia não quebra o combo.', '💫', 'lendaria', 'secretas', 280,
+    { type: 'streak', value: 20 }, true),
 
   // ===== Platina: exige as outras 37 =====
   ach('completionist', 'Complecionista', 'Desbloquear todas as outras 37 conquistas.', '🏆', 'lendaria', 'secretas', 400,

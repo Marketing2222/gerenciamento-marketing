@@ -205,6 +205,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           dueDate: prevTask.dueDate,
           createdAt: prevTask.createdAt,
           assigneeId: prevTask.assigneeId,
+          creatorId: prevTask.creatorId,
           checklistTotal: prevTask.checklist.length,
           checklistDone: prevTask.checklist.filter((c) => c.isCompleted).length,
           contentCategory,

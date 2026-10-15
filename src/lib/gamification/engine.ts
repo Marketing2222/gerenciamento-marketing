@@ -4,7 +4,12 @@ import { ACHIEVEMENTS } from './achievements'
 
 const VIDEO_KEYS = ['vídeo', 'video', 'reels', 'reel', 'youtube', 'tiktok', 'short', 'gravação', 'gravacao', 'roteiro de vídeo', 'roteiro de video', 'edicao', 'edição']
 const POST_KEYS = ['post', 'legenda', 'carrossel', 'copy', 'blog', 'artigo', 'conteúdo', 'conteudo', 'instagram post', 'publicação', 'publicacao']
-const TRAFEGO_KEYS = ['tráfego', 'trafego', 'anúncio', 'anuncio', 'ads', 'meta ads', 'google ads', 'campanha', 'impulsionamento', 'lead', 'conversão', 'conversao', 'orçamento', 'orcamento']
+const TRAFEGO_KEYS = [
+  'tráfego', 'trafego', 'anúncio', 'anuncio', 'ads', 'meta ads', 'google ads', 'campanha',
+  'impulsionamento', 'lead', 'conversão', 'conversao', 'orçamento', 'orcamento',
+  'mídia', 'midia', 'performance', 'funil', 'captação', 'captacao', 'remarketing', 'pixel',
+  'criativo', 'landing', 'investimento', 'escala', 'cpc', 'cpm', 'roas',
+]
 
 function matchKeys(text: string, keys: string[]): boolean {
   return keys.some((k) => text.includes(k))
@@ -28,23 +33,38 @@ function dayKey(iso: string): string {
   return localDayKey(new Date(iso))
 }
 
-/** Streak de dias consecutivos terminando hoje ou ontem. */
+/**
+ * Streak com tolerância: 1 dia isolado perdido não zera a sequência;
+ * 2 dias seguidos sem conclusão quebram. A âncora aceita a última
+ * conclusão em hoje, ontem ou 2 dias atrás (hoje ainda pendente não
+ * conta como falha — cobre a virada domingo→segunda).
+ */
 function computeStreak(dayKeys: Set<string>): number {
   if (dayKeys.size === 0) return 0
   const today = new Date()
-  const yesterday = new Date(today)
-  yesterday.setDate(yesterday.getDate() - 1)
 
-  let start: Date
-  if (dayKeys.has(localDayKey(today))) start = today
-  else if (dayKeys.has(localDayKey(yesterday))) start = yesterday
-  else return 0
+  let anchor: Date | null = null
+  for (let i = 0; i <= 2; i++) {
+    const d = new Date(today)
+    d.setDate(d.getDate() - i)
+    if (dayKeys.has(localDayKey(d))) {
+      anchor = d
+      break
+    }
+  }
+  if (!anchor) return 0
 
   let streak = 0
-  const cursor = new Date(start)
+  let gap = 0
+  const cursor = new Date(anchor)
   while (true) {
-    if (!dayKeys.has(localDayKey(cursor))) break
-    streak++
+    if (dayKeys.has(localDayKey(cursor))) {
+      streak++
+      gap = 0
+    } else {
+      gap++
+      if (gap > 1) break
+    }
     cursor.setDate(cursor.getDate() - 1)
   }
   return streak
@@ -62,7 +82,7 @@ function computeRapid(events: XpEvent[]): boolean {
   return false
 }
 
-export function computeCounters(events: XpEvent[]): Counters {
+export function computeCounters(events: XpEvent[], userId: string | null): Counters {
   const category: Record<ContentCategory, number> = { video: 0, post: 0, trafego: 0, geral: 0 }
   const perDay = new Map<string, number>()
   const dayKeys = new Set<string>()
@@ -71,6 +91,7 @@ export function computeCounters(events: XpEvent[]): Counters {
   let urgentTotal = 0
   let noDeadline = 0
   let noAssignee = 0
+  let otherCreator = 0
   let night = 0
   let sameDayCreate = 0
   let perfectChecklist = 0
@@ -85,6 +106,7 @@ export function computeCounters(events: XpEvent[]): Counters {
     if (e.priority === 'URGENT') urgentTotal++
     if (!e.dueDate) noDeadline++
     if (!e.assigneeId) noAssignee++
+    if (e.creatorId && userId && e.creatorId !== userId) otherCreator++
 
     if (e.backfilled) continue
 
@@ -92,8 +114,10 @@ export function computeCounters(events: XpEvent[]): Counters {
     dayKeys.add(key)
     perDay.set(key, (perDay.get(key) ?? 0) + 1)
 
-    const hour = new Date(e.completedAt).getHours()
-    if (hour >= 0 && hour < 5) night++
+    const completed = new Date(e.completedAt)
+    const minutes = completed.getHours() * 60 + completed.getMinutes()
+    // Janela 18h30–07h30 (inclui os extremos).
+    if (minutes >= 18 * 60 + 30 || minutes <= 7 * 60 + 30) night++
 
     if (e.createdAt && dayKey(e.createdAt) === key) sameDayCreate++
     if (e.checklistTotal > 0 && e.checklistDone >= e.checklistTotal) perfectChecklist++
@@ -114,6 +138,7 @@ export function computeCounters(events: XpEvent[]): Counters {
     category,
     noDeadline,
     noAssignee,
+    otherCreator,
     night,
     sameDayCreate,
     perfectChecklist,
@@ -133,6 +158,7 @@ export function requirementProgress(a: Achievement, c: Counters): number {
     case 'category': return c.category[req.contentCategory ?? 'geral']
     case 'no_deadline': return c.noDeadline
     case 'no_assignee': return c.noAssignee
+    case 'other_creator': return c.otherCreator
     case 'night': return c.night
     case 'same_day_create': return c.sameDayCreate
     case 'perfect_checklist': return c.perfectChecklist

@@ -193,7 +193,7 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
     [events, season]
   )
 
-  const counters = React.useMemo(() => computeCounters(seasonEvents), [seasonEvents])
+  const counters = React.useMemo(() => computeCounters(seasonEvents, userId), [seasonEvents, userId])
 
   const seasonXp = React.useMemo(() => {
     const eventsXp = seasonEvents.reduce((sum, e) => sum + e.xp, 0)

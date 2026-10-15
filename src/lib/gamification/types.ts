@@ -21,6 +21,7 @@ export type RequirementType =
   | 'category'
   | 'no_deadline'
   | 'no_assignee'
+  | 'other_creator'
   | 'night'
   | 'same_day_create'
   | 'perfect_checklist'
@@ -53,6 +54,7 @@ export interface Counters {
   category: Record<ContentCategory, number>
   noDeadline: number
   noAssignee: number
+  otherCreator: number
   night: number
   sameDayCreate: number
   perfectChecklist: number
@@ -70,6 +72,7 @@ export interface XpEvent {
   dueResult: 'early' | 'ontime' | 'late' | 'none'
   createdAt: string
   assigneeId: string | null
+  creatorId: string | null
   checklistTotal: number
   checklistDone: number
   backfilled: boolean

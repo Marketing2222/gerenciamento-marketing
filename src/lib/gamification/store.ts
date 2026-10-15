@@ -77,6 +77,7 @@ function toXpEvent(id: string, raw: Record<string, unknown>): XpEvent {
     dueResult: (raw.dueResult as XpEvent['dueResult']) ?? 'none',
     createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : '',
     assigneeId: typeof raw.assigneeId === 'string' ? raw.assigneeId : null,
+    creatorId: typeof raw.creatorId === 'string' ? raw.creatorId : null,
     checklistTotal: typeof raw.checklistTotal === 'number' ? raw.checklistTotal : 0,
     checklistDone: typeof raw.checklistDone === 'number' ? raw.checklistDone : 0,
     backfilled: raw.backfilled === true,
@@ -181,6 +182,7 @@ export interface ConclusionInput {
   dueDate: string | null
   createdAt: string
   assigneeId: string | null
+  creatorId: string | null
   checklistTotal: number
   checklistDone: number
   contentCategory: ContentCategory
@@ -219,13 +221,14 @@ export async function recordConclusion(input: ConclusionInput): Promise<void> {
     dueResult,
     createdAt: input.createdAt,
     assigneeId: input.assigneeId,
+    creatorId: input.creatorId,
     checklistTotal: input.checklistTotal,
     checklistDone: input.checklistDone,
     backfilled: false,
   }
 
   // Progresso da TEMPORADA atual: contadores, conquistas e nível zeram todo mês.
-  const counters = computeCounters([...seasonEvents, event])
+  const counters = computeCounters([...seasonEvents, event], input.userId)
   const unlocksSnap = await getDocs(await unlocksCol(input.userId))
   const currentUnlockIds = new Set<string>()
   unlocksSnap.docs.forEach((d) => {
@@ -316,7 +319,7 @@ export async function reconcileSeasonUnlocks(uid: string, seasonEvents: XpEvent[
   waitForConfig()
 
   const season = currentSeason()
-  const counters = computeCounters(seasonEvents)
+  const counters = computeCounters(seasonEvents, uid)
 
   const unlocksSnap = await getDocs(await unlocksCol(uid))
   const freshIds = new Set<string>()
@@ -467,6 +470,7 @@ export async function runBackfillIfNeeded(): Promise<void> {
         dueResult: 'none',
         createdAt: t.createdAt,
         assigneeId: t.assigneeId,
+        creatorId: t.creatorId,
         checklistTotal: t.checklist.length,
         checklistDone: t.checklist.filter((c) => c.isCompleted === true || c.completed === true).length,
         backfilled: true,
@@ -475,7 +479,7 @@ export async function runBackfillIfNeeded(): Promise<void> {
     const allEvents = [...existing, ...newEvents]
     if (allEvents.length === 0) continue
 
-    const counters = computeCounters(allEvents)
+    const counters = computeCounters(allEvents, uid)
     const unlocksSnap = await getDocs(await unlocksCol(uid))
     const unlockedIdList = unlocksSnap.docs.map((d) => parseUnlockDocId(d.id).achievementId)
     const newlyUnlocked = evaluateAchievements(unlockedIdList, counters)
