@@ -90,6 +90,11 @@ export interface UserProgress {
   level: number
   newAchievements: number
   coverUrl: string | null
+  /** Zoom da imagem de fundo da página de conquistas (1 = normal). */
+  bgZoom: number
+  /** Cores pessoais do perfil (banner/XP). null = usar gradiente do sistema. */
+  accentFrom: string | null
+  accentTo: string | null
   updatedAt: string
 }
 

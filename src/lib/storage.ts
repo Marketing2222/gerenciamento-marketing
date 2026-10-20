@@ -63,6 +63,14 @@ export async function fileToDataUrl(file: File, label = 'Arquivo'): Promise<stri
   return raw
 }
 
+// Papel de parede já vem recortado no tamanho final pelo editor de crop —
+// só valida o tamanho, sem recomprimir/degradar de novo.
+export async function uploadWallpaper(file: File): Promise<string> {
+  const raw = await readAsDataURL(file)
+  assertSize(raw, 'Papel de parede')
+  return raw
+}
+
 // Wrappers com nomes conhecidos pelo restante do app.
 export async function uploadFile(file: File): Promise<string> {
   return fileToDataUrl(file, 'Arquivo')

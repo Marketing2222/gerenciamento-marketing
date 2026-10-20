@@ -46,7 +46,7 @@ export default function RootLayout({
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{document.documentElement.classList.remove('dark');document.documentElement.classList.add('light')}catch(e){document.documentElement.classList.add('light')}})()`,
+            __html: `(function(){try{document.documentElement.classList.remove('dark');document.documentElement.classList.add('light')}catch(e){}})()`,
           }}
         />
       </head>

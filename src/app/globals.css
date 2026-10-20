@@ -178,3 +178,70 @@ body {
 .animate-fade-in {
   animation: fade-in 0.3s ease-out;
 }
+
+/* Brilho passando na barra de XP */
+@keyframes gm-shimmer {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+.gm-xp-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.gm-xp-shimmer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 45%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  animation: gm-shimmer 2.6s linear infinite;
+}
+
+/* Celebração de conquista recém-desbloqueada */
+@keyframes gm-celebrate {
+  0% {
+    transform: scale(1);
+  }
+  25% {
+    transform: scale(1.07) rotate(-1.2deg);
+  }
+  55% {
+    transform: scale(1.04) rotate(1.2deg);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.gm-celebrate {
+  animation: gm-celebrate 1.1s ease;
+}
+
+@keyframes gm-confetti {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--gx, 0px), var(--gy, -60px)) scale(0.3);
+    opacity: 0;
+  }
+}
+
+.gm-confetti {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border-radius: 9999px;
+  pointer-events: none;
+  z-index: 20;
+  animation: gm-confetti 950ms ease-out forwards;
+}

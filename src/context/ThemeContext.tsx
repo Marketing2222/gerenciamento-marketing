@@ -13,7 +13,7 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
 function getInitialTheme(): Theme {
-  // Sempre começa pelo tema claro; o usuário pode alternar durante a sessão.
+  // Padrão global: tema claro. A página de conquistas força o escuro na montagem.
   return 'light'
 }
 

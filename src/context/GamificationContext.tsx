@@ -7,6 +7,8 @@ import {
   reconcileSeasonUnlocks,
   runBackfillIfNeeded,
   saveCoverUrl,
+  saveProfileAccent,
+  saveProfileBgZoom,
   subscribeEvents,
   subscribeProgress,
   subscribeUnlocks,
@@ -66,6 +68,8 @@ interface GamificationContextType {
   saveGradient: (from: string, to: string) => Promise<void>
   savePageTheme: (patch: import('@/lib/gamification/settings').PageThemePatch) => Promise<void>
   saveCover: (url: string | null) => Promise<void>
+  saveAccent: (from: string, to: string) => Promise<void>
+  saveBgZoom: (zoom: number) => Promise<void>
 }
 
 const GamificationContext = createContext<GamificationContextType | undefined>(undefined)
@@ -174,6 +178,14 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
     if (userId) await saveCoverUrl(userId, url)
   }, [userId])
 
+  const doSaveAccent = useCallback(async (from: string, to: string) => {
+    if (userId) await saveProfileAccent(userId, from, to)
+  }, [userId])
+
+  const doSaveBgZoom = useCallback(async (zoom: number) => {
+    if (userId) await saveProfileBgZoom(userId, zoom)
+  }, [userId])
+
   // ===== Progresso da temporada atual (reset mensal) =====
   // Temporada fixada na montagem: cruzar a virada do mês exige recarregar.
   const season = React.useMemo(() => currentSeason(), [])
@@ -228,6 +240,8 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
     saveGradient: doSaveGradient,
     savePageTheme: doSavePageTheme,
     saveCover: doSaveCover,
+    saveAccent: doSaveAccent,
+    saveBgZoom: doSaveBgZoom,
   }
 
   return (

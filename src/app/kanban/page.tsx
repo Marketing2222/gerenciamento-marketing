@@ -11,6 +11,7 @@ import { useData } from '@/context/DataContext'
 import { useColumns } from '@/context/ColumnsContext'
 import { useMobileUI } from '@/context/MobileUIContext'
 import { useKanbanFilter } from '@/context/KanbanFilterContext'
+import { useTheme } from '@/context/ThemeContext'
 import type { Task } from '@/types'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -101,6 +102,12 @@ function useDragScroll(isDraggingCard: boolean) {
 export default function KanbanPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const { setTheme } = useTheme()
+
+  // Tema claro é o padrão do kanban (conquistas força o escuro).
+  React.useEffect(() => {
+    setTheme('light')
+  }, [setTheme])
 
   const { tasks, loaded, updateTask, updateTaskOrders } = useData()
   const { columns } = useColumns()

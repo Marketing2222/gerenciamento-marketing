@@ -61,6 +61,9 @@ function toProgress(uid: string, raw: Record<string, unknown>): UserProgress {
     level: typeof raw.level === 'number' ? raw.level : 1,
     newAchievements: typeof raw.newAchievements === 'number' ? raw.newAchievements : 0,
     coverUrl: typeof raw.coverUrl === 'string' && raw.coverUrl ? raw.coverUrl : null,
+    bgZoom: typeof raw.bgZoom === 'number' && raw.bgZoom > 0 ? raw.bgZoom : 1,
+    accentFrom: typeof raw.accentFrom === 'string' && raw.accentFrom ? raw.accentFrom : null,
+    accentTo: typeof raw.accentTo === 'string' && raw.accentTo ? raw.accentTo : null,
     updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : '',
   }
 }
@@ -144,7 +147,24 @@ export async function resetNewAchievements(uid: string): Promise<void> {
 export async function saveCoverUrl(uid: string, url: string | null): Promise<void> {
   if (!isFirebaseConfigured()) return
   waitForConfig()
-  await setDoc(await userRef(uid), { coverUrl: url, updatedAt: nowIso() }, { merge: true })
+  const ref = await userRef(uid)
+  await setDoc(ref, { coverUrl: url, updatedAt: nowIso() }, { merge: true })
+}
+
+/** Salva as cores pessoais do perfil (banner + barra de XP). */
+export async function saveProfileAccent(uid: string, from: string, to: string): Promise<void> {
+  if (!isFirebaseConfigured()) return
+  waitForConfig()
+  const ref = await userRef(uid)
+  await setDoc(ref, { accentFrom: from, accentTo: to, updatedAt: nowIso() }, { merge: true })
+}
+
+/** Salva o zoom da imagem de fundo da página de conquistas. */
+export async function saveProfileBgZoom(uid: string, zoom: number): Promise<void> {
+  if (!isFirebaseConfigured()) return
+  waitForConfig()
+  const ref = await userRef(uid)
+  await setDoc(ref, { bgZoom: zoom, updatedAt: nowIso() }, { merge: true })
 }
 
 export function subscribeEvents(uid: string, callback: (events: XpEvent[]) => void): () => void {

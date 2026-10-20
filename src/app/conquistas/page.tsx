@@ -7,11 +7,13 @@ import { ACHIEVEMENTS } from '@/lib/gamification/achievements'
 import { achievementProgress } from '@/lib/gamification/engine'
 import { iconKeys } from '@/lib/gamification/settings'
 import type { AchCategory, Rarity } from '@/lib/gamification/types'
-import { uploadFile } from '@/lib/storage'
+import { uploadWallpaper } from '@/lib/storage'
 import RankGallery from '@/components/gamification/RankGallery'
 import SeasonPopup from '@/components/gamification/SeasonPopup'
+import WallpaperCrop from '@/components/gamification/WallpaperCrop'
 import { buildSeasonSummaries, currentSeason } from '@/lib/gamification/seasons'
-import { Loader2, Moon, Pencil, Sun, Trophy, Upload, Trash2, Filter, Calendar, Gem } from 'lucide-react'
+import { levelTheme, seasonAccent } from '@/lib/gamification/theme'
+import { Loader2, Moon, Pencil, Sun, Trophy, Upload, Trash2, Filter, Calendar, Gem, Lock, Palette, ZoomIn, Crop } from 'lucide-react'
 
 type StatusFilter = 'todas' | 'desbloqueadas' | 'pendentes'
 
@@ -20,6 +22,20 @@ const RARITY_META: Record<Rarity, { label: string; pill: string; border: string;
   rara: { label: 'Rara', pill: 'bg-blue-500/15 text-blue-600 dark:text-blue-300 border-blue-500/30', border: 'border-blue-300 dark:border-blue-700', ring: 'shadow-blue-400/15' },
   epica: { label: 'Épica', pill: 'bg-purple-500/15 text-purple-600 dark:text-purple-300 border-purple-500/30', border: 'border-purple-300 dark:border-purple-700', ring: 'shadow-purple-400/15' },
   lendaria: { label: 'Lendária', pill: 'bg-amber-500/15 text-amber-600 dark:text-amber-300 border-amber-500/40', border: 'border-amber-300 dark:border-amber-600', ring: 'shadow-amber-400/25' },
+}
+
+const RARITY_TINT: Record<Rarity, string> = {
+  comum: 'rgba(205,125,50,0.18)',
+  rara: 'rgba(59,130,246,0.16)',
+  epica: 'rgba(168,85,247,0.16)',
+  lendaria: 'rgba(245,158,11,0.2)',
+}
+
+const RARITY_GLOW: Record<Rarity, string> = {
+  comum: '#cd7f32',
+  rara: '#3b82f6',
+  epica: '#a855f7',
+  lendaria: '#fbbf24',
 }
 
 const CATEGORY_LABELS: { id: AchCategory | 'todas'; label: string }[] = [
@@ -34,7 +50,7 @@ const CATEGORY_LABELS: { id: AchCategory | 'todas'; label: string }[] = [
 ]
 
 export default function ConquistasPage() {
-  const { progress, unlocks, allUnlocks, events, counters, unlockedCount, totalAchievements, loading, level, seasonXp, resetNew, settings, saveCover } = useGamification()
+  const { progress, unlocks, allUnlocks, events, counters, unlockedCount, totalAchievements, loading, level, seasonXp, resetNew, settings, saveCover, saveAccent, saveBgZoom } = useGamification()
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('todas')
   const [catFilter, setCatFilter] = useState<AchCategory | 'todas'>('todas')
   const [catMenu, setCatMenu] = useState(false)
@@ -45,35 +61,84 @@ export default function ConquistasPage() {
   const [coverMenu, setCoverMenu] = useState(false)
   const [savingCover, setSavingCover] = useState(false)
   const [coverError, setCoverError] = useState('')
+  const [cropFile, setCropFile] = useState<File | null>(null)
   const coverInputRef = useRef<HTMLInputElement>(null)
+  const [celebrating, setCelebrating] = useState<Set<string>>(new Set())
+  const [accentMenu, setAccentMenu] = useState(false)
+  const [accentFrom, setAccentFrom] = useState('#f59e0b')
+  const [accentTo, setAccentTo] = useState('#8b5cf6')
+  const [bgZoomMenu, setBgZoomMenu] = useState(false)
+  const [bgZoomDraft, setBgZoomDraft] = useState(1)
+  const prevUnlockedRef = useRef<Set<string> | null>(null)
   const { theme, setTheme } = useTheme()
+
+  // Tema escuro é o padrão desta página (kanban/outras ficam no claro).
+  useEffect(() => {
+    setTheme('dark')
+  }, [setTheme])
+
+  const seasonNow = useMemo(() => currentSeason(), [])
+  const accent = useMemo(() => seasonAccent(seasonNow), [seasonNow])
 
   useEffect(() => {
     resetNew()
   }, [resetNew])
 
-  // A página de conquistas sempre começa no tema claro.
+  // Celebração quando uma conquista é desbloqueada ao vivo
   useEffect(() => {
-    if (theme === 'dark') setTheme('light')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    const ids = new Set(Object.keys(unlocks))
+    const prev = prevUnlockedRef.current
+    prevUnlockedRef.current = ids
+    if (!prev) return
+    const fresh = [...ids].filter((id) => !prev.has(id))
+    if (fresh.length === 0) return
+    setCelebrating((old) => new Set([...old, ...fresh]))
+    const t = setTimeout(() => {
+      setCelebrating((old) => {
+        const n = new Set(old)
+        fresh.forEach((id) => n.delete(id))
+        return n
+      })
+    }, 1500)
+    return () => clearTimeout(t)
+  }, [unlocks])
 
   const grad: React.CSSProperties = {
-    backgroundImage: `linear-gradient(90deg, ${settings.gradientFrom}, ${settings.gradientTo})`,
+    backgroundImage: `linear-gradient(90deg, ${progress?.accentFrom ?? settings.gradientFrom}, ${progress?.accentTo ?? settings.gradientTo})`,
   }
 
   const handleCoverUpload = async (file: File) => {
+    // Abre o recorte/zoom antes de aplicar.
+    setCoverMenu(false)
+    setCropFile(file)
+  }
+
+  const handleCropApply = async (cropped: File) => {
     setSavingCover(true)
     setCoverError('')
     try {
-      const url = await uploadFile(file)
+      const url = await uploadWallpaper(cropped)
       await saveCover(url)
     } catch (err) {
-      setCoverError(err instanceof Error ? err.message : 'Falha ao enviar a capa.')
+      setCoverError(err instanceof Error ? err.message : 'Falha ao enviar o papel de parede.')
     } finally {
       setSavingCover(false)
-      setCoverMenu(false)
+      setCropFile(null)
     }
+  }
+
+  const handleCoverEdit = () => {
+    // Reabre o recorte/zoom com a imagem já aplicada.
+    if (!progress?.coverUrl) return
+    setCoverMenu(false)
+    setSavingCover(true)
+    fetch(progress.coverUrl)
+      .then((res) => res.blob())
+      .then((blob) => {
+        setCropFile(new File([blob], 'wallpaper-atual.jpg', { type: blob.type || 'image/jpeg' }))
+      })
+      .catch(() => setCoverError('Não foi possível editar a imagem atual.'))
+      .finally(() => setSavingCover(false))
   }
 
   const handleCoverRemove = async () => {
@@ -111,40 +176,268 @@ export default function ConquistasPage() {
 
   const totalXp = seasonXp
   const completionPercent = Math.round((unlockedCount / Math.max(1, totalAchievements)) * 100)
+  const rankTheme = levelTheme(level?.level ?? 1)
 
   return (
     <div
-      className="gm-page -mx-4 sm:-mx-6 lg:-mx-8 -mt-4 sm:-mt-6 -mb-24 md:-mb-6 p-4 sm:p-6 pb-24 md:pb-6"
+      className="gm-page relative overflow-hidden -mx-4 sm:-mx-6 lg:-mx-8 -mt-4 sm:-mt-6 -mb-24 md:-mb-6 p-4 sm:p-6 pb-24 md:pb-6"
       style={{
-        backgroundColor: settings.pageBg || undefined,
-        ...(settings.pageText
+        backgroundColor: theme === 'dark' ? undefined : settings.pageBg || undefined,
+        ...(theme !== 'dark' && settings.pageText
           ? ({ '--gm-fg': settings.pageText, '--gm-muted': settings.pageText } as React.CSSProperties)
           : {}),
       }}
     >
-      <div className="max-w-6xl mx-auto space-y-6">
-      {/* Perfil */}
-      <section className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c1220] p-6 md:p-8 shadow-sm overflow-hidden relative">
-        {progress?.coverUrl && (
-          <img src={progress.coverUrl} alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" />
-        )}
-        {progress?.coverUrl ? (
-          settings.transparencyEnabled ? (
+      {/* Papel de parede no fundo da página (atenuado/opaco) */}
+      {progress?.coverUrl && (
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+          <img
+            src={progress.coverUrl}
+            alt=""
+            className="w-full h-full object-cover"
+            style={{ transform: `scale(${progress.bgZoom ?? 1})`, transformOrigin: 'center' }}
+          />
+          <div
+            className={`absolute inset-0 ${
+              theme === 'dark' ? 'bg-[#0b1020]/85' : 'bg-white/85'
+            }`}
+          />
+        </div>
+      )}
+
+      {/* Fundo aurora (sazonal) */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -top-20 -left-16 w-[26rem] h-[26rem] rounded-full blur-3xl opacity-25" style={{ backgroundColor: accent.from }} />
+        <div className="absolute top-1/3 -right-28 w-[32rem] h-[32rem] rounded-full blur-3xl opacity-20" style={{ backgroundColor: accent.to }} />
+        <div className="absolute -bottom-24 left-1/3 w-[24rem] h-[24rem] rounded-full blur-3xl opacity-20" style={{ backgroundColor: progress?.accentTo ?? settings.gradientTo }} />
+      </div>
+
+      <div className="relative max-w-6xl mx-auto space-y-6">
+      {/* Banner — Papel de parede (controles FORA do overflow para o menu não ser cortado) */}
+      <div className="relative">
+        <div className="rounded-3xl overflow-hidden h-44 md:h-56 border border-slate-200 dark:border-slate-800 shadow-sm relative">
+          {progress?.coverUrl ? (
+            <img src={progress.coverUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          ) : (
             <div
-              className="absolute inset-0 pointer-events-none opacity-60"
-              style={{ backgroundColor: settings.transparencyColor }}
+              className="absolute inset-0"
+              style={{ backgroundImage: `linear-gradient(120deg, ${progress?.accentFrom ?? settings.gradientFrom}, ${progress?.accentTo ?? settings.gradientTo})` }}
             />
-          ) : null
-        ) : (
-          <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-amber-500/10 via-transparent to-purple-500/10" />
+          )}
+          {/* brilho decorativo */}
+          <div className="absolute inset-0 pointer-events-none">
+            <div className="absolute -top-20 -left-12 w-64 h-64 rounded-full bg-white/25 blur-3xl" />
+            <div className="absolute -bottom-24 right-8 w-72 h-72 rounded-full bg-white/15 blur-3xl" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+          </div>
+        </div>
+
+        {/* Editar papel de parede */}
+        <div className="absolute top-3 right-3 z-20">
+          <button
+            type="button"
+            onClick={() => setCoverMenu((v) => !v)}
+            disabled={savingCover}
+            title="Editar papel de parede"
+            className="w-9 h-9 rounded-full bg-white/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700 shadow-md flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-amber-600 dark:hover:text-amber-400 transition cursor-pointer disabled:opacity-60"
+          >
+            {savingCover ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pencil className="w-4 h-4" />}
+          </button>
+          {coverMenu && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setCoverMenu(false)} />
+              <div className="absolute top-11 right-0 z-20 w-52 rounded-xl bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-700 shadow-xl overflow-hidden text-xs font-semibold text-slate-700 dark:text-slate-300">
+                <button
+                  type="button"
+                  onClick={() => coverInputRef.current?.click()}
+                  className="w-full text-left px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 cursor-pointer"
+                >
+                  <Upload className="w-3.5 h-3.5 text-amber-500" />
+                  {progress?.coverUrl ? 'Trocar papel de parede' : 'Adicionar papel de parede'}
+                </button>
+                {progress?.coverUrl && (
+                  <button
+                    type="button"
+                    onClick={handleCoverEdit}
+                    className="w-full text-left px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 cursor-pointer border-t border-slate-100 dark:border-slate-800"
+                  >
+                    <Crop className="w-3.5 h-3.5 text-amber-500" />
+                    Editar papel de parede
+                  </button>
+                )}
+                {progress?.coverUrl && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBgZoomDraft(progress.bgZoom ?? 1)
+                      setBgZoomMenu(true)
+                      setCoverMenu(false)
+                    }}
+                    className="w-full text-left px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 cursor-pointer border-t border-slate-100 dark:border-slate-800"
+                  >
+                    <ZoomIn className="w-3.5 h-3.5 text-blue-500" />
+                    Zoom do fundo
+                  </button>
+                )}
+                {progress?.coverUrl && (
+                  <button
+                    type="button"
+                    onClick={handleCoverRemove}
+                    className="w-full text-left px-3 py-2.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 flex items-center gap-2 cursor-pointer border-t border-slate-100 dark:border-slate-800"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Remover papel de parede
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAccentFrom(progress?.accentFrom ?? settings.gradientFrom)
+                    setAccentTo(progress?.accentTo ?? settings.gradientTo)
+                    setAccentMenu(true)
+                    setCoverMenu(false)
+                  }}
+                  className="w-full text-left px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 cursor-pointer border-t border-slate-100 dark:border-slate-800"
+                >
+                  <Palette className="w-3.5 h-3.5 text-purple-500" />
+                  Cores do perfil
+                </button>
+              </div>
+            </>
+          )}
+          {accentMenu && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setAccentMenu(false)} />
+              <div className="absolute top-11 right-0 z-20 w-56 rounded-xl bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-700 shadow-xl p-3 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                  Cores do perfil
+                </p>
+                <div className="flex items-center gap-2 mb-3">
+                  <label className="flex items-center gap-1.5 flex-1">
+                    <input
+                      type="color"
+                      value={accentFrom}
+                      onChange={(e) => setAccentFrom(e.target.value)}
+                      className="w-7 h-7 rounded cursor-pointer border-0 p-0 bg-transparent"
+                    />
+                    <span className="text-[10px] text-slate-400">De</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 flex-1">
+                    <input
+                      type="color"
+                      value={accentTo}
+                      onChange={(e) => setAccentTo(e.target.value)}
+                      className="w-7 h-7 rounded cursor-pointer border-0 p-0 bg-transparent"
+                    />
+                    <span className="text-[10px] text-slate-400">Para</span>
+                  </label>
+                </div>
+                <div
+                  className="h-6 rounded-full mb-3 border border-slate-200 dark:border-slate-700"
+                  style={{ backgroundImage: `linear-gradient(90deg, ${accentFrom}, ${accentTo})` }}
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAccentMenu(false)}
+                    className="flex-1 px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await saveAccent(accentFrom, accentTo)
+                      setAccentMenu(false)
+                    }}
+                    className="flex-1 px-2 py-1.5 rounded-lg text-white cursor-pointer"
+                    style={{ backgroundImage: `linear-gradient(90deg, ${accentFrom}, ${accentTo})` }}
+                  >
+                    Salvar
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+          {bgZoomMenu && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setBgZoomMenu(false)} />
+              <div className="absolute top-11 right-0 z-20 w-56 rounded-xl bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-700 shadow-xl p-3 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                  Zoom do fundo
+                </p>
+                <div className="flex items-center gap-2 mb-3">
+                  <ZoomIn className="w-4 h-4 text-slate-400 shrink-0" />
+                  <input
+                    type="range"
+                    min={0.25}
+                    max={2.5}
+                    step={0.05}
+                    value={bgZoomDraft}
+                    onChange={(e) => setBgZoomDraft(Number(e.target.value))}
+                    className="flex-1 accent-blue-500 cursor-pointer"
+                  />
+                  <span className="text-[10px] text-slate-400 w-9 text-right">
+                    {bgZoomDraft.toFixed(2)}x
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setBgZoomMenu(false)}
+                    className="flex-1 px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await saveBgZoom(bgZoomDraft)
+                      setBgZoomMenu(false)
+                    }}
+                    className="flex-1 px-2 py-1.5 rounded-lg text-white bg-blue-500 hover:bg-blue-600 cursor-pointer"
+                  >
+                    Salvar
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+          <input
+            type="file"
+            ref={coverInputRef}
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              if (f) void handleCoverUpload(f)
+              e.target.value = ''
+            }}
+          />
+        </div>
+        {coverError && (
+          <p className="absolute top-3 left-3 z-20 text-[11px] font-semibold text-red-600 bg-white/95 dark:bg-slate-900/95 px-2 py-1 rounded-lg border border-red-200 dark:border-red-900/50">
+            {coverError}
+          </p>
         )}
+      </div>
+
+      {/* Perfil */}
+      <section className={`rounded-3xl border-2 ${rankTheme.border} bg-white dark:bg-[#0c1220] p-6 md:p-8 ${rankTheme.shadow} overflow-hidden relative`}>
+        <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-amber-500/10 via-transparent to-purple-500/10" />
         <div className="relative flex flex-col md:flex-row md:items-center gap-6">
           <div className="flex items-center gap-4">
+          <div className="relative shrink-0">
+            <span
+              aria-hidden="true"
+              className="absolute inset-1 rounded-2xl blur-xl opacity-75 animate-pulse"
+              style={{ backgroundImage: `linear-gradient(135deg, ${rankTheme.glowFrom}, ${rankTheme.glowTo})` }}
+            />
           <button
             type="button"
             onClick={() => setRankOpen(true)}
             title="Ver patentes"
-            className="w-24 h-24 md:w-28 md:h-28 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center text-5xl shadow-lg shadow-amber-500/30 shrink-0 overflow-hidden cursor-pointer transition hover:scale-105"
+            className="relative w-24 h-24 md:w-28 md:h-28 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center text-5xl shadow-lg shadow-amber-500/30 overflow-hidden cursor-pointer transition hover:scale-105"
           >
             {settings.icons[iconKeys.rank(level?.level ?? 1)] ? (
               <img
@@ -156,6 +449,7 @@ export default function ConquistasPage() {
               <span>{level?.icon ?? '🌱'}</span>
             )}
           </button>
+          </div>
             <div>
               <span className="inline-flex items-center mb-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
                 T{seasonNumberNow}
@@ -179,11 +473,36 @@ export default function ConquistasPage() {
             </div>
             <div className="h-3 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
               <div
-                className="h-full rounded-full transition-all duration-700"
+                className="h-full rounded-full transition-all duration-700 gm-xp-shimmer"
                 style={{ ...grad, width: `${level?.percent ?? 0}%` }}
               />
             </div>
-            <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {/* Temporada (estilo card de stats) */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setSeasonOpen(true)}
+                  className="w-full rounded-xl border-2 border-amber-400/60 bg-amber-500/15 hover:bg-amber-500/25 px-4 py-3 flex items-center gap-2.5 transition cursor-pointer"
+                >
+                  <Calendar className="w-6 h-6 text-amber-400 shrink-0" />
+                  <div className="text-left">
+                    <p className="text-xl font-extrabold text-amber-400 leading-none">
+                      T{seasonNumberNow}
+                    </p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-amber-500/80 mt-1">
+                      Temporada
+                    </p>
+                  </div>
+                </button>
+                {seasonOpen && (
+                  <SeasonPopup
+                    summaries={seasonSummaries}
+                    icons={settings.icons}
+                    onClose={() => setSeasonOpen(false)}
+                  />
+                )}
+              </div>
               <div className="rounded-xl bg-slate-50 dark:bg-slate-800/50 px-4 py-3">
                 <p className="text-xl font-extrabold text-[color:var(--gm-fg)]">
                   {unlockedCount}/{totalAchievements}
@@ -201,60 +520,6 @@ export default function ConquistasPage() {
             </div>
           </div>
         </div>
-
-        {/* Editar capa */}
-        <div className="absolute bottom-3 right-3 z-20">
-          <button
-            type="button"
-            onClick={() => setCoverMenu((v) => !v)}
-            disabled={savingCover}
-            title="Editar capa"
-            className="w-9 h-9 rounded-full bg-white/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700 shadow-md flex items-center justify-center text-[color:var(--gm-muted)] hover:text-amber-600 dark:hover:text-amber-400 transition cursor-pointer disabled:opacity-60"
-          >
-            {savingCover ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pencil className="w-4 h-4" />}
-          </button>
-          {coverMenu && (
-            <>
-              <div className="fixed inset-0 z-10" onClick={() => setCoverMenu(false)} />
-              <div className="absolute bottom-11 right-0 z-20 w-44 rounded-xl bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-700 shadow-xl overflow-hidden text-xs font-semibold text-slate-700 dark:text-slate-300">
-                <button
-                  type="button"
-                  onClick={() => coverInputRef.current?.click()}
-                  className="w-full text-left px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2 cursor-pointer"
-                >
-                  <Upload className="w-3.5 h-3.5 text-amber-500" />
-                  {progress?.coverUrl ? 'Trocar capa' : 'Adicionar capa'}
-                </button>
-                {progress?.coverUrl && (
-                  <button
-                    type="button"
-                    onClick={handleCoverRemove}
-                    className="w-full text-left px-3 py-2.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 flex items-center gap-2 cursor-pointer border-t border-slate-100 dark:border-slate-800"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    Remover capa
-                  </button>
-                )}
-              </div>
-            </>
-          )}
-          <input
-            type="file"
-            ref={coverInputRef}
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0]
-              if (f) void handleCoverUpload(f)
-              e.target.value = ''
-            }}
-          />
-        </div>
-        {coverError && (
-          <p className="absolute bottom-4 right-14 z-20 text-[11px] font-semibold text-red-500 bg-white/95 dark:bg-slate-900/95 px-2 py-1 rounded-lg border border-red-200 dark:border-red-900/50">
-            {coverError}
-          </p>
-        )}
       </section>
 
       {/* Filtros */}
@@ -274,25 +539,6 @@ export default function ConquistasPage() {
               {s}
             </button>
           ))}
-
-          {/* Temporada */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setSeasonOpen((v) => !v)}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition cursor-pointer bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800 hover:bg-amber-200 dark:hover:bg-amber-950/70"
-            >
-              <Calendar className="w-3.5 h-3.5" />
-              TEMPORADA {seasonNumberNow}
-            </button>
-            {seasonOpen && (
-              <SeasonPopup
-                summaries={seasonSummaries}
-                icons={settings.icons}
-                onClose={() => setSeasonOpen(false)}
-              />
-            )}
-          </div>
 
           {/* Filtro de categorias (dropdown) */}
           <div className="relative">
@@ -409,12 +655,50 @@ export default function ConquistasPage() {
             return (
               <article
                 key={a.id}
-                className={`rounded-2xl border p-5 transition relative ${
+                className={`rounded-2xl border p-5 transition relative overflow-hidden ${
                   unlocked
-                    ? `${rarity.border} bg-white dark:bg-[#0c1220] shadow-lg ${rarity.ring}`
-                    : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 opacity-80'
+                    ? `${rarity.border} bg-white dark:bg-[#0c1220] shadow-lg ${rarity.ring} ${celebrating.has(a.id) ? 'gm-celebrate' : ''}`
+                    : 'border-dashed border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/40 opacity-40 grayscale'
                 }`}
               >
+                {unlocked ? (
+                  <>
+                    {/* tinta sutil da raridade */}
+                    <div
+                      className="absolute inset-0 pointer-events-none opacity-70"
+                      style={{ backgroundImage: `linear-gradient(135deg, ${RARITY_TINT[a.rarity]}, transparent 55%)` }}
+                    />
+                    {/* brilho da raridade no canto */}
+                    <div
+                      aria-hidden="true"
+                      className="absolute -top-12 -right-12 w-36 h-36 rounded-full blur-2xl opacity-30 pointer-events-none"
+                      style={{ backgroundColor: RARITY_GLOW[a.rarity] }}
+                    />
+                    {celebrating.has(a.id) &&
+                      ['#f43f5e', '#f59e0b', '#10b981', '#3b82f6', '#a855f7'].map((c, i) => (
+                        <span
+                          key={c}
+                          className="gm-confetti"
+                          style={
+                            {
+                              backgroundColor: c,
+                              left: '50%',
+                              top: '35%',
+                              '--gx': `${(i - 2) * 34}px`,
+                              '--gy': `${i % 2 === 0 ? -70 : -46}px`,
+                            } as React.CSSProperties
+                          }
+                        />
+                      ))}
+                  </>
+                ) : (
+                  <span
+                    className="absolute top-3 left-3 z-10 w-7 h-7 rounded-full bg-slate-500 text-white flex items-center justify-center shadow"
+                    title="Ainda não desbloqueada"
+                  >
+                    <Lock className="w-3.5 h-3.5" />
+                  </span>
+                )}
                 <div className="flex items-center gap-4">
                   <div
                     className={`w-24 h-24 md:w-28 md:h-28 rounded-2xl flex items-center justify-center text-4xl shrink-0 overflow-hidden ${
@@ -490,6 +774,13 @@ export default function ConquistasPage() {
           currentXp={totalXp}
           icons={settings.icons}
           onClose={() => setRankOpen(false)}
+        />
+      )}
+      {cropFile && (
+        <WallpaperCrop
+          file={cropFile}
+          onCancel={() => setCropFile(null)}
+          onApply={(f) => void handleCropApply(f)}
         />
       )}
       </div>
