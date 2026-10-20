@@ -11,6 +11,7 @@ import Avatar from '@/components/Avatar'
 import TrashModal from '@/components/TrashModal'
 import VideoScheduleModal from '@/components/VideoScheduleModal'
 import LinksPanel from '@/components/LinksPanel'
+import FriendsRanking from '@/components/FriendsRanking'
 import {
   Kanban,
   FolderOpen,
@@ -31,6 +32,7 @@ import {
   ChevronRight,
   Link2,
   Trophy,
+  UsersRound,
   type LucideIcon,
 } from 'lucide-react'
 import { useGamification } from '@/context/GamificationContext'
@@ -63,6 +65,7 @@ export default function Header({
     useGamification()
 
   const [isTrashOpen, setIsTrashOpen] = useState(false)
+  const [isRankingOpen, setIsRankingOpen] = useState(false)
   const [isVideoScheduleOpen, setIsVideoScheduleOpen] = useState(false)
   const [isLinksOpen, setIsLinksOpen] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -356,6 +359,15 @@ export default function Header({
 
         {/* Right side */}
         <div className="hidden md:flex items-center gap-2 shrink-0 ml-auto">
+          {/* Amigos — ranking (só ícone) */}
+          <button
+            onClick={() => setIsRankingOpen(true)}
+            title="Amigos — ranking"
+            className="p-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200 transition duration-200 cursor-pointer"
+          >
+            <UsersRound className="w-4 h-4" />
+          </button>
+
           {/* Patente (nível atual) */}
           {!gamLoading && level && (
             <div
@@ -454,6 +466,7 @@ export default function Header({
 
         <TrashModal isOpen={isTrashOpen} onClose={() => setIsTrashOpen(false)} />
         <VideoScheduleModal isOpen={isVideoScheduleOpen} onClose={() => setIsVideoScheduleOpen(false)} />
+        {isRankingOpen && <FriendsRanking onClose={() => setIsRankingOpen(false)} />}
       </header>
 
       <LinksPanel isOpen={isLinksOpen} onClose={() => setIsLinksOpen(false)} />

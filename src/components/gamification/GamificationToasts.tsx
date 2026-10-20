@@ -95,6 +95,7 @@ export default function GamificationToasts({
           return <XpCard key={id} amount={msg.amount} details={msg.details} gradient={gradient} onDismiss={() => onDismiss(id)} />
         }
         if (msg.kind === 'levelup') {
+          const rankIcon = icons[iconKeys.rank(msg.to)]
           return (
             <button
               key={id}
@@ -102,7 +103,15 @@ export default function GamificationToasts({
               className="pointer-events-auto animate-scale-up w-[280px] text-left rounded-2xl px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-2xl shadow-purple-600/40 border border-purple-400/50 cursor-pointer"
             >
               <div className="flex items-center gap-3">
-                <span className="text-3xl">{msg.icon}</span>
+                {rankIcon ? (
+                  <img
+                    src={rankIcon}
+                    alt={`Nível ${msg.to}`}
+                    className="w-10 h-10 rounded-xl object-cover shrink-0 shadow-md border border-white/30"
+                  />
+                ) : (
+                  <span className="text-3xl shrink-0">{msg.icon}</span>
+                )}
                 <div className="min-w-0">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-purple-200">
                     ⚡ Level Up!

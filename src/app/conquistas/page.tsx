@@ -438,9 +438,9 @@ export default function ConquistasPage() {
                         {a.name}
                       </h3>
                       {customRarity ? (
-                        <img src={customRarity} alt={rarity.label} className="shrink-0 h-6 max-w-[100px] object-contain" />
+                        <img src={customRarity} alt={rarity.label} className="shrink-0 w-9 h-9 rounded-full object-cover border border-black/10 dark:border-white/10" />
                       ) : (
-                        <span className={`shrink-0 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase border ${rarity.pill}`}>
+                        <span className={`shrink-0 px-3 py-1.5 rounded-full text-[12px] font-bold uppercase border ${rarity.pill}`}>
                           {rarity.label}
                         </span>
                       )}

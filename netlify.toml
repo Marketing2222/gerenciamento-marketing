@@ -1,6 +1,13 @@
+# Deploy estático (Next.js output: export) — pasta out/
 [build]
   command = "npm run build"
   publish = "out"
 
 [build.environment]
   NEXT_TELEMETRY_DISABLED = "1"
+
+# SPA fallback: rotas sem arquivo caem no index.html (o app redireciona no cliente)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
