@@ -48,6 +48,8 @@ export interface Task {
   dueDate: string | null
   createdAt: string
   deletedAt: string | null
+  /** Usuário que moveu para a lixeira (gamificação "Pro Cesto"). */
+  deletedBy?: string | null
   assigneeId: string | null
   creatorId: string | null
   assignee: User | null

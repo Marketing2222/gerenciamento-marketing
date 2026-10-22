@@ -12,6 +12,7 @@ import { useColumns } from '@/context/ColumnsContext'
 import { useMobileUI } from '@/context/MobileUIContext'
 import { useKanbanFilter } from '@/context/KanbanFilterContext'
 import { useTheme } from '@/context/ThemeContext'
+import { isSprintDate } from '@/lib/gamification/holidays'
 import type { Task } from '@/types'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -128,6 +129,8 @@ export default function KanbanPage() {
   const [isDraggingCard, setIsDraggingCard] = React.useState(false)
   const selectedTask = useMemo(() => tasks.find(t => t.id === selectedTaskId) || null, [tasks, selectedTaskId])
   const activeTasks = useMemo(() => tasks.filter(t => !t.deletedAt), [tasks])
+  // Hoje é o dia de Sprint Final (último dia útil do mês)?
+  const sprintToday = useMemo(() => isSprintDate(new Date()), [])
 
   const dragScroll = useDragScroll(isDraggingCard)
 
@@ -324,6 +327,17 @@ export default function KanbanPage() {
 
   return (
     <div className="flex flex-col h-full">
+      {/* Sprint Final — dia do último dia útil do mês */}
+      {sprintToday && (
+        <div className="shrink-0 mb-2">
+          <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-xl px-3 py-1.5">
+            <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">
+              🏁 Sprint Final — hoje é o último dia útil do mês! Conclua tarefas para desbloquear a conquista Sprint Final (5 conclusões no dia).
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Filter indicator */}
       {hasActiveFilter && (
         <div className="shrink-0 mb-2">

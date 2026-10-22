@@ -198,18 +198,22 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const prevColumnTitle = columns.find((c) => c.id === prevStatus)?.title
         let contentCategory: ContentCategory = prevColumnTitle ? resolveContentCategory(prevColumnTitle) : 'geral'
         if (contentCategory === 'geral') contentCategory = resolveContentCategory(prevTask.title)
-        void recordConclusion({
-          userId: user.id,
-          taskId: id,
-          priority: prevTask.priority,
-          dueDate: prevTask.dueDate,
-          createdAt: prevTask.createdAt,
-          assigneeId: prevTask.assigneeId,
-          creatorId: prevTask.creatorId,
-          checklistTotal: prevTask.checklist.length,
-          checklistDone: prevTask.checklist.filter((c) => c.isCompleted).length,
-          contentCategory,
-        }).catch((err) => console.error('[gamification] recordConclusion', err))
+        void recordConclusion(
+          {
+            userId: user.id,
+            taskId: id,
+            priority: prevTask.priority,
+            dueDate: prevTask.dueDate,
+            createdAt: prevTask.createdAt,
+            title: prevTask.title,
+            assigneeId: prevTask.assigneeId,
+            creatorId: prevTask.creatorId,
+            checklistTotal: prevTask.checklist.length,
+            checklistDone: prevTask.checklist.filter((c) => c.isCompleted).length,
+            contentCategory,
+          },
+          tasks
+        ).catch((err) => console.error('[gamification] recordConclusion', err))
       }
     },
     [users, tasks, columns, user]
@@ -220,8 +224,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const moveToTrash = useCallback(async (id: string) => {
-    await softDeleteTask(id)
-  }, [])
+    await softDeleteTask(id, user?.id ?? null)
+  }, [user])
 
   const restore = useCallback(async (id: string) => {
     await restoreTask(id)

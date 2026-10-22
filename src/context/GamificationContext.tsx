@@ -2,6 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { useUser } from '@/context/UserContext'
+import { useData } from '@/context/DataContext'
 import {
   resetNewAchievements,
   reconcileSeasonUnlocks,
@@ -76,9 +77,12 @@ const GamificationContext = createContext<GamificationContextType | undefined>(u
 
 export function GamificationProvider({ children }: { children: React.ReactNode }) {
   const { user } = useUser()
+  const { tasks, loaded: tasksLoaded } = useData()
   const [progress, setProgress] = useState<UserProgress | null>(null)
   const [unlockDocs, setUnlockDocs] = useState<Record<string, AchievementUnlock>>({})
   const [events, setEvents] = useState<XpEvent[]>([])
+  /** Dono dos `events` atuais — evita reconciliar com eventos de outra sessão. */
+  const [eventsForUser, setEventsForUser] = useState<string | null>(null)
   const [settings, setSettings] = useState<GamificationSettings>({
     gradientFrom: DEFAULT_GRADIENT.from,
     gradientTo: DEFAULT_GRADIENT.to,
@@ -97,6 +101,7 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
       setProgress(null)
       setUnlockDocs({})
       setEvents([])
+      setEventsForUser(null)
       setLoading(true)
       reconciledRef.current = false
       return
@@ -110,16 +115,7 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
     const unsubUnlocks = subscribeUnlocks(userId, setUnlockDocs)
     const unsubEvents = subscribeEvents(userId, (evs) => {
       setEvents(evs)
-      // 1ª carga: reavalia conquistas da temporada (cobre conclusões
-      // anteriores ao reset/deploy e a virada do mês).
-      if (!reconciledRef.current) {
-        reconciledRef.current = true
-        const seasonNow = currentSeason()
-        void reconcileSeasonUnlocks(
-          userId,
-          evs.filter((e) => eventInSeason(e, seasonNow))
-        ).catch((err) => console.error('[gamification] reconcile', err))
-      }
+      setEventsForUser(userId)
     })
     void runBackfillIfNeeded().catch((err) => console.error('[gamification] backfill', err))
     return () => {
@@ -205,7 +201,22 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
     [events, season]
   )
 
-  const counters = React.useMemo(() => computeCounters(seasonEvents, userId), [seasonEvents, userId])
+  const counters = React.useMemo(
+    () => computeCounters(seasonEvents, userId, tasks, season),
+    [seasonEvents, userId, tasks, season]
+  )
+
+  // 1ª carga: reavalia conquistas da temporada (cobre conclusões anteriores
+  // ao reset/deploy e a virada do mês). Espera eventos E tarefas carregados
+  // para os contadores baseados em tarefas.
+  useEffect(() => {
+    if (!userId || !tasksLoaded || eventsForUser !== userId) return
+    if (reconciledRef.current) return
+    reconciledRef.current = true
+    void reconcileSeasonUnlocks(userId, seasonEvents, tasks).catch((err) =>
+      console.error('[gamification] reconcile', err)
+    )
+  }, [userId, tasksLoaded, eventsForUser, seasonEvents, tasks])
 
   const seasonXp = React.useMemo(() => {
     const eventsXp = seasonEvents.reduce((sum, e) => sum + e.xp, 0)

@@ -1,4 +1,7 @@
-import type { Achievement, Counters, ContentCategory, XpEvent } from './types'
+import type { Achievement, Counters, ContentCategory, TaskForCounters, XpEvent } from './types'
+import type { SeasonInfo } from './seasons'
+import { inSeasonMs } from './seasons'
+import { isNonWorkDay, isSprintDate } from './holidays'
 import { parseDateOnly } from '@/lib/dates'
 import { ACHIEVEMENTS } from './achievements'
 
@@ -38,19 +41,32 @@ function dayKey(iso: string): string {
  * 2 dias seguidos sem conclusão quebram. A âncora aceita a última
  * conclusão em hoje, ontem ou 2 dias atrás (hoje ainda pendente não
  * conta como falha — cobre a virada domingo→segunda).
+ *
+ * mode 'work' (Combo x7/x14/x20): domingos e feriados de São Luís são
+ * transparentes — não contam na sequência e não quebram o combo (uma
+ * conclusão nesses dias também não soma). A âncora pula esses dias.
  */
-function computeStreak(dayKeys: Set<string>): number {
+function computeStreak(dayKeys: Set<string>, mode: 'calendar' | 'work' = 'calendar'): number {
   if (dayKeys.size === 0) return 0
   const today = new Date()
+  const excluded = (d: Date) => mode === 'work' && isNonWorkDay(d)
 
+  // Âncora: última conclusão ainda "recente" (2 dias corridos; no modo
+  // work, domingos/feriados são pulados sem consumir a tolerância de
+  // 1 dia perdido — hoje pendente nunca conta como falha).
   let anchor: Date | null = null
-  for (let i = 0; i <= 2; i++) {
+  let missed = 0
+  for (let i = 0; i <= 14; i++) {
     const d = new Date(today)
     d.setDate(d.getDate() - i)
+    if (excluded(d)) continue
     if (dayKeys.has(localDayKey(d))) {
       anchor = d
       break
     }
+    if (i === 0) continue // hoje ainda pendente não conta como falha
+    missed++
+    if (missed > 1) return 0
   }
   if (!anchor) return 0
 
@@ -58,6 +74,10 @@ function computeStreak(dayKeys: Set<string>): number {
   let gap = 0
   const cursor = new Date(anchor)
   while (true) {
+    if (excluded(cursor)) {
+      cursor.setDate(cursor.getDate() - 1)
+      continue
+    }
     if (dayKeys.has(localDayKey(cursor))) {
       streak++
       gap = 0
@@ -82,7 +102,33 @@ function computeRapid(events: XpEvent[]): boolean {
   return false
 }
 
-export function computeCounters(events: XpEvent[], userId: string | null): Counters {
+/** Converte data em execução (string ISO, epoch ou Timestamp) para ms. */
+function dateMs(v: unknown): number {
+  if (typeof v === 'string') {
+    const t = Date.parse(v)
+    return Number.isFinite(t) ? t : NaN
+  }
+  if (typeof v === 'number') return Number.isFinite(v) ? v : NaN
+  if (v && typeof v === 'object' && 'toDate' in v && typeof (v as { toDate: unknown }).toDate === 'function') {
+    const t = (v as { toDate: () => Date }).toDate().getTime()
+    return Number.isFinite(t) ? t : NaN
+  }
+  return NaN
+}
+
+/** Título normalizado para comparação (caixa/acentos/espaços). */
+function normTitle(t: string): string {
+  return t.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+const RADAR_TITLE = 'verificar indicações'
+
+export function computeCounters(
+  events: XpEvent[],
+  userId: string | null,
+  tasks: TaskForCounters[],
+  season: SeasonInfo
+): Counters {
   const category: Record<ContentCategory, number> = { video: 0, post: 0, trafego: 0, geral: 0 }
   const perDay = new Map<string, number>()
   const dayKeys = new Set<string>()
@@ -95,6 +141,10 @@ export function computeCounters(events: XpEvent[], userId: string | null): Count
   let night = 0
   let sameDayCreate = 0
   let perfectChecklist = 0
+  let lateTotal = 0
+  let fastFinish = 0
+  let sprintFinal = 0
+  let radar = 0
 
   for (const e of events) {
     category[e.contentCategory]++
@@ -103,10 +153,26 @@ export function computeCounters(events: XpEvent[], userId: string | null): Count
       early++
       if (e.priority === 'URGENT') urgentEarly++
     }
+    if (e.dueResult === 'late') lateTotal++
     if (e.priority === 'URGENT') urgentTotal++
     if (!e.dueDate) noDeadline++
     if (!e.assigneeId) noAssignee++
     if (e.creatorId && userId && e.creatorId !== userId) otherCreator++
+
+    // Resolve e Toca: criada por mim e concluída em até 24h.
+    if (userId && e.creatorId === userId && !e.backfilled && e.createdAt) {
+      const diff = dateMs(e.completedAt) - dateMs(e.createdAt)
+      if (Number.isFinite(diff) && diff >= 0 && diff < 24 * 60 * 60 * 1000) fastFinish++
+    }
+
+    // Sprint Final: conclusão no último dia útil do mês.
+    if (!e.backfilled) {
+      const ms = dateMs(e.completedAt)
+      if (Number.isFinite(ms) && isSprintDate(new Date(ms))) sprintFinal++
+    }
+
+    // Radar Ligado: título exato "VERIFICAR INDICAÇÕES".
+    if (e.title && normTitle(e.title) === RADAR_TITLE) radar++
 
     if (e.backfilled) continue
 
@@ -128,6 +194,42 @@ export function computeCounters(events: XpEvent[], userId: string | null): Count
     if (count > perDayMax) perDayMax = count
   }
 
+  // ===== Contadores baseados em tarefas (temporada) =====
+  let vozAtiva = 0
+  let arquiteto = 0
+  let deletedTotal = 0
+  let createdByMe = 0
+
+  if (userId) {
+    for (const t of tasks) {
+      const createdMs = dateMs(t.createdAt)
+      const createdInSeason = Number.isFinite(createdMs) && inSeasonMs(createdMs, season)
+
+      if (createdInSeason && t.creatorId === userId) {
+        createdByMe++
+        // Arquiteto: descrição preenchida + checklist 100% concluído.
+        if (t.description && t.description.trim() && t.checklist.length > 0) {
+          if (t.checklist.every((c) => c.isCompleted === true)) arquiteto++
+        }
+      }
+
+      // Pro Cesto: excluída por mim dentro da temporada.
+      if (t.deletedBy === userId && t.deletedAt) {
+        const delMs = dateMs(t.deletedAt)
+        if (inSeasonMs(delMs, season)) deletedTotal++
+      }
+
+      // Voz Ativa: meus comentários em tarefas criadas por outras pessoas.
+      if (t.creatorId && t.creatorId !== userId) {
+        for (const c of t.comments) {
+          if (c.user.id !== userId) continue
+          const cMs = dateMs(c.createdAt)
+          if (Number.isFinite(cMs) && inSeasonMs(cMs, season)) vozAtiva++
+        }
+      }
+    }
+  }
+
   return {
     total: events.length,
     early,
@@ -135,6 +237,7 @@ export function computeCounters(events: XpEvent[], userId: string | null): Count
     urgentTotal,
     perDayMax,
     streak: computeStreak(dayKeys),
+    streakWork: computeStreak(dayKeys, 'work'),
     category,
     noDeadline,
     noAssignee,
@@ -143,6 +246,14 @@ export function computeCounters(events: XpEvent[], userId: string | null): Count
     sameDayCreate,
     perfectChecklist,
     rapid: computeRapid(events),
+    vozAtiva,
+    arquiteto,
+    sprintFinal,
+    lateTotal,
+    deletedTotal,
+    createdByMe,
+    fastFinish,
+    radar,
   }
 }
 
@@ -155,6 +266,7 @@ export function requirementProgress(a: Achievement, c: Counters): number {
     case 'urgent_total': return c.urgentTotal
     case 'per_day': return c.perDayMax
     case 'streak': return c.streak
+    case 'streak_work': return c.streakWork
     case 'category': return c.category[req.contentCategory ?? 'geral']
     case 'no_deadline': return c.noDeadline
     case 'no_assignee': return c.noAssignee
@@ -163,6 +275,14 @@ export function requirementProgress(a: Achievement, c: Counters): number {
     case 'same_day_create': return c.sameDayCreate
     case 'perfect_checklist': return c.perfectChecklist
     case 'rapid': return c.rapid ? 1 : 0
+    case 'voz_ativa': return c.vozAtiva
+    case 'arquiteto': return c.arquiteto
+    case 'sprint_final': return c.sprintFinal
+    case 'late_total': return c.lateTotal
+    case 'deleted_total': return c.deletedTotal
+    case 'created_total': return c.createdByMe
+    case 'fast_finish': return c.fastFinish
+    case 'radar': return c.radar
     case 'all': return 0 // depende do estado de desbloqueio, não dos contadores de eventos
   }
 }

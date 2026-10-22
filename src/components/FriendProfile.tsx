@@ -133,7 +133,7 @@ function MiniBars({
 
 /**
  * Perfil de um amigo (visitante): capa, patente da temporada, nível,
- * XP, conquistas (x/38), tarefas concluídas, sequência (streak),
+ * XP, conquistas (x/46), tarefas concluídas, sequência (streak),
  * conquistas da temporada e histórico de temporadas (T08+).
  */
 export default function FriendProfile({
@@ -145,7 +145,7 @@ export default function FriendProfile({
   season: SeasonInfo
   onClose: () => void
 }) {
-  const { users, roles } = useData()
+  const { users, roles, tasks } = useData()
   const { settings } = useGamification()
   const [progress, setProgress] = useState<UserProgress | null>(null)
   const [events, setEvents] = useState<XpEvent[] | null>(null)
@@ -169,8 +169,8 @@ export default function FriendProfile({
   )
   const level = useMemo(() => levelProgress(stats.xp), [stats.xp])
   const counters = useMemo(
-    () => computeCounters(events ?? [], userId),
-    [events, userId]
+    () => computeCounters(events ?? [], userId, tasks, season),
+    [events, userId, tasks, season]
   )
   const history = useMemo(
     () =>

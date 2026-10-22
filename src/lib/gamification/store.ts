@@ -9,7 +9,7 @@ import {
   setDoc,
   writeBatch,
 } from 'firebase/firestore'
-import type { AchievementUnlock, ContentCategory, UserProgress, XpEvent } from './types'
+import type { AchievementUnlock, ContentCategory, TaskForCounters, UserProgress, XpEvent } from './types'
 import { ACHIEVEMENTS_BY_ID } from './achievements'
 import {
   achievementProgress,
@@ -79,6 +79,7 @@ function toXpEvent(id: string, raw: Record<string, unknown>): XpEvent {
     dueDate: typeof raw.dueDate === 'string' ? raw.dueDate : null,
     dueResult: (raw.dueResult as XpEvent['dueResult']) ?? 'none',
     createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : '',
+    title: typeof raw.title === 'string' ? raw.title : '',
     assigneeId: typeof raw.assigneeId === 'string' ? raw.assigneeId : null,
     creatorId: typeof raw.creatorId === 'string' ? raw.creatorId : null,
     checklistTotal: typeof raw.checklistTotal === 'number' ? raw.checklistTotal : 0,
@@ -201,6 +202,7 @@ export interface ConclusionInput {
   priority: string
   dueDate: string | null
   createdAt: string
+  title: string
   assigneeId: string | null
   creatorId: string | null
   checklistTotal: number
@@ -212,8 +214,10 @@ export interface ConclusionInput {
  * Registra a conclusão de uma tarefa: XP + conquistas.
  * Dedup por doc id determinístico (taskId) em transação — XP conta 1x por tarefa.
  * Silencioso quando o evento já existir (reconclusão/edições).
+ * `tasks` é o quadro atual (comentários/exclusões/criações) para os
+ * contadores baseados em tarefas.
  */
-export async function recordConclusion(input: ConclusionInput): Promise<void> {
+export async function recordConclusion(input: ConclusionInput, tasks: TaskForCounters[]): Promise<void> {
   if (!isFirebaseConfigured() || !input.userId || !input.taskId) return
   waitForConfig()
 
@@ -240,6 +244,7 @@ export async function recordConclusion(input: ConclusionInput): Promise<void> {
     dueDate: input.dueDate,
     dueResult,
     createdAt: input.createdAt,
+    title: input.title,
     assigneeId: input.assigneeId,
     creatorId: input.creatorId,
     checklistTotal: input.checklistTotal,
@@ -248,7 +253,7 @@ export async function recordConclusion(input: ConclusionInput): Promise<void> {
   }
 
   // Progresso da TEMPORADA atual: contadores, conquistas e nível zeram todo mês.
-  const counters = computeCounters([...seasonEvents, event], input.userId)
+  const counters = computeCounters([...seasonEvents, event], input.userId, tasks, season)
   const unlocksSnap = await getDocs(await unlocksCol(input.userId))
   const currentUnlockIds = new Set<string>()
   unlocksSnap.docs.forEach((d) => {
@@ -334,12 +339,16 @@ export async function recordConclusion(input: ConclusionInput): Promise<void> {
  * desbloqueios cujo doc legado pertence a outra temporada.
  * Emite toast para cada conquista escrita. Idempotente (transação re-checa).
  */
-export async function reconcileSeasonUnlocks(uid: string, seasonEvents: XpEvent[]): Promise<void> {
+export async function reconcileSeasonUnlocks(
+  uid: string,
+  seasonEvents: XpEvent[],
+  tasks: TaskForCounters[]
+): Promise<void> {
   if (!isFirebaseConfigured() || !uid) return
   waitForConfig()
 
   const season = currentSeason()
-  const counters = computeCounters(seasonEvents, uid)
+  const counters = computeCounters(seasonEvents, uid, tasks, season)
 
   const unlocksSnap = await getDocs(await unlocksCol(uid))
   const freshIds = new Set<string>()
@@ -428,13 +437,17 @@ function toIsoVal(v: unknown): string | null {
 interface RawTask {
   id: string
   title: string
+  description: string
   status: string
   priority: string
   dueDate: string | null
   createdAt: string
+  deletedAt: string | null
+  deletedBy: string | null
   assigneeId: string | null
   creatorId: string | null
   checklist: { isCompleted?: boolean; completed?: boolean }[]
+  comments: { user: { id: string }; createdAt: unknown }[]
 }
 
 export async function runBackfillIfNeeded(): Promise<void> {
@@ -446,24 +459,32 @@ export async function runBackfillIfNeeded(): Promise<void> {
   if (meta.exists()) return
 
   const tasksSnap = await getDocs(collection(await db(), 'tasks'))
-  const doneTasks = tasksSnap.docs
+  const allRawTasks = tasksSnap.docs
     .map((d) => {
       const raw = d.data() as Partial<RawTask>
+      const rawComments = Array.isArray(raw.comments) ? (raw.comments as { user?: { id?: unknown }; createdAt?: unknown }[]) : []
       return {
         id: d.id,
         title: typeof raw.title === 'string' ? raw.title : '',
+        description: typeof raw.description === 'string' ? raw.description : '',
         status: typeof raw.status === 'string' ? raw.status : '',
         priority: typeof raw.priority === 'string' ? raw.priority : 'MEDIUM',
         dueDate: toIsoVal(raw.dueDate),
         createdAt: toIsoVal(raw.createdAt) ?? nowIso(),
+        deletedAt: toIsoVal(raw.deletedAt),
+        deletedBy: typeof raw.deletedBy === 'string' ? raw.deletedBy : null,
         assigneeId: typeof raw.assigneeId === 'string' ? raw.assigneeId : null,
         creatorId: typeof raw.creatorId === 'string' ? raw.creatorId : null,
         checklist: Array.isArray(raw.checklist)
           ? (raw.checklist as { isCompleted?: boolean; completed?: boolean }[])
           : [],
+        comments: rawComments.map((c) => ({
+          user: { id: c.user && typeof c.user.id === 'string' ? c.user.id : '' },
+          createdAt: c.createdAt ?? null,
+        })),
       } satisfies RawTask
     })
-    .filter((t) => t.status === 'DONE')
+  const doneTasks = allRawTasks.filter((t) => t.status === 'DONE')
 
   const byUser = new Map<string, RawTask[]>()
   for (const t of doneTasks) {
@@ -489,6 +510,7 @@ export async function runBackfillIfNeeded(): Promise<void> {
         dueDate: t.dueDate,
         dueResult: 'none',
         createdAt: t.createdAt,
+        title: t.title,
         assigneeId: t.assigneeId,
         creatorId: t.creatorId,
         checklistTotal: t.checklist.length,
@@ -499,7 +521,7 @@ export async function runBackfillIfNeeded(): Promise<void> {
     const allEvents = [...existing, ...newEvents]
     if (allEvents.length === 0) continue
 
-    const counters = computeCounters(allEvents, uid)
+    const counters = computeCounters(allEvents, uid, allRawTasks, currentSeason())
     const unlocksSnap = await getDocs(await unlocksCol(uid))
     const unlockedIdList = unlocksSnap.docs.map((d) => parseUnlockDocId(d.id).achievementId)
     const newlyUnlocked = evaluateAchievements(unlockedIdList, counters)

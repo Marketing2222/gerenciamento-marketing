@@ -13,7 +13,7 @@ const ach = (
 ): Achievement => ({ id, name, description, icon, rarity, category, secret, xpReward, requirement })
 
 /**
- * 38 conquistas para progressão MENSAL (reseta a cada temporada).
+ * 46 conquistas para progressão MENSAL (reseta a cada temporada).
  * Meta da temporada: 50 tarefas/mês. Recompensas: comum 25–50, rara 60–100,
  * épica 90–150, lendária 200–300, platina 400.
  *
@@ -31,7 +31,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     { type: 'total', value: 10 }),
   ach('tasks_25', 'Executor', 'Concluir 25 tarefas.', '🔧', 'rara', 'produtividade', 90,
     { type: 'total', value: 25 }),
-  ach('tasks_50', 'Veterano', 'Concluir 50 tarefas — a meta do mês.', '🎖️', 'epica', 'produtividade', 150,
+  ach('tasks_50', 'Veterano', 'Concluir 50 tarefas — a meta do mês.', '🎖️', 'lendaria', 'produtividade', 150,
     { type: 'total', value: 50 }),
 
   // ===== Velocidade =====
@@ -49,40 +49,40 @@ export const ACHIEVEMENTS: Achievement[] = [
     { type: 'per_day', value: 3 }),
   ach('day_5', 'Turbo', 'Concluir 5 tarefas em um único dia.', '🏎️', 'rara', 'velocidade', 70,
     { type: 'per_day', value: 5 }),
-  ach('day_10', 'Sem Freio', 'Concluir 10 tarefas em um único dia.', '🌪️', 'epica', 'velocidade', 130,
+  ach('day_10', 'Sem Freio', 'Concluir 7 tarefas em um único dia.', '🌪️', 'epica', 'velocidade', 130,
+    { type: 'per_day', value: 7 }),
+  ach('day_25', 'Avassalador', 'Concluir 10 tarefas em um único dia.', '☄️', 'lendaria', 'velocidade', 220,
     { type: 'per_day', value: 10 }),
-  ach('day_25', 'Avassalador', 'Concluir 15 tarefas em um único dia.', '☄️', 'lendaria', 'velocidade', 220,
-    { type: 'per_day', value: 15 }),
 
   // ===== Consistência =====
   ach('streak_3', 'Combo x3', 'Concluir tarefas em 3 dias. Perder 1 dia não quebra o combo.', '🔗', 'comum', 'consistencia', 35,
     { type: 'streak', value: 3 }),
-  ach('streak_7', 'Combo x7', 'Concluir tarefas em 7 dias. Perder 1 dia não quebra o combo.', '🔥', 'rara', 'consistencia', 70,
-    { type: 'streak', value: 7 }),
-  ach('streak_14', 'Combo x14', 'Concluir tarefas em 14 dias. Perder 1 dia não quebra o combo.', '💪', 'epica', 'consistencia', 130,
-    { type: 'streak', value: 14 }),
-  ach('streak_30', 'Combo x20', 'Concluir tarefas em 20 dias. Perder 1 dia não quebra o combo.', '🌟', 'lendaria', 'consistencia', 260,
-    { type: 'streak', value: 20 }),
+  ach('streak_7', 'Combo x7', 'Concluir tarefas em 7 dias úteis. Domingos e feriados não contam nem quebram o combo.', '🔥', 'rara', 'consistencia', 70,
+    { type: 'streak_work', value: 7 }),
+  ach('streak_14', 'Combo x14', 'Concluir tarefas em 14 dias úteis. Domingos e feriados não contam nem quebram o combo.', '💪', 'epica', 'consistencia', 130,
+    { type: 'streak_work', value: 14 }),
+  ach('streak_30', 'Combo x20', 'Concluir tarefas em 20 dias úteis. Domingos e feriados não contam nem quebram o combo.', '🌟', 'lendaria', 'consistencia', 260,
+    { type: 'streak_work', value: 20 }),
 
   // ===== Vídeos =====
   ach('video_1', 'Primeiro Take', 'Concluir sua primeira tarefa de vídeo.', '🎬', 'comum', 'videos', 30,
     { type: 'category', value: 1, contentCategory: 'video' }),
-  ach('video_5', 'Cineasta', 'Concluir 5 tarefas de vídeo.', '🎥', 'rara', 'videos', 70,
+  ach('video_5', 'Cineasta', 'Concluir 3 tarefas de vídeo.', '🎥', 'rara', 'videos', 70,
+    { type: 'category', value: 3, contentCategory: 'video' }),
+  ach('video_50', 'Blockbuster', 'Concluir 5 tarefas de vídeo.', '🍿', 'epica', 'videos', 120,
     { type: 'category', value: 5, contentCategory: 'video' }),
-  ach('video_50', 'Blockbuster', 'Concluir 10 tarefas de vídeo.', '🍿', 'epica', 'videos', 120,
-    { type: 'category', value: 10, contentCategory: 'video' }),
-  ach('video_150', 'Lenda do Cinema', 'Concluir 15 tarefas de vídeo.', '🌟', 'lendaria', 'videos', 250,
-    { type: 'category', value: 15, contentCategory: 'video' }),
+  ach('video_150', 'Lenda do Cinema', 'Concluir 7 tarefas de vídeo.', '🌟', 'lendaria', 'videos', 250,
+    { type: 'category', value: 7, contentCategory: 'video' }),
 
   // ===== Posts =====
   ach('post_1', 'Primeiro Post', 'Concluir sua primeira tarefa de post.', '✍️', 'comum', 'posts', 30,
     { type: 'category', value: 1, contentCategory: 'post' }),
   ach('post_25', 'Criador', 'Concluir 5 tarefas de post.', '🖌️', 'rara', 'posts', 70,
     { type: 'category', value: 5, contentCategory: 'post' }),
-  ach('post_100', 'Máquina de Conteúdo', 'Concluir 15 tarefas de post.', '🤖', 'epica', 'posts', 120,
+  ach('post_100', 'Máquina de Conteúdo', 'Concluir 10 tarefas de post.', '🤖', 'epica', 'posts', 120,
+    { type: 'category', value: 10, contentCategory: 'post' }),
+  ach('post_250', 'Editor-Chefe', 'Concluir 15 tarefas de post.', '📰', 'lendaria', 'posts', 250,
     { type: 'category', value: 15, contentCategory: 'post' }),
-  ach('post_250', 'Editor-Chefe', 'Concluir 20 tarefas de post.', '📰', 'lendaria', 'posts', 250,
-    { type: 'category', value: 20, contentCategory: 'post' }),
 
   // ===== Tráfego =====
   ach('traf_1', 'Primeira Campanha', 'Concluir sua primeira tarefa de tráfego pago.', '📈', 'comum', 'trafego', 30,
@@ -112,9 +112,27 @@ export const ACHIEVEMENTS: Achievement[] = [
   ach('streak_60', 'Combo Infinito', 'Concluir tarefas em 20 dias. Perder 1 dia não quebra o combo.', '💫', 'lendaria', 'secretas', 280,
     { type: 'streak', value: 20 }, true),
 
-  // ===== Platina: exige as outras 37 =====
-  ach('completionist', 'Complecionista', 'Desbloquear todas as outras 37 conquistas.', '🏆', 'lendaria', 'secretas', 400,
-    { type: 'all', value: 37 }, false),
+  // ===== Novas conquistas =====
+  ach('voz_ativa', 'Voz Ativa', 'Comentar em 5 tarefas criadas por outras pessoas.', '💬', 'comum', 'produtividade', 35,
+    { type: 'voz_ativa', value: 5 }),
+  ach('faisca', 'A Faísca', 'Criar 15 tarefas no mês.', '✨', 'comum', 'produtividade', 40,
+    { type: 'created_total', value: 15 }),
+  ach('pro_cesto', 'Pro Cesto', 'Excluir 1 tarefa.', '🗑️', 'comum', 'produtividade', 30,
+    { type: 'deleted_total', value: 1 }),
+  ach('radar_ligado', 'Radar Ligado', 'Concluir uma tarefa chamada "VERIFICAR INDICAÇÕES".', '🔍', 'comum', 'produtividade', 25,
+    { type: 'radar', value: 1 }),
+  ach('arquiteto', 'Arquiteto de Projetos', 'Criar 5 tarefas com descrição e checklist 100% concluído.', '🏗️', 'rara', 'produtividade', 75,
+    { type: 'arquiteto', value: 5 }),
+  ach('sprint_final', 'Sprint Final', 'Concluir 5 tarefas no último dia útil do mês.', '🏁', 'epica', 'velocidade', 110,
+    { type: 'sprint_final', value: 5 }),
+  ach('viajante', 'Viajante do Tempo', 'Concluir 5 tarefas depois do prazo.', '🕰️', 'epica', 'velocidade', 100,
+    { type: 'late_total', value: 5 }),
+  ach('resolve_toca', 'Resolve e Toca', 'Concluir 10 tarefas criadas por você em até 24 horas.', '🚀', 'lendaria', 'velocidade', 220,
+    { type: 'fast_finish', value: 10 }),
+
+  // ===== Platina: exige as outras 45 =====
+  ach('completionist', 'Complecionista', 'Desbloquear todas as outras 45 conquistas.', '🏆', 'lendaria', 'secretas', 400,
+    { type: 'all', value: 45 }, false),
 ]
 
 export const ACHIEVEMENTS_BY_ID: Record<string, Achievement> = Object.fromEntries(

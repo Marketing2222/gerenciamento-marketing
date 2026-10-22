@@ -63,6 +63,7 @@ function toTaskData(d: FireDoc): Task {
     dueDate: toIso(docData.dueDate),
     createdAt: toIso(docData.createdAt) || '',
     deletedAt: toIso(docData.deletedAt),
+    deletedBy: docData.deletedBy ? toStr(docData.deletedBy) : null,
     assigneeId: docData.assigneeId ? toStr(docData.assigneeId) : null,
     creatorId: docData.creatorId ? toStr(docData.creatorId) : null,
     assignee: toObj<User>(docData.assignee),
@@ -251,12 +252,12 @@ export async function updateTaskOrders(updates: { id: string; order: number }[])
   await Promise.all(promises)
 }
 
-export async function softDeleteTask(taskId: string): Promise<void> {
-  await updateDoc(await taskDoc(taskId), { deletedAt: new Date() })
+export async function softDeleteTask(taskId: string, deletedBy: string | null = null): Promise<void> {
+  await updateDoc(await taskDoc(taskId), { deletedAt: new Date(), deletedBy })
 }
 
 export async function restoreTask(taskId: string): Promise<void> {
-  await updateDoc(await taskDoc(taskId), { deletedAt: null })
+  await updateDoc(await taskDoc(taskId), { deletedAt: null, deletedBy: null })
 }
 
 export async function permanentDeleteTask(taskId: string): Promise<void> {
