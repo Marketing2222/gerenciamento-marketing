@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { ACHIEVEMENTS_BY_ID } from '@/lib/gamification/achievements'
 import { iconForLevel, titleForLevel } from '@/lib/gamification/levels'
-import { iconKeys } from '@/lib/gamification/settings'
+import { achievementName, iconKeys } from '@/lib/gamification/settings'
 import type { SeasonSummary } from '@/lib/gamification/seasons'
 
 function fmt(ms: number): string {
@@ -14,10 +14,12 @@ function fmt(ms: number): string {
 export default function SeasonPopup({
   summaries,
   icons,
+  names,
   onClose,
 }: {
   summaries: SeasonSummary[]
   icons: Record<string, string>
+  names?: Record<string, string>
   onClose: () => void
 }) {
   const last = summaries[summaries.length - 1]
@@ -109,7 +111,7 @@ export default function SeasonPopup({
                     return (
                       <div key={u.achievementId} className="flex items-center gap-1.5 text-[11px]">
                         <span>{icons[`ach_${a.id}`] ? <img src={icons[`ach_${a.id}`]} alt="" className="w-4 h-4 object-cover rounded" /> : a.icon}</span>
-                        <span className="text-slate-600 dark:text-slate-300 truncate">{a.name}</span>
+                        <span className="text-slate-600 dark:text-slate-300 truncate">{achievementName(a, names)}</span>
                         <span className="ml-auto font-bold text-emerald-500 shrink-0">+{a.xpReward}</span>
                       </div>
                     )

@@ -7,6 +7,8 @@ export interface GamificationSettings {
   gradientTo: string
   /** Chave de ícone → data URL (base64). Chaves: ach_*, rarity_*, rank_*, xp */
   icons: Record<string, string>
+  /** Nome customizado de conquista (achievementId → nome). Vazio = padrão. */
+  names: Record<string, string>
   /** Camada de transparência sobre a capa do perfil (conquistas). */
   transparencyEnabled: boolean
   /** Cor da transparência (ex.: #ffffff). */
@@ -48,21 +50,28 @@ async function iconRef(key: string) {
 
 function localGradient(): GamificationSettings {
   if (typeof window === 'undefined') {
-    return { gradientFrom: DEFAULT_GRADIENT.from, gradientTo: DEFAULT_GRADIENT.to, icons: {}, ...DEFAULT_PAGE_THEME }
+    return { gradientFrom: DEFAULT_GRADIENT.from, gradientTo: DEFAULT_GRADIENT.to, icons: {}, names: {}, ...DEFAULT_PAGE_THEME }
   }
   try {
     return {
       gradientFrom: localStorage.getItem('mkt-g-from') || DEFAULT_GRADIENT.from,
       gradientTo: localStorage.getItem('mkt-g-to') || DEFAULT_GRADIENT.to,
       icons: JSON.parse(localStorage.getItem('mkt-g-icons') || '{}'),
+      names: JSON.parse(localStorage.getItem('mkt-g-names') || '{}'),
       transparencyEnabled: localStorage.getItem('mkt-g-transp-on') !== '0',
       transparencyColor: localStorage.getItem('mkt-g-transp-color') || DEFAULT_PAGE_THEME.transparencyColor,
       pageBg: localStorage.getItem('mkt-g-page-bg') || '',
       pageText: localStorage.getItem('mkt-g-page-text') || '',
     }
   } catch {
-    return { gradientFrom: DEFAULT_GRADIENT.from, gradientTo: DEFAULT_GRADIENT.to, icons: {}, ...DEFAULT_PAGE_THEME }
+    return { gradientFrom: DEFAULT_GRADIENT.from, gradientTo: DEFAULT_GRADIENT.to, icons: {}, names: {}, ...DEFAULT_PAGE_THEME }
   }
+}
+
+/** Nome exibido da conquista (customizado nas configurações, senão o padrão). */
+export function achievementName(a: { id: string; name: string }, names?: Record<string, string>): string {
+  const custom = names?.[a.id]?.trim()
+  return custom || a.name
 }
 
 /**
@@ -79,9 +88,10 @@ export function subscribeSettings(callback: (s: GamificationSettings) => void): 
   let unsubIcons: (() => void) | null = null
   let gradient = { ...DEFAULT_GRADIENT }
   let icons: Record<string, string> = {}
+  let names: Record<string, string> = {}
   let pageTheme = { ...DEFAULT_PAGE_THEME }
 
-  const emit = () => callback({ gradientFrom: gradient.from, gradientTo: gradient.to, icons, ...pageTheme })
+  const emit = () => callback({ gradientFrom: gradient.from, gradientTo: gradient.to, icons, names, ...pageTheme })
 
   void (async () => {
     waitForConfig()
@@ -96,6 +106,12 @@ export function subscribeSettings(callback: (s: GamificationSettings) => void): 
         transparencyColor: typeof d?.transparencyColor === 'string' ? d.transparencyColor : DEFAULT_PAGE_THEME.transparencyColor,
         pageBg: typeof d?.pageBg === 'string' ? d.pageBg : '',
         pageText: typeof d?.pageText === 'string' ? d.pageText : '',
+      }
+      names = {}
+      if (d?.customNames && typeof d.customNames === 'object') {
+        for (const [id, n] of Object.entries(d.customNames as Record<string, unknown>)) {
+          if (typeof n === 'string' && n.trim()) names[id] = n
+        }
       }
       emit()
     })
@@ -172,4 +188,22 @@ export async function clearIcon(key: string): Promise<void> {
   if (!isFirebaseConfigured()) return
   waitForConfig()
   await deleteDoc(await iconRef(key))
+}
+
+/** Salva nome customizado de conquista ('' volta ao nome padrão). */
+export async function saveAchievementName(id: string, name: string): Promise<void> {
+  const clean = name.trim()
+  if (typeof window !== 'undefined') {
+    try {
+      const names = JSON.parse(localStorage.getItem('mkt-g-names') || '{}')
+      if (clean) names[id] = clean
+      else delete names[id]
+      localStorage.setItem('mkt-g-names', JSON.stringify(names))
+    } catch {
+      /* ignore */
+    }
+  }
+  if (!isFirebaseConfigured()) return
+  waitForConfig()
+  await setDoc(await settingsRef(), { customNames: { [id]: clean } }, { merge: true })
 }

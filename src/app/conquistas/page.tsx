@@ -5,7 +5,7 @@ import { useGamification } from '@/context/GamificationContext'
 import { useTheme } from '@/context/ThemeContext'
 import { ACHIEVEMENTS } from '@/lib/gamification/achievements'
 import { achievementProgress } from '@/lib/gamification/engine'
-import { iconKeys } from '@/lib/gamification/settings'
+import { achievementName, iconKeys } from '@/lib/gamification/settings'
 import type { AchCategory, Rarity } from '@/lib/gamification/types'
 import { uploadWallpaper } from '@/lib/storage'
 import RankGallery from '@/components/gamification/RankGallery'
@@ -499,6 +499,7 @@ export default function ConquistasPage() {
                   <SeasonPopup
                     summaries={seasonSummaries}
                     icons={settings.icons}
+                    names={settings.names}
                     onClose={() => setSeasonOpen(false)}
                   />
                 )}
@@ -708,7 +709,7 @@ export default function ConquistasPage() {
                     }`}
                   >
                     {customIcon ? (
-                      <img src={customIcon} alt={a.name} className="w-full h-full object-cover" />
+                      <img src={customIcon} alt={achievementName(a, settings.names)} className="w-full h-full object-cover" />
                     ) : (
                       a.icon
                     )}
@@ -716,10 +717,10 @@ export default function ConquistasPage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
                       <h3
-                        title={a.name}
+                        title={achievementName(a, settings.names)}
                         className="min-w-0 text-sm font-bold uppercase tracking-wide text-[color:var(--gm-fg)] leading-tight truncate"
                       >
-                        {a.name}
+                        {achievementName(a, settings.names)}
                       </h3>
                       {customRarity ? (
                         <img src={customRarity} alt={rarity.label} className="shrink-0 w-9 h-9 rounded-full object-cover border border-black/10 dark:border-white/10" />

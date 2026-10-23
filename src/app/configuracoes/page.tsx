@@ -10,7 +10,7 @@ import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea
 import Avatar from '@/components/Avatar'
 import { useGamification } from '@/context/GamificationContext'
 import { ACHIEVEMENTS } from '@/lib/gamification/achievements'
-import { iconKeys, RANK_LEVELS } from '@/lib/gamification/settings'
+import { achievementName, iconKeys, RANK_LEVELS } from '@/lib/gamification/settings'
 import { iconForLevel, titleForLevel } from '@/lib/gamification/levels'
 import type { Rarity } from '@/lib/gamification/types'
 import { uploadFile } from '@/lib/storage'
@@ -21,6 +21,13 @@ const RARITY_LABELS: { id: Rarity; label: string; pill: string }[] = [
   { id: 'epica', label: 'Épica', pill: 'bg-purple-500/15 text-purple-600 dark:text-purple-300 border-purple-500/30' },
   { id: 'lendaria', label: 'Lendária', pill: 'bg-amber-500/15 text-amber-600 dark:text-amber-300 border-amber-500/40' },
 ]
+
+const RARITY_NAME: Record<Rarity, { label: string; cls: string }> = {
+  comum: { label: 'Comum', cls: 'text-slate-500 dark:text-slate-400 border-slate-300 dark:border-slate-600' },
+  rara: { label: 'Rara', cls: 'text-blue-600 dark:text-blue-300 border-blue-300 dark:border-blue-700' },
+  epica: { label: 'Épica', cls: 'text-purple-600 dark:text-purple-300 border-purple-300 dark:border-purple-700' },
+  lendaria: { label: 'Lendária', cls: 'text-amber-600 dark:text-amber-300 border-amber-300 dark:border-amber-700' },
+}
 
 const SUMMARY_OPTIONS: { key: keyof CardSummaryConfig; label: string }[] = [
   { key: 'showPriority', label: 'Prioridade' },
@@ -48,6 +55,9 @@ function GamIconCell({
   busy,
   onUpload,
   onRemove,
+  badge,
+  defaultName,
+  onSaveName,
 }: {
   cellKey: string
   label: string
@@ -56,13 +66,76 @@ function GamIconCell({
   busy?: boolean
   onUpload: (key: string, e: React.ChangeEvent<HTMLInputElement>) => void
   onRemove: (key: string) => void
+  /** Etiqueta acima do nome (ex.: raridade da conquista). */
+  badge?: React.ReactNode
+  /** Nome padrão — presente habilita a edição do nome. */
+  defaultName?: string
+  onSaveName?: (name: string) => void
 }) {
+  const [editingName, setEditingName] = useState(false)
+  const [nameDraft, setNameDraft] = useState('')
+  const nameInputRef = useRef<HTMLInputElement>(null)
+  const isCustom = Boolean(defaultName && label !== defaultName)
+
+  useEffect(() => {
+    if (editingName) nameInputRef.current?.focus()
+  }, [editingName])
+
+  const commitName = () => {
+    setEditingName(false)
+    if (!onSaveName) return
+    const next = nameDraft.trim()
+    if (next !== label.trim()) onSaveName(next)
+  }
+
   return (
     <div className="flex flex-col items-center gap-1.5 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 text-center">
       <div className="w-12 h-12 rounded-lg overflow-hidden flex items-center justify-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-2xl shrink-0">
         {url ? <img src={url} alt="" className="w-full h-full object-cover" /> : fallback}
       </div>
-      <p className="text-[10px] font-bold text-slate-600 dark:text-slate-300 leading-tight w-full truncate" title={label}>{label}</p>
+      {badge && <span className="mt-0.5">{badge}</span>}
+      {editingName ? (
+        <input
+          ref={nameInputRef}
+          value={nameDraft}
+          onChange={(e) => setNameDraft(e.target.value)}
+          onBlur={commitName}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commitName()
+            if (e.key === 'Escape') setEditingName(false)
+          }}
+          placeholder={defaultName}
+          title="Enter salva · Esc cancela · vazio volta ao padrão"
+          className="w-full px-1 py-0.5 text-[10px] font-bold text-center bg-white dark:bg-slate-800 border border-blue-400 dark:border-blue-600 rounded outline-none text-slate-700 dark:text-slate-200"
+        />
+      ) : (
+        <div className="flex items-center justify-center gap-1 w-full">
+          <p className="text-[10px] font-bold text-slate-600 dark:text-slate-300 leading-tight truncate" title={label}>{label}</p>
+          {onSaveName && (
+            <button
+              type="button"
+              onClick={() => {
+                setNameDraft(label)
+                setEditingName(true)
+              }}
+              title={isCustom ? 'Editar nome (personalizado)' : 'Editar nome'}
+              className={`shrink-0 transition cursor-pointer ${isCustom ? 'text-blue-500' : 'text-slate-400 hover:text-blue-500'}`}
+            >
+              <Pencil className="w-2.5 h-2.5" />
+            </button>
+          )}
+        </div>
+      )}
+      {onSaveName && isCustom && !editingName && (
+        <button
+          type="button"
+          onClick={() => onSaveName('')}
+          title={`Restaurar nome padrão: "${defaultName}"`}
+          className="text-[9px] text-slate-400 hover:text-amber-500 transition cursor-pointer"
+        >
+          ↺ padrão
+        </button>
+      )}
       <div className="flex gap-1">
         <label className="p-1.5 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 transition cursor-pointer" title="Enviar imagem">
           {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
@@ -89,7 +162,7 @@ export default function SettingsPage() {
   const { siteName, logoUrl, applyBrand } = useBrand()
   const { saveProfile, uploadAvatar, uploadLogo, users, addUser, removeUser, tasks, updateTask, roles, addRole, updateRole, removeRole } = useData()
   const { columns, summary, updateColumn, updateSummary, addColumn, removeColumn, reorderColumns } = useColumns()
-  const { settings, saveIcon, clearIcon, saveGradient, savePageTheme } = useGamification()
+  const { settings, saveIcon, clearIcon, saveAchievementName, saveGradient, savePageTheme } = useGamification()
   
   const [name, setName] = useState('')
   const [role, setRole] = useState('DESIGNER')
@@ -681,15 +754,23 @@ export default function SettingsPage() {
 
         {/* Conquistas */}
         <div className="space-y-2 border-t border-slate-100 dark:border-slate-800 pt-4">
-          <p className="text-xs font-bold text-slate-600 dark:text-slate-300">Ícones das Conquistas <span className="font-medium text-slate-400">({ACHIEVEMENTS.length} — sem imagem usa o emoji padrão)</span></p>
+          <p className="text-xs font-bold text-slate-600 dark:text-slate-300">Ícones das Conquistas <span className="font-medium text-slate-400">({ACHIEVEMENTS.length} — sem imagem usa o emoji padrão · caneta edita o nome)</span></p>
           <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-8 gap-2">
             {ACHIEVEMENTS.map((a) => {
               const key = iconKeys.achievement(a.id)
+              const rn = RARITY_NAME[a.rarity]
               return (
                 <GamIconCell
                   key={key}
                   cellKey={key}
-                  label={a.name}
+                  label={achievementName(a, settings.names)}
+                  defaultName={a.name}
+                  onSaveName={(name) => {
+                    void saveAchievementName(a.id, name).catch((err) =>
+                      setError(`Erro ao renomear: ${err instanceof Error ? err.message : String(err)}`)
+                    )
+                  }}
+                  badge={<span className={`px-1.5 py-px rounded border text-[8px] font-extrabold uppercase tracking-wider ${rn.cls}`}>{rn.label}</span>}
                   fallback={<span>{a.icon}</span>}
                   url={settings.icons[key]}
                   busy={uploadingIconKey === key}

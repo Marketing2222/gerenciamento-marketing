@@ -18,6 +18,7 @@ import {
   DEFAULT_GRADIENT,
   DEFAULT_PAGE_THEME,
   clearIcon as clearSettingsIcon,
+  saveAchievementName as saveSettingsAchievementName,
   saveGradient,
   saveIcon as saveSettingsIcon,
   savePageTheme,
@@ -66,6 +67,7 @@ interface GamificationContextType {
   settings: GamificationSettings
   saveIcon: (key: string, url: string) => Promise<void>
   clearIcon: (key: string) => Promise<void>
+  saveAchievementName: (id: string, name: string) => Promise<void>
   saveGradient: (from: string, to: string) => Promise<void>
   savePageTheme: (patch: import('@/lib/gamification/settings').PageThemePatch) => Promise<void>
   saveCover: (url: string | null) => Promise<void>
@@ -87,6 +89,7 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
     gradientFrom: DEFAULT_GRADIENT.from,
     gradientTo: DEFAULT_GRADIENT.to,
     icons: {},
+    names: {},
     ...DEFAULT_PAGE_THEME,
   })
   const [loading, setLoading] = useState(true)
@@ -160,6 +163,10 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
 
   const doClearIcon = useCallback(async (key: string) => {
     await clearSettingsIcon(key)
+  }, [])
+
+  const doSaveAchievementName = useCallback(async (id: string, name: string) => {
+    await saveSettingsAchievementName(id, name)
   }, [])
 
   const doSaveGradient = useCallback(async (from: string, to: string) => {
@@ -248,6 +255,7 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
     settings,
     saveIcon: doSaveIcon,
     clearIcon: doClearIcon,
+    saveAchievementName: doSaveAchievementName,
     saveGradient: doSaveGradient,
     savePageTheme: doSavePageTheme,
     saveCover: doSaveCover,
@@ -263,6 +271,7 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
         onDismiss={dismissToast}
         gradient={{ from: settings.gradientFrom, to: settings.gradientTo }}
         icons={settings.icons}
+        names={settings.names}
       />
     </GamificationContext.Provider>
   )

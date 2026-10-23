@@ -23,7 +23,7 @@ import {
   MONTHS_PT,
   computeSeasonStats,
 } from '@/lib/gamification/stats'
-import { iconKeys } from '@/lib/gamification/settings'
+import { achievementName, iconKeys } from '@/lib/gamification/settings'
 import type {
   AchievementUnlock,
   ContentCategory,
@@ -379,13 +379,13 @@ export default function FriendProfile({
                         {custom ? (
                           <img
                             src={custom}
-                            alt={a.name}
+                            alt={achievementName(a, settings.names)}
                             className="w-4 h-4 rounded-full object-cover"
                           />
                         ) : (
                           <span className="text-xs">{a.icon}</span>
                         )}
-                        {a.name}
+                        {achievementName(a, settings.names)}
                       </span>
                     )
                   })}
@@ -410,11 +410,11 @@ export default function FriendProfile({
                   return (
                     <span
                       key={a.id}
-                      title={`${a.name} — ${a.description}${date ? ` · conquistada em ${date}` : ''}`}
+                      title={`${achievementName(a, settings.names)} — ${a.description}${date ? ` · conquistada em ${date}` : ''}`}
                       className="relative w-14 h-14 rounded-full bg-gradient-to-br from-amber-300 via-amber-500 to-orange-600 shadow-lg shadow-amber-500/30 ring-4 ring-amber-400/25 flex items-center justify-center text-2xl"
                     >
                       {custom ? (
-                        <img src={custom} alt={a.name} className="w-8 h-8 rounded-full object-cover" />
+                        <img src={custom} alt={achievementName(a, settings.names)} className="w-8 h-8 rounded-full object-cover" />
                       ) : (
                         a.icon
                       )}
@@ -444,14 +444,14 @@ export default function FriendProfile({
                         className={`w-9 h-9 shrink-0 rounded-xl flex items-center justify-center text-base overflow-hidden ${RARITY_META[a.rarity]}`}
                       >
                         {custom ? (
-                          <img src={custom} alt={a.name} className="w-full h-full object-cover" />
+                          <img src={custom} alt={achievementName(a, settings.names)} className="w-full h-full object-cover" />
                         ) : (
                           a.icon
                         )}
                       </span>
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-extrabold text-slate-800 dark:text-slate-100 truncate">
-                          {a.name}
+                          {achievementName(a, settings.names)}
                         </p>
                         <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
                           {date ? `Conquistada em ${date}` : 'Conquistada'}

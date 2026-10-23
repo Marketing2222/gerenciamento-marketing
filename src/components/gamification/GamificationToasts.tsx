@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import type { ToastItem } from '@/context/GamificationContext'
 import type { XpLine } from '@/lib/gamification/types'
-import { iconKeys } from '@/lib/gamification/settings'
+import { achievementName, iconKeys } from '@/lib/gamification/settings'
 
 const RARITY_STYLE: Record<string, { border: string; glow: string }> = {
   comum: { border: 'border-slate-500/60', glow: 'shadow-slate-500/20' },
@@ -90,11 +90,13 @@ export default function GamificationToasts({
   onDismiss,
   gradient,
   icons,
+  names,
 }: {
   toasts: ToastItem[]
   onDismiss: (id: number) => void
   gradient: { from: string; to: string }
   icons: Record<string, string>
+  names?: Record<string, string>
 }) {
   if (toasts.length === 0) return null
 
@@ -150,6 +152,7 @@ export default function GamificationToasts({
         }
         const r = RARITY_STYLE[msg.achievement.rarity] ?? RARITY_STYLE.comum
         const customIcon = icons[iconKeys.achievement(msg.achievement.id)]
+        const achTitle = achievementName(msg.achievement, names)
         return (
           <button
             key={id}
@@ -160,7 +163,7 @@ export default function GamificationToasts({
               {customIcon ? (
                 <img
                   src={customIcon}
-                  alt={msg.achievement.name}
+                  alt={achTitle}
                   className="w-10 h-10 rounded-xl object-cover shrink-0 mt-0.5 shadow-md"
                 />
               ) : (
@@ -172,7 +175,7 @@ export default function GamificationToasts({
                 <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400">
                   🏆 Conquista desbloqueada
                 </p>
-                <p className="text-sm font-bold leading-tight mt-0.5">{msg.achievement.name}</p>
+                <p className="text-sm font-bold leading-tight mt-0.5">{achTitle}</p>
                 <p className="text-[11px] text-slate-400 leading-snug line-clamp-2">{msg.achievement.description}</p>
                 <p className="text-[11px] font-bold text-emerald-400 mt-1">+{msg.achievement.xpReward} XP</p>
               </div>
