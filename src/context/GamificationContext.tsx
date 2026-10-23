@@ -225,6 +225,19 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
     )
   }, [userId, tasksLoaded, eventsForUser, seasonEvents, tasks])
 
+  // Conquistas baseadas em TAREFAS (excluir, comentar, criar, checklist)
+  // mudam sem nenhuma conclusão — sem este gatilho, elas só desbloqueariam
+  // na próxima conclusão ou no reload. Debounce evita custo a cada snap.
+  useEffect(() => {
+    if (!userId || !tasksLoaded || eventsForUser !== userId) return
+    const timer = window.setTimeout(() => {
+      void reconcileSeasonUnlocks(userId, seasonEvents, tasks).catch((err) =>
+        console.error('[gamification] reconcile (tasks)', err)
+      )
+    }, 1500)
+    return () => window.clearTimeout(timer)
+  }, [userId, tasksLoaded, eventsForUser, seasonEvents, tasks])
+
   const seasonXp = React.useMemo(() => {
     const eventsXp = seasonEvents.reduce((sum, e) => sum + e.xp, 0)
     const rewardsXp = Object.keys(unlocks).reduce(
