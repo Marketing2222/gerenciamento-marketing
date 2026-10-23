@@ -619,6 +619,22 @@ export default function SettingsPage() {
           </div>
         </div>
 
+        {/* Ícone do XP */}
+        <div className="space-y-2 border-t border-slate-100 dark:border-slate-800 pt-4">
+          <p className="text-xs font-bold text-slate-600 dark:text-slate-300">Imagem do XP <span className="font-medium text-slate-400">(notificação de XP ganho — sem imagem usa o ⚡)</span></p>
+          <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-8 gap-2">
+            <GamIconCell
+              cellKey={iconKeys.xp}
+              label="XP ganho"
+              fallback={<span>⚡</span>}
+              url={settings.icons[iconKeys.xp]}
+              busy={uploadingIconKey === iconKeys.xp}
+              onUpload={handleGamIconUpload}
+              onRemove={handleGamIconRemove}
+            />
+          </div>
+        </div>
+
         {/* Patentes */}
         <div className="space-y-2 border-t border-slate-100 dark:border-slate-800 pt-4">
           <p className="text-xs font-bold text-slate-600 dark:text-slate-300">Ícones das Patentes <span className="font-medium text-slate-400">(níveis 1–15)</span></p>

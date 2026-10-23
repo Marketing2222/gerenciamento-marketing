@@ -47,9 +47,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-slate-900 text-slate-100">
-        <Loader2 className="w-10 h-10 text-blue-500 animate-spin mb-4" />
-        <p className="text-slate-400 text-sm font-medium">Carregando MktFlow...</p>
+      <div className="min-h-screen w-full flex items-center justify-center bg-slate-900">
+        <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
       </div>
     )
   }

@@ -13,13 +13,14 @@ const ach = (
 ): Achievement => ({ id, name, description, icon, rarity, category, secret, xpReward, requirement })
 
 /**
- * 46 conquistas para progressão MENSAL (reseta a cada temporada).
+ * 49 conquistas para progressão MENSAL (reseta a cada temporada).
  * Meta da temporada: 50 tarefas/mês. Recompensas: comum 25–50, rara 60–100,
  * épica 90–150, lendária 200–300, platina 400.
  *
  * ATENÇÃO: os ids são históricos (uploads de ícone usam `ach_{id}`) e podem
- * não bater com o valor atual — ex.: `post_25` é o Criador com value 5 e
- * `streak_30` é o Combo x20. Nunca renomear ids existentes.
+ * não bater com o valor atual — ex.: `post_25` é o Criador com value 5,
+ * `streak_14` é o Combo x10 e `streak_30` é o Combo x15. Nunca renomear
+ * ids existentes.
  */
 export const ACHIEVEMENTS: Achievement[] = [
   // ===== Produtividade =====
@@ -59,10 +60,10 @@ export const ACHIEVEMENTS: Achievement[] = [
     { type: 'streak', value: 3 }),
   ach('streak_7', 'Combo x7', 'Concluir tarefas em 7 dias úteis. Domingos e feriados não contam nem quebram o combo.', '🔥', 'rara', 'consistencia', 70,
     { type: 'streak_work', value: 7 }),
-  ach('streak_14', 'Combo x14', 'Concluir tarefas em 14 dias úteis. Domingos e feriados não contam nem quebram o combo.', '💪', 'epica', 'consistencia', 130,
-    { type: 'streak_work', value: 14 }),
-  ach('streak_30', 'Combo x20', 'Concluir tarefas em 20 dias úteis. Domingos e feriados não contam nem quebram o combo.', '🌟', 'lendaria', 'consistencia', 260,
-    { type: 'streak_work', value: 20 }),
+  ach('streak_14', 'Combo x10', 'Concluir tarefas em 10 dias úteis. Domingos e feriados não contam nem quebram o combo.', '💪', 'epica', 'consistencia', 130,
+    { type: 'streak_work', value: 10 }),
+  ach('streak_30', 'Combo x15', 'Concluir tarefas em 15 dias úteis. Domingos e feriados não contam nem quebram o combo.', '🌟', 'lendaria', 'consistencia', 260,
+    { type: 'streak_work', value: 15 }),
 
   // ===== Vídeos =====
   ach('video_1', 'Primeiro Take', 'Concluir sua primeira tarefa de vídeo.', '🎬', 'comum', 'videos', 30,
@@ -109,8 +110,6 @@ export const ACHIEVEMENTS: Achievement[] = [
     { type: 'same_day_create', value: 1 }, true),
   ach('perfect_checklist', 'Perfeccionista', 'Concluir uma tarefa com o checklist 100% completo.', '✅', 'rara', 'secretas', 70,
     { type: 'perfect_checklist', value: 1 }, true),
-  ach('streak_60', 'Combo Infinito', 'Concluir tarefas em 20 dias. Perder 1 dia não quebra o combo.', '💫', 'lendaria', 'secretas', 280,
-    { type: 'streak', value: 20 }, true),
 
   // ===== Novas conquistas =====
   ach('voz_ativa', 'Voz Ativa', 'Comentar em 5 tarefas criadas por outras pessoas.', '💬', 'comum', 'produtividade', 35,
@@ -130,10 +129,38 @@ export const ACHIEVEMENTS: Achievement[] = [
   ach('resolve_toca', 'Resolve e Toca', 'Concluir 10 tarefas criadas por você em até 24 horas.', '🚀', 'lendaria', 'velocidade', 220,
     { type: 'fast_finish', value: 10 }),
 
-  // ===== Platina: exige as outras 45 =====
-  ach('completionist', 'Complecionista', 'Desbloquear todas as outras 45 conquistas.', '🏆', 'lendaria', 'secretas', 400,
-    { type: 'all', value: 45 }, false),
+  // ===== Coleções de raridade (todas lendárias) =====
+  ach('comunista', '"COMUNISTA"', 'Adquira todos os troféus de raridade COMUM.', '☭', 'lendaria', 'secretas', 280,
+    { type: 'rarity_all', value: 0, rarity: 'comum' }),
+  ach('raros_mesmo', 'TU É RARO MESMO', 'Adquira todos os troféus de raridade RARO.', '💎', 'lendaria', 'secretas', 280,
+    { type: 'rarity_all', value: 0, rarity: 'rara' }),
+  ach('epic_games', 'ÉPIC GAMES', 'Adquira todos os troféus de raridade ÉPICO.', '🎮', 'lendaria', 'secretas', 280,
+    { type: 'rarity_all', value: 0, rarity: 'epica' }),
+  ach('eu_sou_a_lenda', 'EU SOU A LENDA', 'Adquira todos os troféus de raridade LENDÁRIO.', '🦁', 'lendaria', 'secretas', 280,
+    { type: 'rarity_all', value: 0, rarity: 'lendaria' }),
+
+  // ===== Platina: exige as outras 48 =====
+  ach('completionist', 'Complecionista', 'Desbloquear todas as outras 48 conquistas.', '🏆', 'lendaria', 'secretas', 400,
+    { type: 'all', value: 48 }, false),
 ]
+
+/**
+ * Conquistas que contam pra uma coleção de raridade ('rarity_all').
+ * Exclui a própria coleção (senão seria impossível completar) e o
+ * Complecionista — senão ele e "EU SOU A LENDA" ficariam num beco sem
+ * saída, cada um esperando o desbloqueio do outro.
+ */
+export function rarityCollectionTargets(a: Achievement): Achievement[] {
+  const rarity = a.requirement.rarity ?? a.rarity
+  return ACHIEVEMENTS.filter((t) => t.rarity === rarity && t.id !== a.id && t.id !== 'completionist')
+}
+
+// Preenche o `value` das coleções com a contagem real (para a barra de progresso).
+for (const a of ACHIEVEMENTS) {
+  if (a.requirement.type === 'rarity_all') {
+    a.requirement.value = rarityCollectionTargets(a).length
+  }
+}
 
 export const ACHIEVEMENTS_BY_ID: Record<string, Achievement> = Object.fromEntries(
   ACHIEVEMENTS.map((a) => [a.id, a])

@@ -5,7 +5,7 @@ import type { Rarity } from './types'
 export interface GamificationSettings {
   gradientFrom: string
   gradientTo: string
-  /** Chave de ícone → data URL (base64). Chaves: ach_*, rarity_*, rank_* */
+  /** Chave de ícone → data URL (base64). Chaves: ach_*, rarity_*, rank_*, xp */
   icons: Record<string, string>
   /** Camada de transparência sobre a capa do perfil (conquistas). */
   transparencyEnabled: boolean
@@ -33,6 +33,7 @@ export const iconKeys = {
   achievement: (id: string) => `ach_${id}`,
   rarity: (r: Rarity) => `rarity_${r}`,
   rank: (level: number) => `rank_${level}`,
+  xp: 'xp_icon',
 }
 
 async function settingsRef() {

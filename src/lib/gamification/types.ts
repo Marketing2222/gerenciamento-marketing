@@ -35,6 +35,7 @@ export type RequirementType =
   | 'created_total'
   | 'fast_finish'
   | 'radar'
+  | 'rarity_all'
   | 'all'
 
 export interface Achievement {
@@ -50,6 +51,8 @@ export interface Achievement {
     type: RequirementType
     value: number
     contentCategory?: ContentCategory
+    /** Raridade alvo para 'rarity_all' (coleção de troféus). */
+    rarity?: Rarity
   }
 }
 
@@ -59,8 +62,10 @@ export interface Counters {
   urgentEarly: number
   urgentTotal: number
   perDayMax: number
+  /** Conclusões de HOJE (janela do dia corrente — zera à meia-noite). */
+  perDayToday: number
   streak: number
-  /** Streak de DIAS ÚTEIS (domingos/feriados não contam nem quebram) — Combo x7/x14/x20. */
+  /** Streak de DIAS ÚTEIS (domingos/feriados não contam nem quebram) — Combo x7/x10/x15. */
   streakWork: number
   category: Record<ContentCategory, number>
   noDeadline: number

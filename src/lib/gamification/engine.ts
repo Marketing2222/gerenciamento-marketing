@@ -3,7 +3,7 @@ import type { SeasonInfo } from './seasons'
 import { inSeasonMs } from './seasons'
 import { isNonWorkDay, isSprintDate } from './holidays'
 import { parseDateOnly } from '@/lib/dates'
-import { ACHIEVEMENTS } from './achievements'
+import { ACHIEVEMENTS, rarityCollectionTargets } from './achievements'
 
 const VIDEO_KEYS = ['vídeo', 'video', 'reels', 'reel', 'youtube', 'tiktok', 'short', 'gravação', 'gravacao', 'roteiro de vídeo', 'roteiro de video', 'edicao', 'edição']
 const POST_KEYS = ['post', 'legenda', 'carrossel', 'copy', 'blog', 'artigo', 'conteúdo', 'conteudo', 'instagram post', 'publicação', 'publicacao']
@@ -42,7 +42,7 @@ function dayKey(iso: string): string {
  * conclusão em hoje, ontem ou 2 dias atrás (hoje ainda pendente não
  * conta como falha — cobre a virada domingo→segunda).
  *
- * mode 'work' (Combo x7/x14/x20): domingos e feriados de São Luís são
+ * mode 'work' (Combo x7/x10/x15): domingos e feriados de São Luís são
  * transparentes — não contam na sequência e não quebram o combo (uma
  * conclusão nesses dias também não soma). A âncora pula esses dias.
  */
@@ -193,6 +193,8 @@ export function computeCounters(
   for (const count of perDay.values()) {
     if (count > perDayMax) perDayMax = count
   }
+  // Progresso das diárias mostra SÓ o dia corrente — à meia-noite zera.
+  const perDayToday = perDay.get(localDayKey(new Date())) ?? 0
 
   // ===== Contadores baseados em tarefas (temporada) =====
   let vozAtiva = 0
@@ -236,6 +238,7 @@ export function computeCounters(
     urgentEarly,
     urgentTotal,
     perDayMax,
+    perDayToday,
     streak: computeStreak(dayKeys),
     streakWork: computeStreak(dayKeys, 'work'),
     category,
@@ -264,7 +267,7 @@ export function requirementProgress(a: Achievement, c: Counters): number {
     case 'early': return c.early
     case 'urgent_early': return c.urgentEarly
     case 'urgent_total': return c.urgentTotal
-    case 'per_day': return c.perDayMax
+    case 'per_day': return c.perDayToday
     case 'streak': return c.streak
     case 'streak_work': return c.streakWork
     case 'category': return c.category[req.contentCategory ?? 'geral']
@@ -283,6 +286,7 @@ export function requirementProgress(a: Achievement, c: Counters): number {
     case 'created_total': return c.createdByMe
     case 'fast_finish': return c.fastFinish
     case 'radar': return c.radar
+    case 'rarity_all': return 0 // depende do estado de desbloqueio por raridade
     case 'all': return 0 // depende do estado de desbloqueio, não dos contadores de eventos
   }
 }
@@ -302,8 +306,19 @@ export function evaluateAchievements(alreadyUnlockedIds: string[], counters: Cou
   const unlockedNow: Achievement[] = []
 
   for (const a of pending) {
-    if (a.requirement.type === 'all') continue
+    if (a.requirement.type === 'all' || a.requirement.type === 'rarity_all') continue
     if (isUnlocked(a, counters)) {
+      unlockedNow.push(a)
+      allIds.add(a.id)
+    }
+  }
+
+  // Coleções de raridade: liberam quando TODAS as conquistas daquela raridade
+  // (excluindo a própria coleção e o Complecionista) estiverem desbloqueadas.
+  for (const a of pending) {
+    if (a.requirement.type !== 'rarity_all') continue
+    const targets = rarityCollectionTargets(a)
+    if (targets.length > 0 && targets.every((t) => allIds.has(t.id))) {
       unlockedNow.push(a)
       allIds.add(a.id)
     }
@@ -325,6 +340,10 @@ export function evaluateAchievements(alreadyUnlockedIds: string[], counters: Cou
 export function achievementProgress(a: Achievement, c: Counters, unlockedIds: string[]): number {
   if (a.requirement.type === 'all') {
     return unlockedIds.filter((id) => id !== a.id).length
+  }
+  if (a.requirement.type === 'rarity_all') {
+    const unlocked = new Set(unlockedIds)
+    return rarityCollectionTargets(a).filter((t) => unlocked.has(t.id)).length
   }
   return requirementProgress(a, c)
 }

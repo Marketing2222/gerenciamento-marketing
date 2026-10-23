@@ -483,14 +483,14 @@ export default function ConquistasPage() {
                 <button
                   type="button"
                   onClick={() => setSeasonOpen(true)}
-                  className="w-full rounded-xl border-2 border-amber-400/60 bg-amber-500/15 hover:bg-amber-500/25 px-4 py-3 flex items-center gap-2.5 transition cursor-pointer"
+                  className="w-full rounded-xl border-2 border-[#FFD700] bg-[#FFD700]/20 hover:bg-[#FFD700]/30 px-4 py-3 flex items-center gap-2.5 transition cursor-pointer gm-xp-shimmer"
                 >
-                  <Calendar className="w-6 h-6 text-amber-400 shrink-0" />
-                  <div className="text-left">
-                    <p className="text-xl font-extrabold text-amber-400 leading-none">
+                  <Calendar className="w-6 h-6 text-[#FFD700] shrink-0 relative z-10" />
+                  <div className="text-left relative z-10">
+                    <p className="text-xl font-extrabold text-[#FFD700] leading-none">
                       T{seasonNumberNow}
                     </p>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-amber-500/80 mt-1">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-[#FFD700]/75 mt-1">
                       Temporada
                     </p>
                   </div>
