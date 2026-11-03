@@ -237,7 +237,13 @@ export default function SettingsPage() {
   if (!user) return null
 
   // Somente o Leonardo pode alterar nome/logo das patentes, adicionar ou remover.
-  const canEditRanks = user.name.trim().toLowerCase() === 'leonardo'
+  // Aceita "Leonardo", "Leonardo Araújo", etc. (sem acento/caixa).
+  const normalizedUserName = user.name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+  const canEditRanks = normalizedUserName === 'leonardo' || normalizedUserName.startsWith('leonardo ')
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
