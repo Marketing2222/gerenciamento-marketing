@@ -1,24 +1,30 @@
 'use client'
 
 import React from 'react'
-import { iconKeys, RANK_LEVELS } from '@/lib/gamification/settings'
-import { iconForLevel, levelThreshold, titleForLevel } from '@/lib/gamification/levels'
+import { iconKeys, rankTitle } from '@/lib/gamification/settings'
+import { iconForLevel, levelThreshold } from '@/lib/gamification/levels'
 import { X } from 'lucide-react'
 
 /**
  * Galeria de patentes: abre ao clicar no quadrado da patente no perfil.
- * Mostra os níveis 1..15 com ícone personalizado (ou emoji padrão),
+ * Mostra os níveis 1..rankCount com ícone personalizado (ou emoji padrão),
  * destaca o nível atual e indica quanto XP falta para os próximos.
  */
 export default function RankGallery({
   currentLevel,
   currentXp,
   icons,
+  rankCount,
+  rankNames,
   onClose,
 }: {
   currentLevel: number
   currentXp: number
   icons: Record<string, string>
+  /** Quantidade de patentes cadastradas (mín. 15). */
+  rankCount: number
+  /** Nomes customizados de patente (chave = nível). */
+  rankNames?: Record<string, string>
   onClose: () => void
 }) {
   return (
@@ -31,7 +37,7 @@ export default function RankGallery({
           <div>
             <h2 className="text-base font-extrabold text-slate-900 dark:text-slate-100">Patentes</h2>
             <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              Você está no nível {currentLevel} — {titleForLevel(currentLevel)}
+              Você está no nível {currentLevel} — {rankTitle(currentLevel, rankNames)}
             </p>
           </div>
           <button onClick={onClose} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer" title="Fechar">
@@ -40,7 +46,7 @@ export default function RankGallery({
         </div>
 
         <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {Array.from({ length: RANK_LEVELS }, (_, i) => i + 1).map((lvl) => {
+          {Array.from({ length: rankCount }, (_, i) => i + 1).map((lvl) => {
             const threshold = levelThreshold(lvl)
             const reached = currentLevel >= lvl
             const isCurrent = currentLevel === lvl
@@ -78,7 +84,7 @@ export default function RankGallery({
                       <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500 text-white">ATUAL</span>
                     )}
                   </div>
-                  <p className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">{titleForLevel(lvl)}</p>
+                  <p className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">{rankTitle(lvl, rankNames)}</p>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">
                     {lvl === 1 ? 'Nível inicial' : reached ? `A partir de ${threshold.toLocaleString('pt-BR')} XP` : `Faltam ${missing.toLocaleString('pt-BR')} XP`}
                   </p>

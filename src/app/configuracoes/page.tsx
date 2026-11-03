@@ -10,8 +10,8 @@ import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea
 import Avatar from '@/components/Avatar'
 import { useGamification } from '@/context/GamificationContext'
 import { ACHIEVEMENTS } from '@/lib/gamification/achievements'
-import { achievementName, iconKeys, RANK_LEVELS } from '@/lib/gamification/settings'
-import { iconForLevel, titleForLevel } from '@/lib/gamification/levels'
+import { achievementName, iconKeys, RANK_LEVELS, RANK_MAX_LEVELS, rankTitle } from '@/lib/gamification/settings'
+import { defaultTitleForLevel, iconForLevel } from '@/lib/gamification/levels'
 import type { Rarity } from '@/lib/gamification/types'
 import { uploadFile } from '@/lib/storage'
 
@@ -58,6 +58,8 @@ function GamIconCell({
   badge,
   defaultName,
   onSaveName,
+  readOnly,
+  onDelete,
 }: {
   cellKey: string
   label: string
@@ -71,6 +73,10 @@ function GamIconCell({
   /** Nome padrão — presente habilita a edição do nome. */
   defaultName?: string
   onSaveName?: (name: string) => void
+  /** Sem edição de imagem (permissão restrita). */
+  readOnly?: boolean
+  /** Remove o ITEM (ex.: patente), não só a imagem — botão vermelho extra. */
+  onDelete?: () => void
 }) {
   const [editingName, setEditingName] = useState(false)
   const [nameDraft, setNameDraft] = useState('')
@@ -136,23 +142,36 @@ function GamIconCell({
           ↺ padrão
         </button>
       )}
-      <div className="flex gap-1">
-        <label className="p-1.5 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 transition cursor-pointer" title="Enviar imagem">
-          {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
-          <input type="file" accept="image/*" className="hidden" onChange={(e) => onUpload(cellKey, e)} />
-        </label>
-        {url && (
-          <button
-            type="button"
-            onClick={() => onRemove(cellKey)}
-            disabled={busy}
-            title="Remover — volta ao padrão"
-            className="p-1.5 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-500 text-slate-500 transition cursor-pointer disabled:opacity-50"
-          >
-            <X className="w-3 h-3" />
-          </button>
-        )}
-      </div>
+      {!readOnly && (
+        <div className="flex gap-1">
+          <label className="p-1.5 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 transition cursor-pointer" title="Enviar imagem">
+            {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+            <input type="file" accept="image/*" className="hidden" onChange={(e) => onUpload(cellKey, e)} />
+          </label>
+          {url && (
+            <button
+              type="button"
+              onClick={() => onRemove(cellKey)}
+              disabled={busy}
+              title="Remover — volta ao padrão"
+              className="p-1.5 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-500 text-slate-500 transition cursor-pointer disabled:opacity-50"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={onDelete}
+              disabled={busy}
+              title="Remover patente"
+              className="p-1.5 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-500 text-slate-500 transition cursor-pointer disabled:opacity-50"
+            >
+              <Trash2 className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -162,7 +181,7 @@ export default function SettingsPage() {
   const { siteName, logoUrl, applyBrand } = useBrand()
   const { saveProfile, uploadAvatar, uploadLogo, users, addUser, removeUser, tasks, updateTask, roles, addRole, updateRole, removeRole } = useData()
   const { columns, summary, updateColumn, updateSummary, addColumn, removeColumn, reorderColumns } = useColumns()
-  const { settings, saveIcon, clearIcon, saveAchievementName, saveGradient, savePageTheme } = useGamification()
+  const { settings, saveIcon, clearIcon, saveAchievementName, saveRankName, saveRankCount, saveGradient, savePageTheme } = useGamification()
   
   const [name, setName] = useState('')
   const [role, setRole] = useState('DESIGNER')
@@ -216,6 +235,9 @@ export default function SettingsPage() {
   }, [siteName, logoUrl])
 
   if (!user) return null
+
+  // Somente o Leonardo pode alterar nome/logo das patentes, adicionar ou remover.
+  const canEditRanks = user.name.trim().toLowerCase() === 'leonardo'
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -304,6 +326,34 @@ export default function SettingsPage() {
       setError(`Erro ao remover: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setUploadingIconKey(null)
+    }
+  }
+
+  const handleAddRank = async () => {
+    if (settings.rankCount >= RANK_MAX_LEVELS) return
+    setError('')
+    setSuccess('')
+    try {
+      await saveRankCount(settings.rankCount + 1)
+      setSuccess(`Patente ${settings.rankCount + 1} adicionada! Envie um ícone e dê um nome para ela.`)
+    } catch (err) {
+      setError(`Erro ao adicionar patente: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
+  const handleRemoveRank = async (lvl: number) => {
+    // Só remove a última patente — remover do meio desalinharia os níveis.
+    if (lvl !== settings.rankCount || lvl <= RANK_LEVELS) return
+    if (!window.confirm(`Remover a patente ${lvl} (${rankTitle(lvl, settings.rankNames)})?`)) return
+    setError('')
+    setSuccess('')
+    try {
+      await saveRankName(lvl, '')
+      await clearIcon(iconKeys.rank(lvl))
+      await saveRankCount(lvl - 1)
+      setSuccess(`Patente ${lvl} removida.`)
+    } catch (err) {
+      setError(`Erro ao remover patente: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
@@ -710,15 +760,40 @@ export default function SettingsPage() {
 
         {/* Patentes */}
         <div className="space-y-2 border-t border-slate-100 dark:border-slate-800 pt-4">
-          <p className="text-xs font-bold text-slate-600 dark:text-slate-300">Ícones das Patentes <span className="font-medium text-slate-400">(níveis 1–15)</span></p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-bold text-slate-600 dark:text-slate-300">Ícones das Patentes <span className="font-medium text-slate-400">(níveis 1–{settings.rankCount})</span></p>
+            {canEditRanks && (
+              <button
+                type="button"
+                onClick={() => void handleAddRank()}
+                disabled={settings.rankCount >= RANK_MAX_LEVELS}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 disabled:bg-slate-200 disabled:dark:bg-slate-800 disabled:text-slate-400 text-white text-[11px] font-semibold transition cursor-pointer disabled:cursor-not-allowed"
+              >
+                <Plus className="w-3 h-3" /> Adicionar patente
+              </button>
+            )}
+          </div>
+          {!canEditRanks && (
+            <p className="text-[10px] text-slate-400">Somente o Leonardo pode alterar nomes, ícones, adicionar ou remover patentes.</p>
+          )}
           <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-8 gap-2">
-            {Array.from({ length: RANK_LEVELS }, (_, i) => i + 1).map((lvl) => {
+            {Array.from({ length: settings.rankCount }, (_, i) => i + 1).map((lvl) => {
               const key = iconKeys.rank(lvl)
+              const isRemovable = canEditRanks && lvl > RANK_LEVELS && lvl === settings.rankCount
               return (
                 <GamIconCell
                   key={key}
                   cellKey={key}
-                  label={`${lvl} · ${titleForLevel(lvl)}`}
+                  label={rankTitle(lvl, settings.rankNames)}
+                  badge={<span className="px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-wider border text-slate-500 dark:text-slate-400 border-slate-300 dark:border-slate-600">Nível {lvl}</span>}
+                  defaultName={canEditRanks ? defaultTitleForLevel(lvl) : undefined}
+                  onSaveName={canEditRanks ? (name) => {
+                    void saveRankName(lvl, name).catch((err) =>
+                      setError(`Erro ao renomear: ${err instanceof Error ? err.message : String(err)}`)
+                    )
+                  } : undefined}
+                  readOnly={!canEditRanks}
+                  onDelete={isRemovable ? () => void handleRemoveRank(lvl) : undefined}
                   fallback={<span>{iconForLevel(lvl)}</span>}
                   url={settings.icons[key]}
                   busy={uploadingIconKey === key}

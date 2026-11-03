@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { ACHIEVEMENTS_BY_ID } from '@/lib/gamification/achievements'
 import { iconForLevel, titleForLevel } from '@/lib/gamification/levels'
 import { achievementName, iconKeys } from '@/lib/gamification/settings'
@@ -15,26 +16,77 @@ export default function SeasonPopup({
   summaries,
   icons,
   names,
+  anchorRef,
   onClose,
 }: {
   summaries: SeasonSummary[]
   icons: Record<string, string>
   names?: Record<string, string>
+  /** Elemento que abriu o popup. O painel é posicionado logo abaixo dele. */
+  anchorRef?: React.RefObject<HTMLElement | null>
   onClose: () => void
 }) {
   const last = summaries[summaries.length - 1]
   const [selectedKey, setSelectedKey] = useState(last?.info.key ?? '')
   const [showSummary, setShowSummary] = useState(false)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
 
   const selected = summaries.find((s) => s.info.key === selectedKey) ?? last
+
+  // Posiciona o painel em relação ao botão (fora do card): fixed + portal
+  // evita que o overflow-hidden da seção recorte o conteúdo.
+  useLayoutEffect(() => {
+    const update = () => {
+      const anchor = anchorRef?.current
+      const panel = panelRef.current
+      if (!anchor || !panel) return
+      const a = anchor.getBoundingClientRect()
+      const w = panel.offsetWidth
+      const h = panel.offsetHeight
+      const margin = 8
+      const gap = 8
+
+      let left = Math.min(a.left, window.innerWidth - margin - w)
+      left = Math.max(margin, left)
+
+      let top = a.bottom + gap
+      if (top + h > window.innerHeight - margin) {
+        const above = a.top - gap - h
+        top = above >= margin ? above : Math.max(margin, window.innerHeight - margin - h)
+      }
+
+      setPos((prev) =>
+        prev && prev.top === top && prev.left === left ? prev : { top, left },
+      )
+    }
+
+    update()
+    window.addEventListener('resize', update)
+    window.addEventListener('scroll', update, true)
+    return () => {
+      window.removeEventListener('resize', update)
+      window.removeEventListener('scroll', update, true)
+    }
+  }, [anchorRef, showSummary, selectedKey])
+
   if (!selected) return null
 
   const rankIcon = icons[iconKeys.rank(selected.levelEnd)]
 
-  return (
+  const panel = (
     <>
-      <div className="fixed inset-0 z-10" onClick={onClose} />
-      <div className="absolute z-20 mt-2 left-0 w-[340px] max-w-[calc(100vw-2rem)] rounded-2xl bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-700 shadow-xl p-3">
+      <div className="fixed inset-0 z-[119]" onClick={onClose} />
+      <div
+        ref={panelRef}
+        role="dialog"
+        className="fixed z-[120] w-[340px] max-w-[calc(100vw-1rem)] max-h-[calc(100vh-1rem)] overflow-y-auto rounded-2xl bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-700 shadow-2xl p-3"
+        style={{
+          top: pos?.top ?? 0,
+          left: pos?.left ?? 0,
+          visibility: pos ? 'visible' : 'hidden',
+        }}
+      >
         {/* Abas T01 T02 ... */}
         <div className="flex flex-wrap gap-1.5">
           {summaries.map((s) => (
@@ -124,4 +176,7 @@ export default function SeasonPopup({
       </div>
     </>
   )
+
+  if (typeof document === 'undefined') return null
+  return createPortal(panel, document.body)
 }

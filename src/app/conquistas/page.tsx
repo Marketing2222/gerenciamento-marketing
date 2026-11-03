@@ -63,6 +63,7 @@ export default function ConquistasPage() {
   const [coverError, setCoverError] = useState('')
   const [cropFile, setCropFile] = useState<File | null>(null)
   const coverInputRef = useRef<HTMLInputElement>(null)
+  const seasonBtnRef = useRef<HTMLButtonElement>(null)
   const [celebrating, setCelebrating] = useState<Set<string>>(new Set())
   const [accentMenu, setAccentMenu] = useState(false)
   const [accentFrom, setAccentFrom] = useState('#f59e0b')
@@ -481,6 +482,7 @@ export default function ConquistasPage() {
               {/* Temporada (estilo card de stats) */}
               <div className="relative">
                 <button
+                  ref={seasonBtnRef}
                   type="button"
                   onClick={() => setSeasonOpen(true)}
                   className="w-full rounded-xl border-2 border-[#FFD700] bg-[#FFD700]/20 hover:bg-[#FFD700]/30 px-4 py-3 flex items-center gap-2.5 transition cursor-pointer gm-xp-shimmer"
@@ -500,6 +502,7 @@ export default function ConquistasPage() {
                     summaries={seasonSummaries}
                     icons={settings.icons}
                     names={settings.names}
+                    anchorRef={seasonBtnRef}
                     onClose={() => setSeasonOpen(false)}
                   />
                 )}
@@ -774,6 +777,8 @@ export default function ConquistasPage() {
           currentLevel={level?.level ?? 1}
           currentXp={totalXp}
           icons={settings.icons}
+          rankCount={settings.rankCount}
+          rankNames={settings.rankNames}
           onClose={() => setRankOpen(false)}
         />
       )}

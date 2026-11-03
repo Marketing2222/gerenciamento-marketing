@@ -71,10 +71,28 @@ function toRoman(num: number): string {
   return out
 }
 
-export function titleForLevel(level: number): string {
+/** Títulos de patente personalizados (configurações → patentes), chave = nível. */
+let customRankTitles: Record<number, string> = {}
+
+/** Aplica nomes customizados vindos das configurações (vazio volta ao padrão). */
+export function applyCustomRankTitles(names: Record<string, string> | undefined): void {
+  const next: Record<number, string> = {}
+  for (const [k, v] of Object.entries(names ?? {})) {
+    const lvl = Number(k)
+    if (Number.isFinite(lvl) && typeof v === 'string' && v.trim()) next[lvl] = v.trim()
+  }
+  customRankTitles = next
+}
+
+/** Título padrão embutido (sem personalização). */
+export function defaultTitleForLevel(level: number): string {
   if (level <= LEVEL_TITLES.length) return LEVEL_TITLES[level - 1]
   if (level <= 15) return PAST_10_TITLES[level] ?? 'Supremo'
   return `Supremo ${toRoman(level - 14)}`
+}
+
+export function titleForLevel(level: number): string {
+  return customRankTitles[level] ?? defaultTitleForLevel(level)
 }
 
 export function iconForLevel(level: number): string {

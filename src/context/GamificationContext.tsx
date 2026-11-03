@@ -22,7 +22,10 @@ import {
   saveGradient,
   saveIcon as saveSettingsIcon,
   savePageTheme,
+  saveRankCount as saveSettingsRankCount,
+  saveRankName as saveSettingsRankName,
   subscribeSettings,
+  RANK_LEVELS,
   type GamificationSettings,
 } from '@/lib/gamification/settings'
 import { gamificationBus } from '@/lib/gamification/bus'
@@ -30,7 +33,7 @@ import { ACHIEVEMENTS_BY_ID, TOTAL_ACHIEVEMENTS } from '@/lib/gamification/achie
 import { computeCounters } from '@/lib/gamification/engine'
 import { currentSeason, eventInSeason, isUnlockInSeason } from '@/lib/gamification/seasons'
 import { playAchievementSound, playLevelUpSound, playXpSound } from '@/lib/gamification/sound'
-import { levelProgress } from '@/lib/gamification/levels'
+import { levelProgress, applyCustomRankTitles } from '@/lib/gamification/levels'
 import type {
   Achievement,
   AchievementUnlock,
@@ -68,6 +71,8 @@ interface GamificationContextType {
   saveIcon: (key: string, url: string) => Promise<void>
   clearIcon: (key: string) => Promise<void>
   saveAchievementName: (id: string, name: string) => Promise<void>
+  saveRankName: (level: number, name: string) => Promise<void>
+  saveRankCount: (count: number) => Promise<void>
   saveGradient: (from: string, to: string) => Promise<void>
   savePageTheme: (patch: import('@/lib/gamification/settings').PageThemePatch) => Promise<void>
   saveCover: (url: string | null) => Promise<void>
@@ -90,6 +95,8 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
     gradientTo: DEFAULT_GRADIENT.to,
     icons: {},
     names: {},
+    rankNames: {},
+    rankCount: RANK_LEVELS,
     ...DEFAULT_PAGE_THEME,
   })
   const [loading, setLoading] = useState(true)
@@ -167,6 +174,14 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
 
   const doSaveAchievementName = useCallback(async (id: string, name: string) => {
     await saveSettingsAchievementName(id, name)
+  }, [])
+
+  const doSaveRankName = useCallback(async (lvl: number, name: string) => {
+    await saveSettingsRankName(lvl, name)
+  }, [])
+
+  const doSaveRankCount = useCallback(async (count: number) => {
+    await saveSettingsRankCount(count)
   }, [])
 
   const doSaveGradient = useCallback(async (from: string, to: string) => {
@@ -248,7 +263,12 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
   }, [seasonEvents, unlocks])
 
   const unlockedCount = Object.keys(unlocks).length
-  const level = React.useMemo(() => levelProgress(seasonXp), [seasonXp])
+  // Aplica os títulos custom ANTES de calcular (senão o memo usaria títulos antigos)
+  // e recomputa quando rankNames muda.
+  const level = React.useMemo(() => {
+    applyCustomRankTitles(settings.rankNames)
+    return levelProgress(seasonXp)
+  }, [seasonXp, settings.rankNames])
 
   const value: GamificationContextType = {
     progress,
@@ -269,6 +289,8 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
     saveIcon: doSaveIcon,
     clearIcon: doClearIcon,
     saveAchievementName: doSaveAchievementName,
+    saveRankName: doSaveRankName,
+    saveRankCount: doSaveRankCount,
     saveGradient: doSaveGradient,
     savePageTheme: doSavePageTheme,
     saveCover: doSaveCover,

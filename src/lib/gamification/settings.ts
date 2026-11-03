@@ -1,5 +1,6 @@
 import { db, isFirebaseConfigured, waitForConfig } from '@/lib/firebaseClient'
 import { collection, deleteDoc, doc, onSnapshot, setDoc } from 'firebase/firestore'
+import { defaultTitleForLevel } from './levels'
 import type { Rarity } from './types'
 
 export interface GamificationSettings {
@@ -9,6 +10,10 @@ export interface GamificationSettings {
   icons: Record<string, string>
   /** Nome customizado de conquista (achievementId → nome). Vazio = padrão. */
   names: Record<string, string>
+  /** Nome customizado de patente (level como string → nome). Vazio = padrão. */
+  rankNames: Record<string, string>
+  /** Quantidade de patentes exibidas (mín. 15; permite adicionar acima). */
+  rankCount: number
   /** Camada de transparência sobre a capa do perfil (conquistas). */
   transparencyEnabled: boolean
   /** Cor da transparência (ex.: #ffffff). */
@@ -31,6 +36,9 @@ export const DEFAULT_PAGE_THEME = {
 /** Patentes exibidas/ganhas upload: níveis 1..15. */
 export const RANK_LEVELS = 15
 
+/** Máximo de patentes (acrescentáveis nas configurações). */
+export const RANK_MAX_LEVELS = 30
+
 export const iconKeys = {
   achievement: (id: string) => `ach_${id}`,
   rarity: (r: Rarity) => `rarity_${r}`,
@@ -48,9 +56,14 @@ async function iconRef(key: string) {
   return doc(await db(), 'gamification_settings', 'global', 'icons', key)
 }
 
+function clampRankCount(n: unknown): number {
+  const v = typeof n === 'number' && Number.isFinite(n) ? Math.round(n) : RANK_LEVELS
+  return Math.min(RANK_MAX_LEVELS, Math.max(RANK_LEVELS, v))
+}
+
 function localGradient(): GamificationSettings {
   if (typeof window === 'undefined') {
-    return { gradientFrom: DEFAULT_GRADIENT.from, gradientTo: DEFAULT_GRADIENT.to, icons: {}, names: {}, ...DEFAULT_PAGE_THEME }
+    return { gradientFrom: DEFAULT_GRADIENT.from, gradientTo: DEFAULT_GRADIENT.to, icons: {}, names: {}, rankNames: {}, rankCount: RANK_LEVELS, ...DEFAULT_PAGE_THEME }
   }
   try {
     return {
@@ -58,13 +71,15 @@ function localGradient(): GamificationSettings {
       gradientTo: localStorage.getItem('mkt-g-to') || DEFAULT_GRADIENT.to,
       icons: JSON.parse(localStorage.getItem('mkt-g-icons') || '{}'),
       names: JSON.parse(localStorage.getItem('mkt-g-names') || '{}'),
+      rankNames: JSON.parse(localStorage.getItem('mkt-g-rank-names') || '{}'),
+      rankCount: clampRankCount(Number(localStorage.getItem('mkt-g-rank-count') || RANK_LEVELS)),
       transparencyEnabled: localStorage.getItem('mkt-g-transp-on') !== '0',
       transparencyColor: localStorage.getItem('mkt-g-transp-color') || DEFAULT_PAGE_THEME.transparencyColor,
       pageBg: localStorage.getItem('mkt-g-page-bg') || '',
       pageText: localStorage.getItem('mkt-g-page-text') || '',
     }
   } catch {
-    return { gradientFrom: DEFAULT_GRADIENT.from, gradientTo: DEFAULT_GRADIENT.to, icons: {}, names: {}, ...DEFAULT_PAGE_THEME }
+    return { gradientFrom: DEFAULT_GRADIENT.from, gradientTo: DEFAULT_GRADIENT.to, icons: {}, names: {}, rankNames: {}, rankCount: RANK_LEVELS, ...DEFAULT_PAGE_THEME }
   }
 }
 
@@ -89,9 +104,11 @@ export function subscribeSettings(callback: (s: GamificationSettings) => void): 
   let gradient = { ...DEFAULT_GRADIENT }
   let icons: Record<string, string> = {}
   let names: Record<string, string> = {}
+  let rankNames: Record<string, string> = {}
+  let rankCount = RANK_LEVELS
   let pageTheme = { ...DEFAULT_PAGE_THEME }
 
-  const emit = () => callback({ gradientFrom: gradient.from, gradientTo: gradient.to, icons, names, ...pageTheme })
+  const emit = () => callback({ gradientFrom: gradient.from, gradientTo: gradient.to, icons, names, rankNames, rankCount, ...pageTheme })
 
   void (async () => {
     waitForConfig()
@@ -113,6 +130,13 @@ export function subscribeSettings(callback: (s: GamificationSettings) => void): 
           if (typeof n === 'string' && n.trim()) names[id] = n
         }
       }
+      rankNames = {}
+      if (d?.customRankNames && typeof d.customRankNames === 'object') {
+        for (const [lvl, n] of Object.entries(d.customRankNames as Record<string, unknown>)) {
+          if (typeof n === 'string' && n.trim()) rankNames[lvl] = n
+        }
+      }
+      rankCount = clampRankCount(d?.rankCount)
       emit()
     })
     unsubIcons = onSnapshot(await iconsCol(), (snap) => {
@@ -206,4 +230,40 @@ export async function saveAchievementName(id: string, name: string): Promise<voi
   if (!isFirebaseConfigured()) return
   waitForConfig()
   await setDoc(await settingsRef(), { customNames: { [id]: clean } }, { merge: true })
+}
+
+/** Salva nome customizado de patente ('' volta ao nome padrão). */
+export async function saveRankName(level: number, name: string): Promise<void> {
+  const clean = name.trim()
+  const key = String(level)
+  if (typeof window !== 'undefined') {
+    try {
+      const rankNames = JSON.parse(localStorage.getItem('mkt-g-rank-names') || '{}')
+      if (clean) rankNames[key] = clean
+      else delete rankNames[key]
+      localStorage.setItem('mkt-g-rank-names', JSON.stringify(rankNames))
+    } catch {
+      /* ignore */
+    }
+  }
+  if (!isFirebaseConfigured()) return
+  waitForConfig()
+  await setDoc(await settingsRef(), { customRankNames: { [key]: clean } }, { merge: true })
+}
+
+/** Salva a quantidade de patentes exibidas (mín. 15, máx. RANK_MAX_LEVELS). */
+export async function saveRankCount(count: number): Promise<void> {
+  const clean = clampRankCount(count)
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('mkt-g-rank-count', String(clean))
+  }
+  if (!isFirebaseConfigured()) return
+  waitForConfig()
+  await setDoc(await settingsRef(), { rankCount: clean }, { merge: true })
+}
+
+/** Nome exibido da patente (customizado nas configurações, senão o padrão). */
+export function rankTitle(level: number, rankNames?: Record<string, string>): string {
+  const custom = rankNames?.[String(level)]?.trim()
+  return custom || defaultTitleForLevel(level)
 }
