@@ -20,27 +20,35 @@ const PAST_10_TITLES: Record<number, string> = {
 }
 
 /**
- * XP necessário para cada nível (nível 1 = 0 XP) até o nível 15 (Supremo).
- * Curva mensal: mês fraco ~1.500 = nv 7, mês bom ~4.000 = nv 11,
- * mês forte ~7.500 = nv 15, mês perfeito ~8.500 = nv 16.
+ * XP necessário para cada nível (nível 1 = 0 XP) — régua MENSAL (o nível
+ * zera a cada temporada/mês). Calibrada com dados reais do time:
+ *   mês fraco ~1.400  = nv 7
+ *   mês bom   ~3.100  = nv 15  (12/15 "fáceis" num mês decente)
+ *   mês forte ~6.300  = nv 29  (um mês forte encosta no 30)
+ *   nv 30 = 6.500     → possível num mês excelente; recorde ~10.100 passa folgado.
  */
 export const LEVEL_THRESHOLDS: number[] = [
-  0, 100, 260, 470, 730, 1050, 1430, 1880, 2400, 3000, 3700, 4500, 5400, 6400, 7500,
+  // 1–15 (Supremo): degraus suaves, terminando em 3.000.
+  0, 100, 220, 360, 520, 700, 900, 1120, 1360, 1600, 1850, 2100, 2370, 2670, 3000,
+  // 16–20: +200 por nível.
+  3200, 3400, 3600, 3800, 4000,
+  // 21–30: +250 por nível.
+  4250, 4500, 4750, 5000, 5250, 5500, 5750, 6000, 6250, 6500,
 ]
 
-/** Após o nível 15 o limiar cresce: +1200, +1300, +1400, ... (progressão ilimitada). */
-function thresholdAfter15(level: number): number {
-  let xp = LEVEL_THRESHOLDS[14]
-  for (let l = 16; l <= level; l++) {
-    xp += 1200 + 100 * (l - 16)
+/** Após o nível 30 o limiar cresce +300, +350, +400, ... (progressão ilimitada). */
+function thresholdAfter30(level: number): number {
+  let xp = LEVEL_THRESHOLDS[29]
+  for (let l = 31; l <= level; l++) {
+    xp += 300 + 50 * (l - 31)
   }
   return xp
 }
 
 export function levelThreshold(level: number): number {
   if (level <= 1) return 0
-  if (level <= 15) return LEVEL_THRESHOLDS[level - 1]
-  return thresholdAfter15(level)
+  if (level <= 30) return LEVEL_THRESHOLDS[level - 1]
+  return thresholdAfter30(level)
 }
 
 export function levelFromXp(xp: number): number {
