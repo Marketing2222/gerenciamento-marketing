@@ -213,7 +213,13 @@ export default function ConquistasPage() {
         <div className="absolute -bottom-24 left-1/3 w-[24rem] h-[24rem] rounded-full blur-3xl opacity-20" style={{ backgroundColor: progress?.accentTo ?? settings.gradientTo }} />
       </div>
 
-      <div className="relative max-w-6xl mx-auto space-y-6">
+      {/* Em 4 colunas o container alarga para as laterais: cada card mantém os
+          mesmos 373px da versão de 3 colunas (texto e ícones sem apertar). */}
+      <div
+        className={`relative mx-auto space-y-6 ${
+          settings.achColumns === 4 ? 'max-w-[1542px]' : 'max-w-6xl'
+        }`}
+      >
       {/* Banner — Papel de parede (controles FORA do overflow para o menu não ser cortado) */}
       <div className="relative">
         <div className="rounded-3xl overflow-hidden h-44 md:h-56 border border-slate-200 dark:border-slate-800 shadow-sm relative">
@@ -645,7 +651,11 @@ export default function ConquistasPage() {
           <p className="text-sm font-medium">Nenhuma conquista neste filtro.</p>
         </div>
       ) : (
-        <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <section
+          className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${
+            settings.achColumns === 4 ? 'lg:grid-cols-3 xl:grid-cols-4' : 'xl:grid-cols-3'
+          }`}
+        >
           {filtered.map((a) => {
             const unlocked = Boolean(unlocks[a.id])
             const rarity = RARITY_META[a.rarity]
@@ -661,8 +671,10 @@ export default function ConquistasPage() {
                 key={a.id}
                 className={`rounded-2xl border p-5 transition relative overflow-hidden ${
                   unlocked
-                    ? `${rarity.border} bg-white dark:bg-[#0c1220] shadow-lg ${rarity.ring} ${celebrating.has(a.id) ? 'gm-celebrate' : ''}`
-                    : 'border-dashed border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/40 opacity-40 grayscale'
+                    ? `${rarity.border} bg-white dark:bg-[#0c1220] shadow-lg ${rarity.ring} ${celebrating.has(a.id) ? 'gm-celebrate' : ''} ${a.rarity === 'lendaria' ? 'gm-legendary' : ''}`
+                    : `border-dashed border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/40 opacity-40 grayscale ${
+                        a.rarity === 'lendaria' ? 'gm-legendary gm-legendary-locked' : ''
+                      }`
                 }`}
               >
                 {unlocked ? (

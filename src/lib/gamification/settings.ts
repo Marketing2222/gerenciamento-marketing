@@ -14,6 +14,8 @@ export interface GamificationSettings {
   rankNames: Record<string, string>
   /** Quantidade de patentes exibidas (mín. 15; permite adicionar acima). */
   rankCount: number
+  /** Quantidade de colunas do grid de conquistas (3 ou 4). */
+  achColumns: number
   /** Camada de transparência sobre a capa do perfil (conquistas). */
   transparencyEnabled: boolean
   /** Cor da transparência (ex.: #ffffff). */
@@ -39,6 +41,13 @@ export const RANK_LEVELS = 15
 /** Máximo de patentes (acrescentáveis nas configurações). */
 export const RANK_MAX_LEVELS = 30
 
+/** Colunas do grid de conquistas — padrão 3 (opção de 3 ou 4 nas configurações). */
+export const ACH_COLUMNS_DEFAULT = 3
+
+function clampAchColumns(n: unknown): number {
+  return n === 4 ? 4 : ACH_COLUMNS_DEFAULT
+}
+
 export const iconKeys = {
   achievement: (id: string) => `ach_${id}`,
   rarity: (r: Rarity) => `rarity_${r}`,
@@ -63,7 +72,7 @@ function clampRankCount(n: unknown): number {
 
 function localGradient(): GamificationSettings {
   if (typeof window === 'undefined') {
-    return { gradientFrom: DEFAULT_GRADIENT.from, gradientTo: DEFAULT_GRADIENT.to, icons: {}, names: {}, rankNames: {}, rankCount: RANK_LEVELS, ...DEFAULT_PAGE_THEME }
+    return { gradientFrom: DEFAULT_GRADIENT.from, gradientTo: DEFAULT_GRADIENT.to, icons: {}, names: {}, rankNames: {}, rankCount: RANK_LEVELS, achColumns: ACH_COLUMNS_DEFAULT, ...DEFAULT_PAGE_THEME }
   }
   try {
     return {
@@ -73,13 +82,14 @@ function localGradient(): GamificationSettings {
       names: JSON.parse(localStorage.getItem('mkt-g-names') || '{}'),
       rankNames: JSON.parse(localStorage.getItem('mkt-g-rank-names') || '{}'),
       rankCount: clampRankCount(Number(localStorage.getItem('mkt-g-rank-count') || RANK_LEVELS)),
+      achColumns: clampAchColumns(Number(localStorage.getItem('mkt-g-ach-cols') || ACH_COLUMNS_DEFAULT)),
       transparencyEnabled: localStorage.getItem('mkt-g-transp-on') !== '0',
       transparencyColor: localStorage.getItem('mkt-g-transp-color') || DEFAULT_PAGE_THEME.transparencyColor,
       pageBg: localStorage.getItem('mkt-g-page-bg') || '',
       pageText: localStorage.getItem('mkt-g-page-text') || '',
     }
   } catch {
-    return { gradientFrom: DEFAULT_GRADIENT.from, gradientTo: DEFAULT_GRADIENT.to, icons: {}, names: {}, rankNames: {}, rankCount: RANK_LEVELS, ...DEFAULT_PAGE_THEME }
+    return { gradientFrom: DEFAULT_GRADIENT.from, gradientTo: DEFAULT_GRADIENT.to, icons: {}, names: {}, rankNames: {}, rankCount: RANK_LEVELS, achColumns: ACH_COLUMNS_DEFAULT, ...DEFAULT_PAGE_THEME }
   }
 }
 
@@ -106,9 +116,10 @@ export function subscribeSettings(callback: (s: GamificationSettings) => void): 
   let names: Record<string, string> = {}
   let rankNames: Record<string, string> = {}
   let rankCount = RANK_LEVELS
+  let achColumns = ACH_COLUMNS_DEFAULT
   let pageTheme = { ...DEFAULT_PAGE_THEME }
 
-  const emit = () => callback({ gradientFrom: gradient.from, gradientTo: gradient.to, icons, names, rankNames, rankCount, ...pageTheme })
+  const emit = () => callback({ gradientFrom: gradient.from, gradientTo: gradient.to, icons, names, rankNames, rankCount, achColumns, ...pageTheme })
 
   void (async () => {
     waitForConfig()
@@ -137,6 +148,7 @@ export function subscribeSettings(callback: (s: GamificationSettings) => void): 
         }
       }
       rankCount = clampRankCount(d?.rankCount)
+      achColumns = clampAchColumns(d?.achColumns)
       emit()
     })
     unsubIcons = onSnapshot(await iconsCol(), (snap) => {
@@ -260,6 +272,17 @@ export async function saveRankCount(count: number): Promise<void> {
   if (!isFirebaseConfigured()) return
   waitForConfig()
   await setDoc(await settingsRef(), { rankCount: clean }, { merge: true })
+}
+
+/** Salva a quantidade de colunas do grid de conquistas (3 ou 4). */
+export async function saveAchievementsColumns(columns: number): Promise<void> {
+  const clean = clampAchColumns(columns)
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('mkt-g-ach-cols', String(clean))
+  }
+  if (!isFirebaseConfigured()) return
+  waitForConfig()
+  await setDoc(await settingsRef(), { achColumns: clean }, { merge: true })
 }
 
 /** Nome exibido da patente (customizado nas configurações, senão o padrão). */

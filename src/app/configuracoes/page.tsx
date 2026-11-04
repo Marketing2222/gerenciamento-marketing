@@ -181,7 +181,7 @@ export default function SettingsPage() {
   const { siteName, logoUrl, applyBrand } = useBrand()
   const { saveProfile, uploadAvatar, uploadLogo, users, addUser, removeUser, tasks, updateTask, roles, addRole, updateRole, removeRole } = useData()
   const { columns, summary, updateColumn, updateSummary, addColumn, removeColumn, reorderColumns } = useColumns()
-  const { settings, saveIcon, clearIcon, saveAchievementName, saveRankName, saveRankCount, saveGradient, savePageTheme } = useGamification()
+  const { settings, saveIcon, clearIcon, saveAchievementName, saveRankName, saveRankCount, saveAchColumns, saveGradient, savePageTheme } = useGamification()
   
   const [name, setName] = useState('')
   const [role, setRole] = useState('DESIGNER')
@@ -745,6 +745,36 @@ export default function SettingsPage() {
                 {appearDraft ? 'Aplicar aparência' : 'Aparência salva'}
               </button>
             </div>
+          </div>
+        </div>
+
+        {/* Colunas do grid de conquistas */}
+        <div className="space-y-2 border-t border-slate-100 dark:border-slate-800 pt-4">
+          <p className="text-xs font-bold text-slate-600 dark:text-slate-300">Colunas das conquistas <span className="font-medium text-slate-400">(em 4 colunas o grid se alarga para os lados, mantendo o tamanho dos cards)</span></p>
+          <div className="flex items-center gap-2">
+            {[3, 4].map((cols) => (
+              <button
+                key={cols}
+                type="button"
+                onClick={() => {
+                  void (async () => {
+                    try {
+                      await saveAchColumns(cols)
+                      setSuccess(`Grid de conquistas: ${cols} colunas.`)
+                    } catch (err) {
+                      setError(`Erro ao salvar colunas: ${err instanceof Error ? err.message : String(err)}`)
+                    }
+                  })()
+                }}
+                className={`px-4 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                  settings.achColumns === cols
+                    ? 'bg-amber-600 border-amber-600 text-white shadow'
+                    : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                }`}
+              >
+                {cols} colunas
+              </button>
+            ))}
           </div>
         </div>
 

@@ -15,10 +15,12 @@ import {
   subscribeUnlocks,
 } from '@/lib/gamification/store'
 import {
+  ACH_COLUMNS_DEFAULT,
   DEFAULT_GRADIENT,
   DEFAULT_PAGE_THEME,
   clearIcon as clearSettingsIcon,
   saveAchievementName as saveSettingsAchievementName,
+  saveAchievementsColumns as saveSettingsAchColumns,
   saveGradient,
   saveIcon as saveSettingsIcon,
   savePageTheme,
@@ -73,6 +75,7 @@ interface GamificationContextType {
   saveAchievementName: (id: string, name: string) => Promise<void>
   saveRankName: (level: number, name: string) => Promise<void>
   saveRankCount: (count: number) => Promise<void>
+  saveAchColumns: (columns: number) => Promise<void>
   saveGradient: (from: string, to: string) => Promise<void>
   savePageTheme: (patch: import('@/lib/gamification/settings').PageThemePatch) => Promise<void>
   saveCover: (url: string | null) => Promise<void>
@@ -97,6 +100,7 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
     names: {},
     rankNames: {},
     rankCount: RANK_LEVELS,
+    achColumns: ACH_COLUMNS_DEFAULT,
     ...DEFAULT_PAGE_THEME,
   })
   const [loading, setLoading] = useState(true)
@@ -182,6 +186,10 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
 
   const doSaveRankCount = useCallback(async (count: number) => {
     await saveSettingsRankCount(count)
+  }, [])
+
+  const doSaveAchColumns = useCallback(async (columns: number) => {
+    await saveSettingsAchColumns(columns)
   }, [])
 
   const doSaveGradient = useCallback(async (from: string, to: string) => {
@@ -291,6 +299,7 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
     saveAchievementName: doSaveAchievementName,
     saveRankName: doSaveRankName,
     saveRankCount: doSaveRankCount,
+    saveAchColumns: doSaveAchColumns,
     saveGradient: doSaveGradient,
     savePageTheme: doSavePageTheme,
     saveCover: doSaveCover,
