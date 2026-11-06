@@ -10,6 +10,7 @@ export interface KanbanFilter {
   filterMonth: number // 0-11, month for week/day filter
   filterYear: number  // year for week/day filter
   filterMonthActive: boolean // true when calendar month filter is active (Todos = all in month)
+  search: string // busca por título da tarefa no kanban ('' = sem busca)
 }
 
 interface KanbanFilterContextType extends KanbanFilter {
@@ -20,6 +21,7 @@ interface KanbanFilterContextType extends KanbanFilter {
   setFilterMonth: (v: number) => void
   setFilterYear: (v: number) => void
   setFilterMonthActive: (v: boolean) => void
+  setSearch: (v: string) => void
   clearAllFilters: () => void
   isCalendarOpen: boolean
   setIsCalendarOpen: (v: boolean) => void
@@ -38,6 +40,7 @@ export function KanbanFilterProvider({ children }: { children: React.ReactNode }
   const [filterMonth, setFilterMonth] = useState(now.getMonth())
   const [filterYear, setFilterYear] = useState(now.getFullYear())
   const [filterMonthActive, setFilterMonthActive] = useState(false)
+  const [search, setSearch] = useState('')
   const [isCalendarOpen, setIsCalendarOpen] = useState(false)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
 
@@ -47,6 +50,7 @@ export function KanbanFilterProvider({ children }: { children: React.ReactNode }
     setWeekFilter('')
     setDayFilter('')
     setFilterMonthActive(false)
+    setSearch('')
   }
 
   return (
@@ -58,6 +62,7 @@ export function KanbanFilterProvider({ children }: { children: React.ReactNode }
       filterMonth, setFilterMonth,
       filterYear, setFilterYear,
       filterMonthActive, setFilterMonthActive,
+      search, setSearch,
       clearAllFilters,
       isCalendarOpen, setIsCalendarOpen,
       isCreateOpen, setIsCreateOpen,

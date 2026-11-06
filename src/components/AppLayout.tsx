@@ -15,6 +15,7 @@ function AppInner({ children }: { children: React.ReactNode }) {
   const {
     assigneeFilter, setAssigneeFilter,
     priorityFilter, setPriorityFilter,
+    search, setSearch,
     setIsCalendarOpen, setIsCreateOpen,
   } = useKanbanFilter()
 
@@ -28,6 +29,8 @@ function AppInner({ children }: { children: React.ReactNode }) {
         onPriorityChange={setPriorityFilter}
         assigneeFilter={assigneeFilter}
         priorityFilter={priorityFilter}
+        search={search}
+        onSearchChange={setSearch}
         onCreateTask={() => setIsCreateOpen(true)}
       />
       {/* Calendar filter panel (floating, only relevant on kanban) */}

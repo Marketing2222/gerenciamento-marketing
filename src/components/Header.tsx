@@ -24,6 +24,7 @@ import {
   Menu,
   X,
   RefreshCw,
+  Search,
   Video,
   Plus,
   Users,
@@ -44,6 +45,9 @@ interface HeaderProps {
   onPriorityChange?: (p: string) => void
   assigneeFilter?: string
   priorityFilter?: string
+  /** Busca por título da tarefa (header do Kanban). */
+  search?: string
+  onSearchChange?: (v: string) => void
   onCreateTask?: () => void
 }
 
@@ -53,6 +57,8 @@ export default function Header({
   onPriorityChange,
   assigneeFilter = '',
   priorityFilter = '',
+  search = '',
+  onSearchChange,
   onCreateTask,
 }: HeaderProps) {
   const pathname = usePathname()
@@ -188,6 +194,34 @@ export default function Header({
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 mb-3">Filtros do Kanban</p>
           </div>
 
+          {/* Busca por título */}
+          {onSearchChange && (
+            <div className="px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-2 mb-2">
+                <Search className="w-3.5 h-3.5 text-slate-500" />
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Buscar tarefa</span>
+              </div>
+              <div className="relative">
+                <input
+                  value={search}
+                  onChange={(e) => onSearchChange(e.target.value)}
+                  placeholder="Digite o título..."
+                  className="w-full text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg pl-7 pr-7 py-1.5 outline-none focus:border-blue-500 text-slate-700 dark:text-slate-300 placeholder:text-slate-400"
+                />
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                {search && (
+                  <button
+                    onClick={() => onSearchChange('')}
+                    title="Limpar busca"
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition cursor-pointer"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Assignee Filter */}
           <div className="px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800">
             <div className="flex items-center gap-2 mb-2">
@@ -223,9 +257,9 @@ export default function Header({
             </select>
           </div>
 
-          {(assigneeFilter || priorityFilter) && (
+          {(assigneeFilter || priorityFilter || search) && (
             <button
-              onClick={() => { onAssigneeChange?.(''); onPriorityChange?.('') }}
+              onClick={() => { onAssigneeChange?.(''); onPriorityChange?.(''); onSearchChange?.('') }}
               className="w-full text-xs font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 px-3 py-2 rounded-xl transition"
             >
               Limpar filtros ativos
@@ -330,6 +364,30 @@ export default function Header({
             >
               <CalendarDays className="w-4 h-4" />
             </button>
+          )}
+
+          {/* Busca por título — só no Kanban (lupa + campo) */}
+          {isKanban && onSearchChange && (
+            <div className="relative ml-2 shrink-0 hidden lg:block">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+              <input
+                value={search}
+                onChange={(e) => onSearchChange(e.target.value)}
+                placeholder="Buscar tarefa..."
+                title="Buscar tarefa pelo título"
+                aria-label="Buscar tarefa pelo título"
+                className="w-44 xl:w-56 pl-8 pr-7 py-1.5 rounded-lg text-xs bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 outline-none focus:border-blue-500 focus:bg-white dark:focus:bg-slate-800 placeholder:text-slate-400 transition"
+              />
+              {search && (
+                <button
+                  onClick={() => onSearchChange('')}
+                  title="Limpar busca"
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition cursor-pointer"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
           )}
         </nav>
 

@@ -42,6 +42,11 @@ function formatDayHeader(dateStr: string) {
   }
 }
 
+/** Busca por título sem depender de acento/caixa ("vídeo" encontra "Video"). */
+function normSearch(s: string) {
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+}
+
 // ─── Drag-to-scroll hook ─────────────────────────────────────────────────────
 function useDragScroll(isDraggingCard: boolean) {
   const ref = useRef<HTMLDivElement>(null)
@@ -121,6 +126,7 @@ export default function KanbanPage() {
     filterMonth,
     filterYear,
     filterMonthActive,
+    search,
     isCreateOpen,
     setIsCreateOpen,
   } = useKanbanFilter()
@@ -164,8 +170,13 @@ export default function KanbanPage() {
         return taskMonth === filterMonth && taskYear === filterYear
       })
     }
+    // Busca por título (aplica a todas, inclusive fixas — é "encontrar", não filtrar)
+    if (search.trim()) {
+      const q = normSearch(search.trim())
+      list = list.filter(t => normSearch(t.title).includes(q))
+    }
     return list
-  }, [activeTasks, assigneeFilter, priorityFilter, weekFilter, dayFilter, filterMonth, filterYear, filterMonthActive])
+  }, [activeTasks, assigneeFilter, priorityFilter, weekFilter, dayFilter, filterMonth, filterYear, filterMonthActive, search])
 
   // Open via URL params
   React.useEffect(() => {
@@ -321,7 +332,7 @@ export default function KanbanPage() {
     return result
   }, [filteredTasks, columns])
 
-  const hasActiveFilter = assigneeFilter || priorityFilter || weekFilter || dayFilter || filterMonthActive
+  const hasActiveFilter = assigneeFilter || priorityFilter || weekFilter || dayFilter || filterMonthActive || search.trim()
   // Column count for dynamic sizing: aim for 6 visible at 100% zoom
   const colCount = columns.length
 
@@ -349,6 +360,7 @@ export default function KanbanPage() {
               {!dayFilter && !weekFilter && filterMonthActive && ` • ${MONTH_PT[filterMonth]}`}
               {assigneeFilter && ' • Responsável'}
               {priorityFilter && ' • Prioridade'}
+              {search.trim() && ` • Busca: "${search.trim()}"`}
             </span>
           </div>
         </div>
@@ -433,7 +445,7 @@ export default function KanbanPage() {
                         >
                           {colTasks.length === 0 ? (
                             <div className="py-4 text-center text-slate-400 text-[10px] border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
-                              Solte aqui
+                              {search.trim() ? 'Sem resultados' : 'Solte aqui'}
                             </div>
                           ) : (
                             colTasks.map((task, index) => (
