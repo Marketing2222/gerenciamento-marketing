@@ -6,6 +6,7 @@ import { DragDropContext, DropResult } from '@hello-pangea/dnd'
 import { Plus, Loader2 } from 'lucide-react'
 import TaskCard from '@/components/TaskCard'
 import TaskModal from '@/components/TaskModal'
+import TaskPicker from '@/components/TaskPicker'
 import { StrictModeDroppable } from '@/components/StrictModeDroppable'
 import { useData } from '@/context/DataContext'
 import { useColumns } from '@/context/ColumnsContext'
@@ -132,9 +133,32 @@ export default function KanbanPage() {
   } = useKanbanFilter()
 
   const [selectedTaskId, setSelectedTaskId] = React.useState<string | null>(null)
+  // ── Modo lado a lado: 2ª tarefa aberta + seletor ──────────────────────────
+  const [selectedTaskId2, setSelectedTaskId2] = React.useState<string | null>(null)
+  const [pickerOpen, setPickerOpen] = React.useState(false)
+  const [pickerSlot, setPickerSlot] = React.useState<'left' | 'right'>('right')
   const [isDraggingCard, setIsDraggingCard] = React.useState(false)
   const selectedTask = useMemo(() => tasks.find(t => t.id === selectedTaskId) || null, [tasks, selectedTaskId])
+  const selectedTask2 = useMemo(() => tasks.find(t => t.id === selectedTaskId2) || null, [tasks, selectedTaskId2])
+  const bothOpen = selectedTask !== null && selectedTask2 !== null
   const activeTasks = useMemo(() => tasks.filter(t => !t.deletedAt), [tasks])
+
+  // Modo criação ocupa a tela inteira → fecha a 2ª tarefa e o seletor
+  React.useEffect(() => {
+    if (isCreateOpen) {
+      setSelectedTaskId2(null)
+      setPickerOpen(false)
+    }
+  }, [isCreateOpen])
+
+  // Escolher no seletor: preenche o slot vazio; com os 2 abertos, troca o slot escolhido
+  const handlePickTask = React.useCallback((t: Task) => {
+    if (!selectedTask) setSelectedTaskId(t.id)
+    else if (!selectedTaskId2) setSelectedTaskId2(t.id)
+    else if (pickerSlot === 'left') setSelectedTaskId(t.id)
+    else setSelectedTaskId2(t.id)
+    setPickerOpen(false)
+  }, [selectedTask, selectedTaskId2, pickerSlot])
   // Hoje é o dia de Sprint Final (último dia útil do mês)?
   const sprintToday = useMemo(() => isSprintDate(new Date()), [])
 
@@ -476,7 +500,45 @@ export default function KanbanPage() {
         isOpen={selectedTask !== null || isCreateOpen}
         onClose={() => { setSelectedTaskId(null); setIsCreateOpen(false) }}
         initialStatus="TODO"
+        splitSide={bothOpen ? 'left' : undefined}
       />
+
+      {/* 2ª tarefa — lado a lado (50/50) quando há 2 abertas; caso contrário,
+          renderiza centralizada sozinha (ao fechar a 1ª, ela "re-centra") */}
+      <TaskModal
+        task={selectedTask2}
+        isOpen={selectedTask2 !== null}
+        onClose={() => setSelectedTaskId2(null)}
+        splitSide={bothOpen ? 'right' : undefined}
+      />
+
+      {/* Seletor de tarefa para abrir/trocar no modo lado a lado */}
+      {pickerOpen && (
+        <TaskPicker
+          tasks={activeTasks}
+          openTaskIds={[selectedTask?.id, selectedTask2?.id].filter(Boolean) as string[]}
+          slot1Title={selectedTask?.title ?? null}
+          slot2Title={selectedTask2?.title ?? null}
+          replaceSlot={pickerSlot}
+          onReplaceSlotChange={setPickerSlot}
+          onPick={handlePickTask}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
+
+      {/* Botão + flutuante (só em tela larga): abre a 2ª tarefa ao lado;
+          com as 2 abertas, fica no canto para trocar uma delas */}
+      {(selectedTask || selectedTask2) && !isCreateOpen && (
+        <button
+          onClick={() => setPickerOpen(true)}
+          title={bothOpen ? 'Trocar uma das tarefas abertas' : 'Abrir outra tarefa ao lado'}
+          className={`fixed z-[99999] hidden min-[1400px]:flex items-center justify-center w-9 h-9 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30 transition cursor-pointer ${
+            bothOpen ? 'top-2 right-2' : 'right-4 top-1/2 -translate-y-1/2'
+          }`}
+        >
+          <Plus className="w-5 h-5" />
+        </button>
+      )}
     </div>
   )
 }

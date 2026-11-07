@@ -34,9 +34,17 @@ interface TaskModalProps {
   isOpen: boolean
   onClose: () => void
   initialStatus?: string
+  /**
+   * Modo "lado a lado": quando definido, este modal ocupa metade da tela
+   * (esquerda ou direita) para exibir 2 tarefas simultaneamente.
+   * 'left' mantém o fundo escuro compartilhado; 'right' renderiza apenas
+   * o painel (por cima do fundo da instância esquerda) com cliques habilitados.
+   */
+  splitSide?: 'left' | 'right'
 }
 
-export default function TaskModal({ task, isOpen, onClose, initialStatus = 'TODO' }: TaskModalProps) {
+export default function TaskModal({ task, isOpen, onClose, initialStatus = 'TODO', splitSide }: TaskModalProps) {
+  const split = Boolean(splitSide)
   const { 
     users, 
     updateTask, 
@@ -86,10 +94,14 @@ export default function TaskModal({ task, isOpen, onClose, initialStatus = 'TODO
   const [markedDone, setMarkedDone] = useState(false)
   
   const fileInputRef = useRef<HTMLInputElement>(null)
+  // Última tarefa sincronizada — usado para resetar sub-estados ao trocar de
+  // tarefa in-place (modo lado a lado / seletor de troca sem fechar o modal)
+  const lastSyncedTaskIdRef = useRef<string | null>(null)
 
   // Carregar dados da tarefa e usuários
   useEffect(() => {
     if (isOpen && !task) {
+      lastSyncedTaskIdRef.current = null
       setLocalTask({
         id: '',
         title: '',
@@ -120,6 +132,21 @@ export default function TaskModal({ task, isOpen, onClose, initialStatus = 'TODO
       return
     }
     if (task && isOpen) {
+      // Trocou de tarefa sem fechar o modal? Zera os sub-estados da anterior
+      // (preview, edição de checklist, popup de conclusão, links, comentários…)
+      if (lastSyncedTaskIdRef.current !== task.id) {
+        lastSyncedTaskIdRef.current = task.id
+        setPreviewAttachment(null)
+        setEditingCheck(null)
+        setShowDonePopup(false)
+        setMarkedDone(false)
+        setIsDescriptionExpanded(false)
+        setNewCheckItem('')
+        setNewComment('')
+        setNewLinkName('')
+        setNewLinkUrl('')
+        setIsAddingLink(false)
+      }
       setLocalTask(task)
       setTitle(task.title)
       setDescription(task.description)
@@ -160,11 +187,15 @@ export default function TaskModal({ task, isOpen, onClose, initialStatus = 'TODO
         setIsDescriptionExpanded(false)
         return
       }
+      // Modo lado a lado: o ESC fecha apenas a tarefa da DIREITA (a aberta por
+      // último via seletor) e a da esquerda recentra; a instância da esquerda
+      // ignora o evento para as duas não fecharem com um mesmo ESC.
+      if (splitSide === 'left') return
       onClose()
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [isOpen, showDonePopup, editingCheck, previewAttachment, isDescriptionExpanded, onClose, cancelDoneSave])
+  }, [isOpen, showDonePopup, editingCheck, previewAttachment, isDescriptionExpanded, onClose, cancelDoneSave, splitSide])
 
   if (!isOpen) return null
 
@@ -417,8 +448,9 @@ export default function TaskModal({ task, isOpen, onClose, initialStatus = 'TODO
   }
 
   return (
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm select-none">
-      <div className="relative w-full max-w-[1200px] bg-white dark:bg-[#111625] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl flex flex-col h-[90vh] max-h-[900px] overflow-hidden animate-scale-up">
+    <>
+    <div className={`fixed inset-0 z-[99999] flex items-center p-4 select-none ${split ? (splitSide === 'left' ? 'justify-start bg-slate-950/60 backdrop-blur-sm' : 'justify-end pointer-events-none') : 'justify-center bg-slate-950/60 backdrop-blur-sm'}`}>
+      <div className={`relative ${split ? 'w-[calc(50%-20px)] min-w-[520px]' : 'w-full'} max-w-[1200px] bg-white dark:bg-[#111625] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl flex flex-col h-[90vh] max-h-[900px] overflow-hidden animate-scale-up ${split && splitSide === 'right' ? 'pointer-events-auto' : ''}`}>
         
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 shrink-0">
@@ -481,9 +513,11 @@ export default function TaskModal({ task, isOpen, onClose, initialStatus = 'TODO
 
         {/* Main 3-Column Container */}
         <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0 bg-white dark:bg-[#111625]">
-          
+          {/* Zonas 1+2 agrupadas no modo lado a lado (empilhadas verticalmente
+              na metade da tela); no modo normal o wrapper não renderiza box */}
+          <div className={split ? 'flex flex-col min-w-0 flex-1 border-r border-slate-200 dark:border-slate-800' : 'contents'}>
           {/* COLUMN 1: Descrição e Comentários */}
-          <div className="flex-[1.3] flex flex-col p-6 space-y-8 border-r border-slate-200 dark:border-slate-800 overflow-y-auto">
+          <div className={`flex-[1.3] flex flex-col p-6 space-y-8 ${split ? 'border-b' : 'border-r'} border-slate-200 dark:border-slate-800 overflow-y-auto`}>
             {/* Description */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -571,7 +605,7 @@ export default function TaskModal({ task, isOpen, onClose, initialStatus = 'TODO
           </div>
 
           {/* COLUMN 2: Checklist e Anexos */}
-          <div className="flex-1 flex flex-col p-6 space-y-8 md:border-r border-slate-200 dark:border-slate-800 overflow-y-auto bg-slate-50/30 dark:bg-[#0c1220]/30">
+          <div className={`flex-1 flex flex-col p-6 space-y-8 ${split ? '' : 'md:border-r'} border-slate-200 dark:border-slate-800 overflow-y-auto bg-slate-50/30 dark:bg-[#0c1220]/30`}>
             {/* Checklist */}
             <div className="space-y-4">
               <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Checklist (Subtarefas)</label>
@@ -834,7 +868,8 @@ export default function TaskModal({ task, isOpen, onClose, initialStatus = 'TODO
             </div>
             )}
           </div>
-          <div className="w-full md:w-72 lg:w-80 shrink-0 p-6 space-y-7 overflow-y-auto bg-slate-50 dark:bg-[#0c1220]">
+          </div>{/* fim zonas 1+2 (wrapper) */}
+          <div className={`${split ? 'w-full md:w-60 lg:w-64' : 'w-full md:w-72 lg:w-80'} shrink-0 p-6 space-y-7 overflow-y-auto bg-slate-50 dark:bg-[#0c1220]`}>
             
             {/* Status Select */}
             <div className="space-y-2">
@@ -967,6 +1002,9 @@ export default function TaskModal({ task, isOpen, onClose, initialStatus = 'TODO
         </div>
 
       </div>
+      {/* Fim do overlay/painel — os sub-overlays abaixo ficam na raiz do React
+          para renderizarem ACIMA dos dois modais no modo lado a lado */}
+      </div>
 
       {/* Popup: confirmação ao marcar Publicado/Concluído */}
       {showDonePopup && (
@@ -1083,6 +1121,6 @@ export default function TaskModal({ task, isOpen, onClose, initialStatus = 'TODO
           onMouseUp={() => setIsDragging(false)}
         />
       )}
-    </div>
+    </>
   )
 }
