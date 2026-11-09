@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Draggable } from '@hello-pangea/dnd'
-import { Play, CheckCircle2, MessageSquare, MoreHorizontal, ChevronDown } from 'lucide-react'
+import { Play, CheckCircle2, MessageSquare, MoreHorizontal, ChevronDown, AlertTriangle } from 'lucide-react'
 
 import { Task } from '@/types'
 import Avatar from '@/components/Avatar'
@@ -41,7 +41,7 @@ const getPriorityLabel = (prio: string) => {
 
 export default function TaskCard({ task, index, onOpenDetail, columnColor }: TaskCardProps) {
   const { summary } = useColumns()
-  const { updateTask, addComment } = useData()
+  const { updateTask, addComment, users } = useData()
   const { user } = useUser()
 
   const [showPriority, setShowPriority] = useState(true)
@@ -50,8 +50,26 @@ export default function TaskCard({ task, index, onOpenDetail, columnColor }: Tas
   const [isActing, setIsActing] = useState(false)
   const [showDoneConfirm, setShowDoneConfirm] = useState(false)
 
-  const isPlaying = task.assigneeId === user?.id
+  // Play = "quem está executando AGORA" (workingId) — desacoplado do responsável.
+  // Azul no card só quando EU marquei (isPlaying).
+  const isPlaying = task.workingId === user?.id
   const isDone = task.status === DONE_COLUMN_ID
+  // Outro usuário marcado (só para o tooltip do play)
+  const workingOther = task.workingId && task.workingId !== user?.id
+    ? users.find(u => u.id === task.workingId)?.name || 'outro usuário'
+    : null
+
+  // Prazo no card: atrasada = vermelho, vence hoje = amarelo; futuro/sem data
+  // e concluídas não destacam.
+  const agora = new Date()
+  const hojeISO = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}-${String(agora.getDate()).padStart(2, '0')}`
+  const venceEm = task.dueDate ? task.dueDate.slice(0, 10) : null
+  const prazo: 'atrasada' | 'hoje' | null =
+    venceEm && !isDone
+      ? venceEm < hojeISO ? 'atrasada'
+        : venceEm === hojeISO ? 'hoje'
+        : null
+      : null
 
   const handlePlay = async (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -59,9 +77,9 @@ export default function TaskCard({ task, index, onOpenDetail, columnColor }: Tas
     setIsActing(true)
     try {
       if (isPlaying) {
-        await updateTask(task.id, { assigneeId: null })
+        await updateTask(task.id, { workingId: null })
       } else {
-        await updateTask(task.id, { assigneeId: user.id })
+        await updateTask(task.id, { workingId: user.id })
       }
     } finally {
       setIsActing(false)
@@ -150,11 +168,23 @@ export default function TaskCard({ task, index, onOpenDetail, columnColor }: Tas
                     <ChevronDown className={`w-2.5 h-2.5 transition-transform ${showPriority ? 'rotate-0' : '-rotate-90'}`} />
                   </button>
                 )}
-                {task.dueDate && summary.showDueDate && (
+                {prazo ? (
+                  <span
+                    title={prazo === 'atrasada'
+                      ? `Atrasada — venceu em ${formatDate(task.dueDate || '')}`
+                      : `Vence hoje — ${formatDate(task.dueDate || '')}`}
+                    className={`inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md text-white shrink-0 ${
+                      prazo === 'atrasada' ? 'bg-red-500' : 'bg-amber-500'
+                    }`}
+                  >
+                    <AlertTriangle className="w-2.5 h-2.5" />
+                    {formatDate(task.dueDate || '')}
+                  </span>
+                ) : task.dueDate && summary.showDueDate ? (
                   <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500">
                     {formatDate(task.dueDate)}
                   </span>
-                )}
+                ) : null}
               </div>
               {summary.showAssignee && task.assignee && (
                 <Avatar
@@ -213,18 +243,24 @@ export default function TaskCard({ task, index, onOpenDetail, columnColor }: Tas
           {/* Action buttons footer */}
           <div className="flex items-center justify-between px-3 py-2 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/20">
             <div className="flex items-center gap-1">
-              {/* Play */}
+              {/* Play — execução manual ("o que estou fazendo agora") */}
               <button
                 onClick={handlePlay}
-                title="Marcar como Em Andamento"
+                title={
+                  isPlaying ? 'Você está executando — clique para liberar'
+                  : workingOther ? `Executando: ${workingOther} — clique para assumir`
+                  : 'Marcar como Em Andamento'
+                }
                 disabled={isActing}
                 className={`p-1.5 rounded-lg transition ${
                   isPlaying
                     ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400'
+                    : workingOther
+                    ? 'bg-amber-50/60 dark:bg-amber-900/20 text-amber-500/80 dark:text-amber-400/80'
                     : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-amber-500'
                 }`}
               >
-                <Play className="w-3.5 h-3.5" fill={isPlaying ? 'currentColor' : 'none'} />
+                <Play className="w-3.5 h-3.5" fill={isPlaying || workingOther ? 'currentColor' : 'none'} />
               </button>
 
               {/* Check */}

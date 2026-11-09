@@ -51,6 +51,8 @@ export interface Task {
   /** Usuário que moveu para a lixeira (gamificação "Pro Cesto"). */
   deletedBy?: string | null
   assigneeId: string | null
+  /** Usuário que está executando AGORA esta tarefa (play manual do card — desacoplado do responsável). */
+  workingId?: string | null
   creatorId: string | null
   assignee: User | null
   creator: User | null

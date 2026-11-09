@@ -65,6 +65,7 @@ function toTaskData(d: FireDoc): Task {
     deletedAt: toIso(docData.deletedAt),
     deletedBy: docData.deletedBy ? toStr(docData.deletedBy) : null,
     assigneeId: docData.assigneeId ? toStr(docData.assigneeId) : null,
+    workingId: docData.workingId ? toStr(docData.workingId) : null,
     creatorId: docData.creatorId ? toStr(docData.creatorId) : null,
     assignee: toObj<User>(docData.assignee),
     creator: toObj<User>(docData.creator),
@@ -227,7 +228,7 @@ export async function createTask(input: {
 
 export async function updateTaskFields(
   taskId: string,
-  patch: Partial<Pick<Task, 'title' | 'description' | 'priority' | 'status' | 'order' | 'dueDate' | 'assigneeId' | 'assignee' | 'deletedAt' | 'isFixed'>>
+  patch: Partial<Pick<Task, 'title' | 'description' | 'priority' | 'status' | 'order' | 'dueDate' | 'assigneeId' | 'assignee' | 'deletedAt' | 'isFixed' | 'workingId'>>
 ): Promise<void> {
   const partial: Record<string, unknown> = {}
   if (patch.title !== undefined) partial.title = patch.title
@@ -242,6 +243,12 @@ export async function updateTaskFields(
   }
   if (patch.deletedAt !== undefined) partial.deletedAt = patch.deletedAt ? new Date(patch.deletedAt) : null
   if (patch.isFixed !== undefined) partial.isFixed = patch.isFixed
+  if (patch.workingId !== undefined) partial.workingId = patch.workingId
+  // Concluir a tarefa limpa o play (execução) automaticamente — em qualquer
+  // origem (card, arraste, modal), a menos que o patch já defina workingId.
+  if (patch.status !== undefined && patch.status === 'DONE' && patch.workingId === undefined) {
+    partial.workingId = null
+  }
   await updateDoc(await taskDoc(taskId), partial)
 }
 

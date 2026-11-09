@@ -72,7 +72,7 @@ interface DataContextType {
   addTask: (input: NewTaskInput) => Promise<void>
   updateTask: (
     id: string,
-    patch: Partial<Pick<Task, 'title' | 'description' | 'priority' | 'status' | 'dueDate' | 'assigneeId' | 'assignee'>>
+    patch: Partial<Pick<Task, 'title' | 'description' | 'priority' | 'status' | 'dueDate' | 'assigneeId' | 'assignee' | 'workingId'>>
   ) => Promise<void>
   updateTaskOrders: (updates: { id: string; order: number }[]) => Promise<void>
   moveToTrash: (id: string) => Promise<void>
@@ -180,7 +180,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [user])
 
   const updateTask = useCallback(
-    async (id: string, patch: Partial<Pick<Task, 'title' | 'description' | 'priority' | 'status' | 'dueDate' | 'assigneeId' | 'assignee' | 'isFixed'>>) => {
+    async (id: string, patch: Partial<Pick<Task, 'title' | 'description' | 'priority' | 'status' | 'dueDate' | 'assigneeId' | 'assignee' | 'isFixed' | 'workingId'>>) => {
       let resolvedPatch: Parameters<typeof updateTaskFields>[1] = { ...patch }
       if (patch.assigneeId !== undefined) {
         const found = users.find((u) => u.id === patch.assigneeId)
