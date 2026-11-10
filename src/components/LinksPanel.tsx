@@ -188,8 +188,9 @@ export default function LinksPanel({ isOpen, onClose }: LinksPanelProps) {
 
   useEffect(() => {
     if (isOpen) {
+      // Padrão: categorias RECOLHIDAS ao abrir o painel (clique no cabeçalho expande)
       const m: Record<string, boolean> = {}
-      quickLinkCategories.forEach((c) => { m[c.id] = true })
+      quickLinkCategories.forEach((c) => { m[c.id] = false })
       setExpandedCats(m)
     }
   }, [isOpen, quickLinkCategories])
@@ -336,7 +337,7 @@ export default function LinksPanel({ isOpen, onClose }: LinksPanelProps) {
             <>
               {quickLinkCategories.map((cat) => {
                 const catLinks = getCatLinks(cat.id)
-                const isExpanded = expandedCats[cat.id] !== false
+                const isExpanded = expandedCats[cat.id] === true
                 return (
                   <div key={cat.id} className="border border-slate-200 dark:border-slate-800 rounded-xl">
                     <div className="flex items-center justify-between px-3 py-2.5 bg-slate-50 dark:bg-slate-900/40 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800/60 transition" onClick={() => toggleCat(cat.id)}>

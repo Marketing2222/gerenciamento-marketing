@@ -3,10 +3,9 @@
 import React, { useMemo, useRef, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { DragDropContext, DropResult } from '@hello-pangea/dnd'
-import { Plus, Loader2 } from 'lucide-react'
+import { Plus, Loader2, X, Columns2 } from 'lucide-react'
 import TaskCard from '@/components/TaskCard'
 import TaskModal from '@/components/TaskModal'
-import TaskPicker from '@/components/TaskPicker'
 import { StrictModeDroppable } from '@/components/StrictModeDroppable'
 import { useData } from '@/context/DataContext'
 import { useColumns } from '@/context/ColumnsContext'
@@ -133,7 +132,7 @@ export default function KanbanPage() {
   } = useKanbanFilter()
 
   const [selectedTaskId, setSelectedTaskId] = React.useState<string | null>(null)
-  // ── Modo lado a lado: 2ª tarefa aberta + seletor ──────────────────────────
+  // ── Modo lado a lado: 2ª tarefa aberta + escolha no próprio kanban ─────────
   const [selectedTaskId2, setSelectedTaskId2] = React.useState<string | null>(null)
   const [pickerOpen, setPickerOpen] = React.useState(false)
   const [pickerSlot, setPickerSlot] = React.useState<'left' | 'right'>('right')
@@ -151,7 +150,7 @@ export default function KanbanPage() {
     }
   }, [isCreateOpen])
 
-  // Escolher no seletor: preenche o slot vazio; com os 2 abertos, troca o slot escolhido
+  // Escolher no kanban: preenche o slot vazio; com os 2 abertos, troca o slot escolhido
   const handlePickTask = React.useCallback((t: Task) => {
     if (!selectedTask) setSelectedTaskId(t.id)
     else if (!selectedTaskId2) setSelectedTaskId2(t.id)
@@ -159,6 +158,19 @@ export default function KanbanPage() {
     else setSelectedTaskId2(t.id)
     setPickerOpen(false)
   }, [selectedTask, selectedTaskId2, pickerSlot])
+
+  // ESC cancela a escolha no kanban — em fase de captura e com stopPropagation,
+  // para que os listeners de ESC dos TaskModal escondidos (fase de bolha) não rodem.
+  React.useEffect(() => {
+    if (!pickerOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      e.stopPropagation()
+      setPickerOpen(false)
+    }
+    document.addEventListener('keydown', onKey, true)
+    return () => document.removeEventListener('keydown', onKey, true)
+  }, [pickerOpen])
   // Hoje é o dia de Sprint Final (último dia útil do mês)?
   const sprintToday = useMemo(() => isSprintDate(new Date()), [])
 
@@ -254,6 +266,7 @@ export default function KanbanPage() {
   }, [loaded, tasks, columns, updateTaskOrders])
 
   const handleDragEnd = (result: DropResult) => {
+    if (pickerOpen) return // modo escolha: nada é movido
     const { source, destination, draggableId } = result
     if (!destination) return
     if (source.droppableId === destination.droppableId && source.index === destination.index) return
@@ -362,6 +375,61 @@ export default function KanbanPage() {
 
   return (
     <div className="flex flex-col h-full">
+      {/* Faixa de escolha — o kanban fica livre pra clicar no card desejado */}
+      {pickerOpen && (
+        <div className="shrink-0 mb-2">
+          <div className="flex items-center gap-3 bg-blue-600 text-white rounded-xl px-4 py-2.5 shadow-lg shadow-blue-500/30">
+            <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center shrink-0">
+              <Columns2 className="w-4 h-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-black truncate">
+                {bothOpen
+                  ? 'Escolha no kanban a tarefa para trocar'
+                  : 'Escolha no kanban a tarefa para abrir ao lado'}
+              </p>
+              <p className="text-[10px] text-blue-100 truncate">
+                Clique no card desejado • dá pra usar a busca do cabeçalho • ESC cancela
+              </p>
+            </div>
+
+            {/* Com as 2 abertas: qual slot o clique substitui */}
+            {bothOpen && (
+              <div className="flex items-center gap-1.5 shrink-0">
+                {([['left', selectedTask?.title], ['right', selectedTask2?.title]] as const).map(([slot, title]) => {
+                  const active = pickerSlot === slot
+                  return (
+                    <button
+                      key={slot}
+                      onClick={() => setPickerSlot(slot)}
+                      title={title || ''}
+                      className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-black border transition cursor-pointer max-w-[150px] ${
+                        active
+                          ? 'bg-white text-blue-700 border-white'
+                          : 'border-blue-300/60 text-blue-100 hover:bg-blue-500/40'
+                      }`}
+                    >
+                      <span className={`px-1 py-0.5 rounded ${active ? 'bg-blue-600 text-white' : 'bg-white/20 text-white'}`}>
+                        {slot === 'left' ? '1ª' : '2ª'}
+                      </span>
+                      <span className="truncate">{title}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            <button
+              onClick={() => setPickerOpen(false)}
+              title="Cancelar escolha (ESC)"
+              className="p-2 rounded-lg text-blue-100 hover:text-white hover:bg-white/15 transition cursor-pointer shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Sprint Final — dia do último dia útil do mês */}
       {sprintToday && (
         <div className="shrink-0 mb-2">
@@ -477,7 +545,13 @@ export default function KanbanPage() {
                                 key={task.id}
                                 task={task}
                                 index={index}
-                                onOpenDetail={t => setSelectedTaskId(t.id)}
+                                onOpenDetail={t => {
+                                  // Modo escolha: o clique preenche o slot vazio/troca o escolhido
+                                  if (pickerOpen) { handlePickTask(t); return }
+                                  setSelectedTaskId(t.id)
+                                }}
+                                picking={pickerOpen}
+                                pickBlocked={pickerOpen && (task.id === selectedTaskId || task.id === selectedTaskId2)}
                                 columnColor={column.bgColor || column.customColor}
                               />
                             ))
@@ -495,40 +569,33 @@ export default function KanbanPage() {
         )}
       </div>
 
-      <TaskModal
-        task={selectedTask || null}
-        isOpen={selectedTask !== null || isCreateOpen}
-        onClose={() => { setSelectedTaskId(null); setIsCreateOpen(false) }}
-        initialStatus="TODO"
-        splitSide={bothOpen ? 'left' : undefined}
-      />
-
-      {/* 2ª tarefa — lado a lado (50/50) quando há 2 abertas; caso contrário,
-          renderiza centralizada sozinha (ao fechar a 1ª, ela "re-centra") */}
-      <TaskModal
-        task={selectedTask2}
-        isOpen={selectedTask2 !== null}
-        onClose={() => setSelectedTaskId2(null)}
-        splitSide={bothOpen ? 'right' : undefined}
-      />
-
-      {/* Seletor de tarefa para abrir/trocar no modo lado a lado */}
-      {pickerOpen && (
-        <TaskPicker
-          tasks={activeTasks}
-          openTaskIds={[selectedTask?.id, selectedTask2?.id].filter(Boolean) as string[]}
-          slot1Title={selectedTask?.title ?? null}
-          slot2Title={selectedTask2?.title ?? null}
-          replaceSlot={pickerSlot}
-          onReplaceSlotChange={setPickerSlot}
-          onPick={handlePickTask}
-          onClose={() => setPickerOpen(false)}
+      {/* Modo escolha no kanban: os modais ficam escondidos (display:none) —
+          componente montado, portanto edições não salvas e sub-estados são
+          preservados; o ESC deles é interceptado pelo listener em fase de
+          captura da página (stopPropagation). */}
+      <div style={{ display: pickerOpen ? 'none' : 'contents' }}>
+        <TaskModal
+          task={selectedTask || null}
+          isOpen={selectedTask !== null || isCreateOpen}
+          onClose={() => { setSelectedTaskId(null); setIsCreateOpen(false) }}
+          initialStatus="TODO"
+          splitSide={bothOpen ? 'left' : undefined}
         />
-      )}
+
+        {/* 2ª tarefa — lado a lado (50/50) quando há 2 abertas; caso contrário,
+            renderiza centralizada sozinha (ao fechar a 1ª, ela "re-centra") */}
+        <TaskModal
+          task={selectedTask2}
+          isOpen={selectedTask2 !== null}
+          onClose={() => setSelectedTaskId2(null)}
+          splitSide={bothOpen ? 'right' : undefined}
+        />
+      </div>
 
       {/* Botão + flutuante (só em tela larga): abre a 2ª tarefa ao lado;
-          com as 2 abertas, fica no canto para trocar uma delas */}
-      {(selectedTask || selectedTask2) && !isCreateOpen && (
+          com as 2 abertas, fica no canto para trocar uma delas; escondido
+          enquanto o modo escolha está ativo (a faixa tem o próprio ✕) */}
+      {(selectedTask || selectedTask2) && !isCreateOpen && !pickerOpen && (
         <button
           onClick={() => setPickerOpen(true)}
           title={bothOpen ? 'Trocar uma das tarefas abertas' : 'Abrir outra tarefa ao lado'}

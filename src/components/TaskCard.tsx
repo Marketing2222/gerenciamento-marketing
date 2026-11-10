@@ -17,6 +17,10 @@ interface TaskCardProps {
   index: number
   onOpenDetail: (task: Task) => void
   columnColor?: string
+  /** Modo escolha do kanban (abrir ao lado): destaque no hover, clique = escolher. */
+  picking?: boolean
+  /** No modo escolha: tarefa já aberta → esmaecida e clique ignorado. */
+  pickBlocked?: boolean
 }
 
 const DONE_COLUMN_ID = 'DONE'
@@ -39,7 +43,7 @@ const getPriorityLabel = (prio: string) => {
   }
 }
 
-export default function TaskCard({ task, index, onOpenDetail, columnColor }: TaskCardProps) {
+export default function TaskCard({ task, index, onOpenDetail, columnColor, picking, pickBlocked }: TaskCardProps) {
   const { summary } = useColumns()
   const { updateTask, addComment, users } = useData()
   const { user } = useUser()
@@ -128,7 +132,7 @@ export default function TaskCard({ task, index, onOpenDetail, columnColor }: Tas
 
   return (
     <>
-    <Draggable draggableId={task.id} index={index}>
+    <Draggable draggableId={task.id} index={index} isDragDisabled={picking}>
       {(provided, snapshot) => (
         <div
           ref={provided.innerRef}
@@ -136,6 +140,9 @@ export default function TaskCard({ task, index, onOpenDetail, columnColor }: Tas
           {...provided.dragHandleProps}
           className={`rounded-xl border shadow-sm hover:shadow-md group mb-2 select-none overflow-hidden
             ${snapshot.isDragging ? 'dragging-card ring-2 ring-blue-400/40 relative z-[9999]' : 'transition-[box-shadow,border-color] duration-150'}
+            ${picking ? 'relative' : ''}
+            ${picking && pickBlocked ? 'opacity-45 cursor-not-allowed' : ''}
+            ${picking && !pickBlocked ? 'cursor-pointer hover:ring-2 hover:ring-blue-500 hover:shadow-lg' : ''}
             ${isDone
               ? 'bg-emerald-100 dark:bg-emerald-900/40 border-emerald-300 dark:border-emerald-700 border-l-[4px] border-l-emerald-500'
               : isPlaying
@@ -153,7 +160,11 @@ export default function TaskCard({ task, index, onOpenDetail, columnColor }: Tas
           {/* Card Body */}
           <div
             className="p-3 cursor-pointer"
-            onClick={() => onOpenDetail(task)}
+            onClick={() => {
+              // Modo escolha: card já aberto não pode ser escolhido de novo
+              if (picking && pickBlocked) return
+              onOpenDetail(task)
+            }}
           >
             {/* Top row: priority toggle + avatar */}
             <div className="flex items-start justify-between gap-2 mb-2">
@@ -297,7 +308,7 @@ export default function TaskCard({ task, index, onOpenDetail, columnColor }: Tas
 
               {/* Ellipsis / Full detail */}
               <button
-                onClick={e => { e.stopPropagation(); onOpenDetail(task) }}
+                onClick={e => { e.stopPropagation(); if (picking && pickBlocked) return; onOpenDetail(task) }}
                 title="Ver detalhes"
                 className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-600 dark:hover:text-slate-300 transition"
               >
@@ -306,6 +317,21 @@ export default function TaskCard({ task, index, onOpenDetail, columnColor }: Tas
             </div>
 
           </div>
+
+          {/* Modo escolha do kanban: camada invisível cobre o card inteiro —
+              qualquer clique = escolher a tarefa (ou ignorar, se já aberta);
+              botões internos (play/check/comentário) ficam bloqueados. */}
+          {picking && (
+            <div
+              onClick={e => {
+                e.stopPropagation()
+                if (pickBlocked) return
+                onOpenDetail(task)
+              }}
+              title={pickBlocked ? 'Já está aberta' : 'Clique para abrir ao lado'}
+              className="absolute inset-0 z-10"
+            />
+          )}
         </div>
       )}
     </Draggable>
