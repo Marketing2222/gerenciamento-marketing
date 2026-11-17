@@ -3,6 +3,8 @@ export interface User {
   name: string
   avatarUrl: string
   role: string
+  /** Usuário desabilitado não pode fazer login nem acessar o sistema. */
+  disabled?: boolean
 }
 
 export interface ChecklistItem {

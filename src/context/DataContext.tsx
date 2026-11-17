@@ -93,6 +93,7 @@ interface DataContextType {
   saveProfile: (id: string, patch: { name?: string; role?: string; avatarUrl?: string; pin?: string }) => Promise<void>
   addUser: (input: { name: string; role: string; avatarUrl?: string; pin?: string }) => Promise<void>
   removeUser: (id: string) => Promise<void>
+  setUserDisabled: (id: string, disabled: boolean) => Promise<void>
   uploadAvatar: (file: File) => Promise<string>
   uploadGeneral: (file: File) => Promise<string>
   uploadLogo: (file: File) => Promise<string>
@@ -290,6 +291,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
     await firestoreDeleteUser(id)
   }, [])
 
+  const setUserDisabled = useCallback(async (id: string, disabled: boolean) => {
+    await updateUser(id, { disabled })
+  }, [])
+
   const seed = useCallback(async () => {
     await seedDatabase(users, tasks)
   }, [users, tasks])
@@ -360,6 +365,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     saveProfile,
     addUser,
     removeUser,
+    setUserDisabled,
     uploadAvatar: (f) => uploadAvatar(f),
     uploadGeneral: (f) => uploadFile(f),
     uploadLogo: (f) => uploadLogo(f),

@@ -84,6 +84,7 @@ function toUserData(d: FireDoc): User {
     name: toStr(docData.name),
     role: toStr(docData.role),
     avatarUrl: toStr(docData.avatarUrl),
+    disabled: docData.disabled === true,
   }
 }
 
@@ -151,13 +152,14 @@ export async function createUser(input: {
 
 export async function updateUser(
   id: string,
-  patch: { name?: string; role?: string; avatarUrl?: string; pin?: string }
+  patch: { name?: string; role?: string; avatarUrl?: string; pin?: string; disabled?: boolean }
 ): Promise<void> {
   const partial: Record<string, unknown> = {}
   if (patch.name !== undefined) partial.name = patch.name
   if (patch.role !== undefined) partial.role = patch.role
   if (patch.avatarUrl !== undefined) partial.avatarUrl = patch.avatarUrl
   if (patch.pin !== undefined) partial.pin = patch.pin
+  if (patch.disabled !== undefined) partial.disabled = patch.disabled
   await updateDoc(doc(await usersCol(), id), partial)
 }
 

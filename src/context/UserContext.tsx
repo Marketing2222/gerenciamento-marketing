@@ -64,6 +64,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         (snap) => {
           if (snap.exists()) {
             const d = snap.data()
+            // Usuário desabilitado perde o acesso na hora (mesmo com sessão aberta)
+            if (d.disabled === true) {
+              localStorage.removeItem(USER_STORAGE_KEY)
+              setUser(null)
+              setLoading(false)
+              if (pathname !== '/login') {
+                router.push('/login')
+              }
+              return
+            }
             const u: User = { id: snap.id, name: d.name || '', role: d.role || '', avatarUrl: d.avatarUrl || '' }
             setUser(u)
           } else {
@@ -110,6 +120,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           return { success: false, error: 'Usuário não encontrado' }
         }
         const data = snap.data()
+        if (data.disabled === true) {
+          return { success: false, error: 'Este usuário está desabilitado. Contate o administrador.' }
+        }
         const storedPin = data.pin || ''
         if (!storedPin) {
           return { success: false, error: 'Este usuário não possui PIN configurado. Configure um PIN primeiro.' }

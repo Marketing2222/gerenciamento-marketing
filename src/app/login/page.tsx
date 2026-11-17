@@ -111,19 +111,25 @@ export default function LoginPage() {
             {users.map((u) => (
               <button
                 key={u.id}
-                onClick={() => setSelectedUser(u)}
-                className="flex flex-col items-center p-4 rounded-xl border border-slate-800 bg-slate-900/40 hover:bg-slate-800/50 hover:border-slate-700 transition duration-300 text-center group cursor-pointer"
+                onClick={() => { if (u.disabled) return; setSelectedUser(u) }}
+                disabled={u.disabled}
+                className={`flex flex-col items-center p-4 rounded-xl border border-slate-800 bg-slate-900/40 transition duration-300 text-center group ${u.disabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-slate-800/50 hover:border-slate-700 cursor-pointer'}`}
               >
                 <div className="relative mb-3">
-                  <Avatar name={u.name} url={u.avatarUrl} size="2xl" className="border-2 border-slate-700 group-hover:border-blue-500 transition duration-300" />
-                  <div className="absolute inset-0 rounded-full bg-blue-500/10 opacity-0 group-hover:opacity-100 transition duration-300" />
+                  <Avatar name={u.name} url={u.avatarUrl} size="2xl" className={`border-2 border-slate-700 ${u.disabled ? 'grayscale' : 'group-hover:border-blue-500 transition duration-300'}`} />
+                  {!u.disabled && <div className="absolute inset-0 rounded-full bg-blue-500/10 opacity-0 group-hover:opacity-100 transition duration-300" />}
                 </div>
-                <h3 className="font-semibold text-slate-200 text-sm group-hover:text-white line-clamp-1">
+                <h3 className={`font-semibold text-slate-200 text-sm line-clamp-1 ${!u.disabled && 'group-hover:text-white'}`}>
                   {u.name}
                 </h3>
                 <p className="text-slate-500 text-xs mt-1">
                   {getRoleName(u.role)}
                 </p>
+                {u.disabled && (
+                  <span className="mt-2 px-2 py-0.5 rounded-full bg-red-950/60 border border-red-800/60 text-red-400 text-[10px] font-bold uppercase tracking-wider">
+                    Desabilitado
+                  </span>
+                )}
               </button>
             ))}
           </div>

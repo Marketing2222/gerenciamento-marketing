@@ -5,7 +5,7 @@ import { useUser } from '@/context/UserContext'
 import { useBrand } from '@/context/BrandContext'
 import { useData } from '@/context/DataContext'
 import { useColumns, CardSummaryConfig } from '@/context/ColumnsContext'
-import { User, Shield, Camera, Loader2, Sparkles, Globe, Upload, X, Check, Columns3, Plus, Pencil, Trash2, Users, GripVertical, Briefcase, Trophy } from 'lucide-react'
+import { User, Shield, Camera, Loader2, Sparkles, Globe, Upload, X, Check, Columns3, Plus, Pencil, Trash2, Users, GripVertical, Briefcase, Trophy, UserX, UserCheck } from 'lucide-react'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 import Avatar from '@/components/Avatar'
 import { useGamification } from '@/context/GamificationContext'
@@ -14,6 +14,10 @@ import { achievementName, iconKeys, RANK_LEVELS, RANK_MAX_LEVELS, rankTitle } fr
 import { defaultTitleForLevel, iconForLevel } from '@/lib/gamification/levels'
 import type { Rarity } from '@/lib/gamification/types'
 import { uploadFile } from '@/lib/storage'
+
+// Apenas Leonardo Araujo pode desabilitar/habilitar usuários (checado por ID,
+// não por nome — o nome pode ser editado no perfil por qualquer usuário).
+const ADMIN_USER_ID = '8d97e0ce-7ca8-43ad-87d8-7c012d5dc77f'
 
 const RARITY_LABELS: { id: Rarity; label: string; pill: string }[] = [
   { id: 'comum', label: 'Comum', pill: 'bg-slate-500/15 text-slate-600 dark:text-slate-300 border-slate-500/30' },
@@ -179,7 +183,7 @@ function GamIconCell({
 export default function SettingsPage() {
   const { user, refreshUser } = useUser()
   const { siteName, logoUrl, applyBrand } = useBrand()
-  const { saveProfile, uploadAvatar, uploadLogo, users, addUser, removeUser, tasks, updateTask, roles, addRole, updateRole, removeRole } = useData()
+  const { saveProfile, uploadAvatar, uploadLogo, users, addUser, removeUser, setUserDisabled, tasks, updateTask, roles, addRole, updateRole, removeRole } = useData()
   const { columns, summary, updateColumn, updateSummary, addColumn, removeColumn, reorderColumns } = useColumns()
   const { settings, saveIcon, clearIcon, saveAchievementName, saveRankName, saveRankCount, saveAchColumns, saveGradient, savePageTheme } = useGamification()
   
@@ -206,6 +210,7 @@ export default function SettingsPage() {
   const [userForm, setUserForm] = useState<UserFormData>(EMPTY_USER_FORM)
   const [savingUser, setSavingUser] = useState(false)
   const [deletingUser, setDeletingUser] = useState<string | null>(null)
+  const [togglingUser, setTogglingUser] = useState<string | null>(null)
 
   const [showColumnModal, setShowColumnModal] = useState(false)
   const [newColumnTitle, setNewColumnTitle] = useState('')
@@ -454,6 +459,26 @@ export default function SettingsPage() {
       setError(`Erro: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setDeletingUser(null)
+    }
+  }
+
+  const isLeonardo = user.id === ADMIN_USER_ID
+
+  const handleToggleUserDisabled = async (u: { id: string; name: string; disabled?: boolean }) => {
+    if (u.id === user.id) { setError('Você não pode desabilitar a si mesmo'); return }
+    const msg = u.disabled
+      ? `Habilitar o acesso de ${u.name}?`
+      : `Desabilitar ${u.name}?\n\nEle não poderá mais fazer login nem acessar o sistema.`
+    if (!confirm(msg)) return
+    setTogglingUser(u.id)
+    setError('')
+    try {
+      await setUserDisabled(u.id, !u.disabled)
+      setSuccess(u.disabled ? 'Usuário habilitado!' : 'Usuário desabilitado!')
+    } catch (err) {
+      setError(`Erro: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setTogglingUser(null)
     }
   }
 
@@ -994,13 +1019,21 @@ export default function SettingsPage() {
         </div>
         <div className="space-y-2">
           {users.map((u) => (
-            <div key={u.id} className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-200 dark:border-slate-800">
-              <Avatar name={u.name} url={u.avatarUrl} size="lg" />
+            <div key={u.id} className={`flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-200 dark:border-slate-800 ${u.disabled ? 'opacity-60' : ''}`}>
+              <Avatar name={u.name} url={u.avatarUrl} size="lg" className={u.disabled ? 'grayscale' : ''} />
               <div className="flex-1 min-w-0">
-                <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">{u.name}</h4>
+                <div className="flex items-center gap-2 min-w-0">
+                  <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">{u.name}</h4>
+                  {u.disabled && <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900 text-[9px] font-bold uppercase tracking-wider">Desabilitado</span>}
+                </div>
                 <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">{roles.find(r => r.id === u.role)?.name || u.role}</span>
               </div>
               <div className="flex items-center gap-1 shrink-0">
+                {isLeonardo && u.id !== user.id && (
+                  <button onClick={() => handleToggleUserDisabled(u)} disabled={togglingUser === u.id} className={`p-2 rounded-lg text-slate-400 transition cursor-pointer disabled:opacity-50 ${u.disabled ? 'hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/20' : 'hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/20'}`} title={u.disabled ? 'Habilitar acesso' : 'Desabilitar acesso'}>
+                    {togglingUser === u.id ? <Loader2 className="w-4 h-4 animate-spin" /> : u.disabled ? <UserCheck className="w-4 h-4" /> : <UserX className="w-4 h-4" />}
+                  </button>
+                )}
                 <button onClick={() => openEditUser(u)} className="p-2 rounded-lg text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/20 transition cursor-pointer" title="Editar"><Pencil className="w-4 h-4" /></button>
                 {u.id !== user.id && <button onClick={() => handleDeleteUser(u.id)} disabled={deletingUser === u.id} className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition cursor-pointer disabled:opacity-50" title="Excluir">{deletingUser === u.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}</button>}
               </div>
