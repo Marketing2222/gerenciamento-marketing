@@ -1,6 +1,11 @@
 import type { AchievementUnlock, XpEvent } from './types'
 import { ACHIEVEMENTS_BY_ID } from './achievements'
 import { levelFromXp } from './levels'
+import {
+  seasonInfoFromNumber,
+  storedSeasonsFor,
+  type StoredSeasonRecord,
+} from './pastSeasons'
 
 /**
  * Temporadas contínuas: T01 = Janeiro/2026, cada mês é uma temporada
@@ -92,16 +97,48 @@ export function isUnlockInSeason(docId: string, unlockedAt: string, season: Seas
   return inSeasonMs(ts(unlockedAt), season)
 }
 
+/** Converte um registro oficial (dados fixos) em resumo de temporada. */
+function storedSummary(rec: StoredSeasonRecord): SeasonSummary {
+  const { year, month } = seasonInfoFromNumber(rec.season)
+  const info = seasonInfo(year, month)
+  // Data fictícia no meio da temporada — só exibição (chips não mostram hora).
+  const midIso = new Date(year, month - 1, 15, 12, 0, 0, 0).toISOString()
+  const achievements: AchievementUnlock[] = rec.achievementIds.map((id) => ({
+    achievementId: id,
+    unlockedAt: midIso,
+    progress: ACHIEVEMENTS_BY_ID[id]?.requirement.value ?? 1,
+  }))
+  return {
+    info,
+    xpEarned: rec.xp,
+    tasksCompleted: rec.tasks,
+    achievements,
+    levelStart: 1,
+    levelEnd: rec.levelEnd,
+  }
+}
+
+export interface SeasonSummariesOptions {
+  /** Dono dos eventos — aplica os registros oficiais de temporadas antigas. */
+  uid?: string | null
+  /** Conquistas pausadas/removidas: não contam na temporada ATUAL. */
+  inactiveIds?: ReadonlySet<string>
+  now?: Date
+}
+
 /**
  * Resumo de todas as temporadas com atividade, da época (Jan/2026) até a
  * temporada atual (inclusive — sempre presente, mesmo sem dados).
  * Temporadas passadas nunca mudam (datas fechadas); a atual fica ao vivo.
+ * Temporadas com registro oficial (T06–T10 de Leonardo) usam os dados fixos
+ * em vez dos eventos reais.
  */
 export function buildSeasonSummaries(
   events: XpEvent[],
   unlocks: Record<string, AchievementUnlock>,
-  now: Date = new Date()
+  opts: SeasonSummariesOptions = {}
 ): SeasonSummary[] {
+  const now = opts.now ?? new Date()
   const evs: { ms: number; xp: number }[] = []
   for (const e of events) {
     const ms = ts(e.completedAt)
@@ -146,6 +183,25 @@ export function buildSeasonSummaries(
       levelEnd: levelFromXp(xpEarned),
     }
   })
+
+  // Registros oficiais de temporadas antigas (dados fixos informados) —
+  // substituem o cálculo por eventos. summaries[i] = temporada i+1 (T01 = 0).
+  for (const rec of storedSeasonsFor(opts.uid)) {
+    if (rec.season >= 1 && rec.season <= summaries.length) {
+      summaries[rec.season - 1] = storedSummary(rec)
+    }
+  }
+
+  // Temporada atual: conquista pausada/removida sai da contagem do mês.
+  const inactive = opts.inactiveIds
+  if (inactive && inactive.size > 0) {
+    const lastIdx = summaries.length - 1
+    const last = summaries[lastIdx]
+    const kept = last.achievements.filter((u) => !inactive.has(u.achievementId))
+    if (kept.length !== last.achievements.length) {
+      summaries[lastIdx] = { ...last, achievements: kept }
+    }
+  }
 
   // Mostra só da primeira temporada com atividade até a atual;
   // sem nenhuma atividade, mostra apenas a temporada atual.

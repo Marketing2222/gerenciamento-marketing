@@ -26,6 +26,8 @@ import {
   savePageTheme,
   saveRankCount as saveSettingsRankCount,
   saveRankName as saveSettingsRankName,
+  savePausedAchievements,
+  saveRemovedAchievements,
   subscribeSettings,
   RANK_LEVELS,
   type GamificationSettings,
@@ -81,6 +83,12 @@ interface GamificationContextType {
   saveCover: (url: string | null) => Promise<void>
   saveAccent: (from: string, to: string) => Promise<void>
   saveBgZoom: (zoom: number) => Promise<void>
+  /** Pausa/despausa uma conquista (não conta no mês atual). */
+  setAchievementPaused: (id: string, paused: boolean) => Promise<void>
+  /** Remove/restaura uma conquista (sai/joga de volta ao jogo). */
+  setAchievementRemoved: (id: string, removed: boolean) => Promise<void>
+  /** Ids pausados + removidos (não contam na temporada atual). */
+  inactiveIds: ReadonlySet<string>
 }
 
 const GamificationContext = createContext<GamificationContextType | undefined>(undefined)
@@ -101,6 +109,8 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
     rankNames: {},
     rankCount: RANK_LEVELS,
     achColumns: ACH_COLUMNS_DEFAULT,
+    pausedAchievements: [],
+    removedAchievements: [],
     ...DEFAULT_PAGE_THEME,
   })
   const [loading, setLoading] = useState(true)
@@ -270,7 +280,46 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
     return eventsXp + rewardsXp
   }, [seasonEvents, unlocks])
 
-  const unlockedCount = Object.keys(unlocks).length
+  // Conquistas pausadas/removidas: fora da contagem do mês ATUAL.
+  const inactiveIds = React.useMemo(() => {
+    const set = new Set<string>()
+    settings.pausedAchievements.forEach((id) => set.add(id))
+    settings.removedAchievements.forEach((id) => set.add(id))
+    return set
+  }, [settings.pausedAchievements, settings.removedAchievements])
+
+  const activeUnlockedCount = React.useMemo(
+    () => Object.keys(unlocks).filter((id) => !inactiveIds.has(id)).length,
+    [unlocks, inactiveIds]
+  )
+
+  // Denominador: total menos as que não contam (pausadas/removidas).
+  const totalAchievements = React.useMemo(() => {
+    let inactiveValid = 0
+    inactiveIds.forEach((id) => {
+      if (ACHIEVEMENTS_BY_ID[id]) inactiveValid++
+    })
+    return Math.max(1, TOTAL_ACHIEVEMENTS - inactiveValid)
+  }, [inactiveIds])
+
+  const doSetAchievementPaused = useCallback(async (id: string, paused: boolean) => {
+    const next = paused
+      ? [...new Set([...settings.pausedAchievements, id])]
+      : settings.pausedAchievements.filter((x) => x !== id)
+    // Pausar tira também da removida (mutuamente exclusivas).
+    const nextRemoved = settings.removedAchievements.filter((x) => x !== id)
+    await savePausedAchievements(next)
+    if (nextRemoved.length !== settings.removedAchievements.length) await saveRemovedAchievements(nextRemoved)
+  }, [settings.pausedAchievements, settings.removedAchievements])
+
+  const doSetAchievementRemoved = useCallback(async (id: string, removed: boolean) => {
+    const next = removed
+      ? [...new Set([...settings.removedAchievements, id])]
+      : settings.removedAchievements.filter((x) => x !== id)
+    const nextPaused = settings.pausedAchievements.filter((x) => x !== id)
+    await saveRemovedAchievements(next)
+    if (nextPaused.length !== settings.pausedAchievements.length) await savePausedAchievements(nextPaused)
+  }, [settings.removedAchievements, settings.pausedAchievements])
   // Aplica os títulos custom ANTES de calcular (senão o memo usaria títulos antigos)
   // e recomputa quando rankNames muda.
   const level = React.useMemo(() => {
@@ -284,8 +333,9 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
     allUnlocks: unlockDocs,
     events,
     counters,
-    unlockedCount,
-    totalAchievements: TOTAL_ACHIEVEMENTS,
+    unlockedCount: activeUnlockedCount,
+    totalAchievements,
+    inactiveIds,
     newAchievements: progress?.newAchievements ?? 0,
     loading,
     level,
@@ -305,6 +355,8 @@ export function GamificationProvider({ children }: { children: React.ReactNode }
     saveCover: doSaveCover,
     saveAccent: doSaveAccent,
     saveBgZoom: doSaveBgZoom,
+    setAchievementPaused: doSetAchievementPaused,
+    setAchievementRemoved: doSetAchievementRemoved,
   }
 
   return (

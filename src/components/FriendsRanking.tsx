@@ -6,14 +6,13 @@ import { useData } from '@/context/DataContext'
 import { useUser } from '@/context/UserContext'
 import { useGamification } from '@/context/GamificationContext'
 import { subscribeEvents, subscribeUnlocks } from '@/lib/gamification/store'
-import { TOTAL_ACHIEVEMENTS } from '@/lib/gamification/achievements'
 import {
   SEASON_EPOCH,
   currentSeason,
   seasonInfo,
   type SeasonInfo,
 } from '@/lib/gamification/seasons'
-import { iconForLevel, levelProgress } from '@/lib/gamification/levels'
+import { iconForLevel, levelProgressAt } from '@/lib/gamification/levels'
 import {
   FIRST_AVAILABLE_SEASON,
   MONTHS_PT,
@@ -36,13 +35,15 @@ interface RankingRow {
   title: string
   icon: string
   achievements: number
+  /** Denominador de conquistas da temporada (pode excluir pausadas/removidas). */
+  total: number
 }
 
 const MEDALS = ['bg-gradient-to-br from-amber-300 to-amber-600 text-amber-950 shadow-md shadow-amber-500/30',
   'bg-gradient-to-br from-slate-300 to-slate-500 text-slate-900 shadow-md shadow-slate-400/30',
   'bg-gradient-to-br from-amber-600 to-orange-700 text-white shadow-md shadow-orange-600/30']
 
-/** Temporadas da T08 até a atual, da mais recente para a mais antiga. */
+/** Temporadas da T06 até a atual, da mais recente para a mais antiga. */
 function seasonOptions(now: Date = new Date()): SeasonInfo[] {
   const cur = currentSeason(now)
   const list: SeasonInfo[] = []
@@ -67,7 +68,7 @@ function seasonOptions(now: Date = new Date()): SeasonInfo[] {
 export default function FriendsRanking({ onClose }: { onClose: () => void }) {
   const { users, roles } = useData()
   const { user } = useUser()
-  const { settings } = useGamification()
+  const { settings, inactiveIds } = useGamification()
   const [stats, setStats] = useState<Record<string, FriendStats>>({})
   const [isSeasonMenuOpen, setIsSeasonMenuOpen] = useState(false)
   const [profileId, setProfileId] = useState<string | null>(null)
@@ -104,8 +105,11 @@ export default function FriendsRanking({ onClose }: { onClose: () => void }) {
   const rows: RankingRow[] = useMemo(() => {
     const list = rankable.map((u) => {
       const st = stats[u.id]
-      const s = computeSeasonStats(st?.events ?? [], st?.unlocks ?? {}, season)
-      const level = levelProgress(s.xp)
+      const s = computeSeasonStats(st?.events ?? [], st?.unlocks ?? {}, season, {
+        uid: u.id,
+        inactiveIds,
+      })
+      const level = levelProgressAt(s.levelEnd, s.xp)
       return {
         id: u.id,
         name: u.name,
@@ -114,10 +118,11 @@ export default function FriendsRanking({ onClose }: { onClose: () => void }) {
         title: level.title,
         icon: level.icon,
         achievements: s.unlockedIds.length,
+        total: s.total,
       }
     })
     return list.sort((a, b) => b.xp - a.xp || a.name.localeCompare(b.name))
-  }, [rankable, stats, season])
+  }, [rankable, stats, season, inactiveIds])
 
   const loading = rankable.some((u) => !stats[u.id])
 
@@ -261,7 +266,7 @@ export default function FriendsRanking({ onClose }: { onClose: () => void }) {
 
                 <span className="w-20 text-right shrink-0">
                   <span className="px-2 py-1 rounded-md text-[11px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
-                    {r.achievements}/{TOTAL_ACHIEVEMENTS}
+                    {r.achievements}/{r.total}
                   </span>
                 </span>
 

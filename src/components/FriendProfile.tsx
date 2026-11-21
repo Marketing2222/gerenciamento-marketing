@@ -9,14 +9,13 @@ import {
   subscribeProgress,
   subscribeUnlocks,
 } from '@/lib/gamification/store'
-import { TOTAL_ACHIEVEMENTS } from '@/lib/gamification/achievements'
 import {
   buildSeasonSummaries,
   eventInSeason,
   isUnlockInSeason,
   type SeasonInfo,
 } from '@/lib/gamification/seasons'
-import { levelProgress } from '@/lib/gamification/levels'
+import { levelProgressAt } from '@/lib/gamification/levels'
 import { computeCounters } from '@/lib/gamification/engine'
 import {
   FIRST_AVAILABLE_SEASON,
@@ -133,8 +132,8 @@ function MiniBars({
 
 /**
  * Perfil de um amigo (visitante): capa, patente da temporada, nível,
- * XP, conquistas (x/46), tarefas concluídas, sequência (streak),
- * conquistas da temporada e histórico de temporadas (T08+).
+ * XP, conquistas (x/total), tarefas concluídas da temporada, sequência
+ * (streak), conquistas da temporada e histórico de temporadas (T06+).
  */
 export default function FriendProfile({
   userId,
@@ -146,7 +145,7 @@ export default function FriendProfile({
   onClose: () => void
 }) {
   const { users, roles, tasks } = useData()
-  const { settings } = useGamification()
+  const { settings, inactiveIds } = useGamification()
   const [progress, setProgress] = useState<UserProgress | null>(null)
   const [events, setEvents] = useState<XpEvent[] | null>(null)
   const [unlocks, setUnlocks] = useState<Record<string, AchievementUnlock>>({})
@@ -164,28 +163,30 @@ export default function FriendProfile({
   }, [userId])
 
   const stats = useMemo(
-    () => computeSeasonStats(events ?? [], unlocks, season),
-    [events, unlocks, season]
+    () => computeSeasonStats(events ?? [], unlocks, season, { uid: userId, inactiveIds }),
+    [events, unlocks, season, userId, inactiveIds]
   )
-  const level = useMemo(() => levelProgress(stats.xp), [stats.xp])
+  const level = useMemo(() => levelProgressAt(stats.levelEnd, stats.xp), [stats])
   const counters = useMemo(
     () => computeCounters(events ?? [], userId, tasks, season),
     [events, userId, tasks, season]
   )
   const history = useMemo(
     () =>
-      buildSeasonSummaries(events ?? [], unlocks)
+      buildSeasonSummaries(events ?? [], unlocks, { uid: userId, inactiveIds })
         .filter(
           (s) =>
             s.info.number >= FIRST_AVAILABLE_SEASON && s.info.key !== season.key
         )
         .reverse(),
-    [events, unlocks, season]
+    [events, unlocks, season, userId, inactiveIds]
   )
 
+  // Temporadas com registro oficial não têm eventos detalhados — esconde
+  // ritmo/atividades (os cards de XP/tarefas/conquistas usam os dados fixos).
   const seasonEvents = useMemo(
-    () => (events ?? []).filter((e) => eventInSeason(e, season)),
-    [events, season]
+    () => (stats.stored ? [] : (events ?? []).filter((e) => eventInSeason(e, season))),
+    [events, season, stats.stored]
   )
 
   const unlockDates = useMemo(() => {
@@ -333,7 +334,7 @@ export default function FriendProfile({
             <div className="p-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 text-center">
               <p className="text-lg font-extrabold text-amber-600 dark:text-amber-400 flex items-center justify-center gap-1">
                 <Trophy className="w-4 h-4" />
-                {stats.achievements.length}/{TOTAL_ACHIEVEMENTS}
+                {stats.achievements.length}/{stats.total}
               </p>
               <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
                 Conquistas
@@ -342,10 +343,10 @@ export default function FriendProfile({
             <div className="p-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 text-center">
               <p className="text-lg font-extrabold text-sky-600 dark:text-sky-400 flex items-center justify-center gap-1">
                 <ListChecks className="w-4 h-4" />
-                {counters.total}
+                {stats.tasksCompleted}
               </p>
               <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
-                Tarefas total
+                Tarefas {season.label}
               </p>
             </div>
             <div className="p-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 text-center">

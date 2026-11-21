@@ -115,7 +115,12 @@ export function iconForLevel(level: number): string {
   return '💫'
 }
 
-export function levelProgress(xp: number): {
+/**
+ * Progresso de um nível JÁ definido (temporadas com registro oficial usam o
+ * nível registrado em vez do derivado do XP). O "into" é limitado ao nível —
+ * XP acima do limiar do próximo nível só satura a barra em 100%.
+ */
+export function levelProgressAt(level: number, xp: number): {
   level: number
   title: string
   icon: string
@@ -124,11 +129,10 @@ export function levelProgress(xp: number): {
   intoLevel: number
   percent: number
 } {
-  const level = levelFromXp(xp)
   const currentLevelXp = levelThreshold(level)
   const nextLevelXp = levelThreshold(level + 1)
-  const intoLevel = xp - currentLevelXp
   const span = Math.max(1, nextLevelXp - currentLevelXp)
+  const intoLevel = Math.max(0, Math.min(xp - currentLevelXp, span))
   return {
     level,
     title: titleForLevel(level),
@@ -138,4 +142,16 @@ export function levelProgress(xp: number): {
     intoLevel,
     percent: Math.min(100, Math.round((intoLevel / span) * 100)),
   }
+}
+
+export function levelProgress(xp: number): {
+  level: number
+  title: string
+  icon: string
+  currentLevelXp: number
+  nextLevelXp: number
+  intoLevel: number
+  percent: number
+} {
+  return levelProgressAt(levelFromXp(xp), xp)
 }

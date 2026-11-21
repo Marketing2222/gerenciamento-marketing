@@ -5,7 +5,7 @@ import { useUser } from '@/context/UserContext'
 import { useBrand } from '@/context/BrandContext'
 import { useData } from '@/context/DataContext'
 import { useColumns, CardSummaryConfig } from '@/context/ColumnsContext'
-import { User, Shield, Camera, Loader2, Sparkles, Globe, Upload, X, Check, Columns3, Plus, Pencil, Trash2, Users, GripVertical, Briefcase, Trophy, UserX, UserCheck } from 'lucide-react'
+import { User, Shield, Camera, Loader2, Sparkles, Globe, Upload, X, Check, Columns3, Plus, Pencil, Pause, Play, RotateCcw, Trash2, Users, GripVertical, Briefcase, Trophy, UserX, UserCheck } from 'lucide-react'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 import Avatar from '@/components/Avatar'
 import { useGamification } from '@/context/GamificationContext'
@@ -64,6 +64,10 @@ function GamIconCell({
   onSaveName,
   readOnly,
   onDelete,
+  paused,
+  removed,
+  onTogglePause,
+  onToggleRemove,
 }: {
   cellKey: string
   label: string
@@ -81,6 +85,14 @@ function GamIconCell({
   readOnly?: boolean
   /** Remove o ITEM (ex.: patente), não só a imagem — botão vermelho extra. */
   onDelete?: () => void
+  /** Conquista pausada (não conta no mês). */
+  paused?: boolean
+  /** Conquista removida (fora do jogo). */
+  removed?: boolean
+  /** Pausar/retomar a conquista. */
+  onTogglePause?: () => void
+  /** Remover/restaurar a conquista. */
+  onToggleRemove?: () => void
 }) {
   const [editingName, setEditingName] = useState(false)
   const [nameDraft, setNameDraft] = useState('')
@@ -176,6 +188,40 @@ function GamIconCell({
           )}
         </div>
       )}
+      {(onTogglePause || onToggleRemove) && (
+        <div className="flex gap-1">
+          {onTogglePause && (
+            <button
+              type="button"
+              onClick={onTogglePause}
+              title={paused ? 'Retomar — volta a contar como conquista no mês' : 'Pausar — deixa de contar como conquista no mês'}
+              className={`flex items-center gap-1 px-1.5 py-1 rounded-md text-[9px] font-bold transition cursor-pointer ${
+                paused
+                  ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/40'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-amber-50 dark:hover:bg-amber-950/30 hover:text-amber-600 border border-transparent'
+              }`}
+            >
+              {paused ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
+              {paused ? 'Retomar' : 'Pausar'}
+            </button>
+          )}
+          {onToggleRemove && (
+            <button
+              type="button"
+              onClick={onToggleRemove}
+              title={removed ? 'Restaurar — volta para o jogo' : 'Remover — sai do jogo e das contagens'}
+              className={`flex items-center gap-1 px-1.5 py-1 rounded-md text-[9px] font-bold transition cursor-pointer ${
+                removed
+                  ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/40'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-500 border border-transparent'
+              }`}
+            >
+              {removed ? <RotateCcw className="w-3 h-3" /> : <Trash2 className="w-3 h-3" />}
+              {removed ? 'Restaurar' : 'Remover'}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -185,7 +231,7 @@ export default function SettingsPage() {
   const { siteName, logoUrl, applyBrand } = useBrand()
   const { saveProfile, uploadAvatar, uploadLogo, users, addUser, removeUser, setUserDisabled, tasks, updateTask, roles, addRole, updateRole, removeRole } = useData()
   const { columns, summary, updateColumn, updateSummary, addColumn, removeColumn, reorderColumns } = useColumns()
-  const { settings, saveIcon, clearIcon, saveAchievementName, saveRankName, saveRankCount, saveAchColumns, saveGradient, savePageTheme } = useGamification()
+  const { settings, saveIcon, clearIcon, saveAchievementName, saveRankName, saveRankCount, saveAchColumns, saveGradient, savePageTheme, setAchievementPaused, setAchievementRemoved } = useGamification()
   
   const [name, setName] = useState('')
   const [role, setRole] = useState('DESIGNER')
@@ -890,11 +936,29 @@ export default function SettingsPage() {
 
         {/* Conquistas */}
         <div className="space-y-2 border-t border-slate-100 dark:border-slate-800 pt-4">
-          <p className="text-xs font-bold text-slate-600 dark:text-slate-300">Ícones das Conquistas <span className="font-medium text-slate-400">({ACHIEVEMENTS.length} — sem imagem usa o emoji padrão · caneta edita o nome)</span></p>
+          <p className="text-xs font-bold text-slate-600 dark:text-slate-300">Ícones das Conquistas <span className="font-medium text-slate-400">({ACHIEVEMENTS.length} — sem imagem usa o emoji padrão · caneta edita o nome{canEditRanks ? ' · pausar/remove do mês atual' : ''})</span></p>
           <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-8 gap-2">
             {ACHIEVEMENTS.map((a) => {
               const key = iconKeys.achievement(a.id)
               const rn = RARITY_NAME[a.rarity]
+              const isPaused = settings.pausedAchievements.includes(a.id)
+              const isRemoved = settings.removedAchievements.includes(a.id)
+              const handleTogglePause = () => {
+                void setAchievementPaused(a.id, !isPaused).catch((err) =>
+                  setError(`Erro ao pausar: ${err instanceof Error ? err.message : String(err)}`)
+                )
+              }
+              const handleToggleRemove = () => {
+                if (!isRemoved) {
+                  const ok = window.confirm(
+                    `Remover "${achievementName(a, settings.names)}"? Ela sai do jogo e das contagens do mês.`
+                  )
+                  if (!ok) return
+                }
+                void setAchievementRemoved(a.id, !isRemoved).catch((err) =>
+                  setError(`Erro ao remover: ${err instanceof Error ? err.message : String(err)}`)
+                )
+              }
               return (
                 <GamIconCell
                   key={key}
@@ -912,10 +976,19 @@ export default function SettingsPage() {
                   busy={uploadingIconKey === key}
                   onUpload={handleGamIconUpload}
                   onRemove={handleGamIconRemove}
+                  paused={isPaused}
+                  removed={isRemoved}
+                  onTogglePause={canEditRanks ? handleTogglePause : undefined}
+                  onToggleRemove={canEditRanks ? handleToggleRemove : undefined}
                 />
               )
             })}
           </div>
+          {canEditRanks && (
+            <p className="text-[10px] text-slate-400">
+              Pausar: deixa de contar como conquista no mês (o XP já ganho permanece). Remover: sai do grid e das contagens até ser restaurada.
+            </p>
+          )}
         </div>
       </div>
 

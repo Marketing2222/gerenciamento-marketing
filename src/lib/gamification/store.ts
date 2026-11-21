@@ -28,6 +28,7 @@ import {
   unlockDocId,
 } from './seasons'
 import { gamificationBus } from './bus'
+import { fetchInactiveAchievementIds } from './settings'
 
 const USERS = 'gamification_users'
 const META = 'gamification_meta'
@@ -263,7 +264,8 @@ export async function recordConclusion(input: ConclusionInput, tasks: TaskForCou
     }
   })
   const unlockedIdList = [...currentUnlockIds]
-  const newlyUnlocked = evaluateAchievements(unlockedIdList, counters)
+  const inactiveIds = await fetchInactiveAchievementIds()
+  const newlyUnlocked = evaluateAchievements(unlockedIdList, counters, inactiveIds)
   const achievementXp = newlyUnlocked.reduce((sum, a) => sum + a.xpReward, 0)
 
   // Nível da temporada: XP (eventos + recompensas) do mês atual.
@@ -358,7 +360,8 @@ export async function reconcileSeasonUnlocks(
     if (isUnlockInSeason(d.id, unlockedAt, season)) freshIds.add(parseUnlockDocId(d.id).achievementId)
   })
 
-  const pending = evaluateAchievements([...freshIds], counters)
+  const inactiveIds = await fetchInactiveAchievementIds()
+  const pending = evaluateAchievements([...freshIds], counters, inactiveIds)
   if (pending.length === 0) return
 
   const uRef = await userRef(uid)
@@ -524,7 +527,8 @@ export async function runBackfillIfNeeded(): Promise<void> {
     const counters = computeCounters(allEvents, uid, allRawTasks, currentSeason())
     const unlocksSnap = await getDocs(await unlocksCol(uid))
     const unlockedIdList = unlocksSnap.docs.map((d) => parseUnlockDocId(d.id).achievementId)
-    const newlyUnlocked = evaluateAchievements(unlockedIdList, counters)
+    const inactiveIds = await fetchInactiveAchievementIds()
+    const newlyUnlocked = evaluateAchievements(unlockedIdList, counters, inactiveIds)
     const allUnlockedIds = [...unlockedIdList, ...newlyUnlocked.map((a) => a.id)]
 
     const eventsXp = allEvents.reduce((sum, e) => sum + e.xp, 0)

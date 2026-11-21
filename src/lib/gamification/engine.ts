@@ -299,10 +299,17 @@ export function isUnlocked(a: Achievement, c: Counters): boolean {
  * Avalia quais conquistas devem ser desbloqueadas dado o conjunto atual de
  * desbloqueios + contadores de eventos. Trata a conquista "all" (platina)
  * separadamente: só libera quando TODAS as outras estiverem desbloqueadas.
+ * `inactiveIds` = pausadas/removidas: ficam de fora do mês atual (não
+ * desbloqueiam nem entram nas coleções/contagens).
  */
-export function evaluateAchievements(alreadyUnlockedIds: string[], counters: Counters): Achievement[] {
+export function evaluateAchievements(
+  alreadyUnlockedIds: string[],
+  counters: Counters,
+  inactiveIds?: ReadonlySet<string>
+): Achievement[] {
+  const isInactive = (id: string) => inactiveIds?.has(id) ?? false
   const allIds = new Set(alreadyUnlockedIds)
-  const pending = ACHIEVEMENTS.filter((a) => !allIds.has(a.id))
+  const pending = ACHIEVEMENTS.filter((a) => !allIds.has(a.id) && !isInactive(a.id))
   const unlockedNow: Achievement[] = []
 
   for (const a of pending) {
@@ -314,10 +321,11 @@ export function evaluateAchievements(alreadyUnlockedIds: string[], counters: Cou
   }
 
   // Coleções de raridade: liberam quando TODAS as conquistas daquela raridade
-  // (excluindo a própria coleção e o Complecionista) estiverem desbloqueadas.
+  // (excluindo a própria coleção e o Complecionista, e as pausadas/removidas)
+  // estiverem desbloqueadas.
   for (const a of pending) {
     if (a.requirement.type !== 'rarity_all') continue
-    const targets = rarityCollectionTargets(a)
+    const targets = rarityCollectionTargets(a).filter((t) => !isInactive(t.id))
     if (targets.length > 0 && targets.every((t) => allIds.has(t.id))) {
       unlockedNow.push(a)
       allIds.add(a.id)
@@ -326,8 +334,11 @@ export function evaluateAchievements(alreadyUnlockedIds: string[], counters: Cou
 
   const meta = pending.find((a) => a.requirement.type === 'all')
   if (meta) {
-    const others = [...allIds].filter((id) => id !== meta.id).length
-    if (others >= meta.requirement.value) {
+    // Pausadas/removidas nunca contam: reduz a meta na mesma proporção.
+    const inactiveOthers = ACHIEVEMENTS.filter((a) => a.id !== meta.id && isInactive(a.id)).length
+    const required = Math.max(0, meta.requirement.value - inactiveOthers)
+    const others = [...allIds].filter((id) => id !== meta.id && !isInactive(id)).length
+    if (others >= required) {
       unlockedNow.push(meta)
       allIds.add(meta.id)
     }
@@ -337,15 +348,37 @@ export function evaluateAchievements(alreadyUnlockedIds: string[], counters: Cou
 }
 
 /** Progresso para exibição (a platina conta as outras desbloqueadas). */
-export function achievementProgress(a: Achievement, c: Counters, unlockedIds: string[]): number {
+export function achievementProgress(
+  a: Achievement,
+  c: Counters,
+  unlockedIds: string[],
+  inactiveIds?: ReadonlySet<string>
+): number {
   if (a.requirement.type === 'all') {
-    return unlockedIds.filter((id) => id !== a.id).length
+    return unlockedIds.filter((id) => id !== a.id && !inactiveIds?.has(id)).length
   }
   if (a.requirement.type === 'rarity_all') {
     const unlocked = new Set(unlockedIds)
-    return rarityCollectionTargets(a).filter((t) => unlocked.has(t.id)).length
+    return rarityCollectionTargets(a).filter((t) => !inactiveIds?.has(t.id) && unlocked.has(t.id)).length
   }
   return requirementProgress(a, c)
+}
+
+/**
+ * Valor efetivo do requisito para exibição — a meta da platina ("todas as
+ * outras") diminui junto com as conquistas pausadas/removidas do mês.
+ */
+export function effectiveRequirementValue(
+  a: Achievement,
+  inactiveIds?: ReadonlySet<string>
+): number {
+  if (!inactiveIds || inactiveIds.size === 0 || a.requirement.type !== 'all') {
+    return a.requirement.value
+  }
+  const inactiveOthers = ACHIEVEMENTS.filter(
+    (x) => x.id !== a.id && inactiveIds.has(x.id)
+  ).length
+  return Math.max(0, a.requirement.value - inactiveOthers)
 }
 
 /** Comparação de datas de prazo sem depender de fuso (usa apenas a parte de data). */

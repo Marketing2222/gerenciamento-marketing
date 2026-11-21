@@ -1,5 +1,5 @@
 import { db, isFirebaseConfigured, waitForConfig } from '@/lib/firebaseClient'
-import { collection, deleteDoc, doc, onSnapshot, setDoc } from 'firebase/firestore'
+import { collection, deleteDoc, doc, getDoc, onSnapshot, setDoc } from 'firebase/firestore'
 import { defaultTitleForLevel } from './levels'
 import type { Rarity } from './types'
 
@@ -16,6 +16,10 @@ export interface GamificationSettings {
   rankCount: number
   /** Quantidade de colunas do grid de conquistas (3 ou 4). */
   achColumns: number
+  /** Conquistas PAUSADAS: não contam como conquista no mês atual. */
+  pausedAchievements: string[]
+  /** Conquistas REMOVIDAS: fora do jogo (grid + contagens). */
+  removedAchievements: string[]
   /** Camada de transparência sobre a capa do perfil (conquistas). */
   transparencyEnabled: boolean
   /** Cor da transparência (ex.: #ffffff). */
@@ -70,9 +74,14 @@ function clampRankCount(n: unknown): number {
   return Math.min(RANK_MAX_LEVELS, Math.max(RANK_LEVELS, v))
 }
 
+/** Lê um array de strings válido de um doc do Firestore (seguro contra lixo). */
+function readStrArray(v: unknown): string[] {
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && Boolean(x)) : []
+}
+
 function localGradient(): GamificationSettings {
   if (typeof window === 'undefined') {
-    return { gradientFrom: DEFAULT_GRADIENT.from, gradientTo: DEFAULT_GRADIENT.to, icons: {}, names: {}, rankNames: {}, rankCount: RANK_LEVELS, achColumns: ACH_COLUMNS_DEFAULT, ...DEFAULT_PAGE_THEME }
+    return { gradientFrom: DEFAULT_GRADIENT.from, gradientTo: DEFAULT_GRADIENT.to, icons: {}, names: {}, rankNames: {}, rankCount: RANK_LEVELS, achColumns: ACH_COLUMNS_DEFAULT, pausedAchievements: [], removedAchievements: [], ...DEFAULT_PAGE_THEME }
   }
   try {
     return {
@@ -83,13 +92,23 @@ function localGradient(): GamificationSettings {
       rankNames: JSON.parse(localStorage.getItem('mkt-g-rank-names') || '{}'),
       rankCount: clampRankCount(Number(localStorage.getItem('mkt-g-rank-count') || RANK_LEVELS)),
       achColumns: clampAchColumns(Number(localStorage.getItem('mkt-g-ach-cols') || ACH_COLUMNS_DEFAULT)),
+      pausedAchievements: readStrArray(safeJson(localStorage.getItem('mkt-g-paused-ach'))),
+      removedAchievements: readStrArray(safeJson(localStorage.getItem('mkt-g-removed-ach'))),
       transparencyEnabled: localStorage.getItem('mkt-g-transp-on') !== '0',
       transparencyColor: localStorage.getItem('mkt-g-transp-color') || DEFAULT_PAGE_THEME.transparencyColor,
       pageBg: localStorage.getItem('mkt-g-page-bg') || '',
       pageText: localStorage.getItem('mkt-g-page-text') || '',
     }
   } catch {
-    return { gradientFrom: DEFAULT_GRADIENT.from, gradientTo: DEFAULT_GRADIENT.to, icons: {}, names: {}, rankNames: {}, rankCount: RANK_LEVELS, achColumns: ACH_COLUMNS_DEFAULT, ...DEFAULT_PAGE_THEME }
+    return { gradientFrom: DEFAULT_GRADIENT.from, gradientTo: DEFAULT_GRADIENT.to, icons: {}, names: {}, rankNames: {}, rankCount: RANK_LEVELS, achColumns: ACH_COLUMNS_DEFAULT, pausedAchievements: [], removedAchievements: [], ...DEFAULT_PAGE_THEME }
+  }
+}
+
+function safeJson(raw: string | null): unknown {
+  try {
+    return JSON.parse(raw || 'null')
+  } catch {
+    return null
   }
 }
 
@@ -117,9 +136,11 @@ export function subscribeSettings(callback: (s: GamificationSettings) => void): 
   let rankNames: Record<string, string> = {}
   let rankCount = RANK_LEVELS
   let achColumns = ACH_COLUMNS_DEFAULT
+  let pausedAchievements: string[] = []
+  let removedAchievements: string[] = []
   let pageTheme = { ...DEFAULT_PAGE_THEME }
 
-  const emit = () => callback({ gradientFrom: gradient.from, gradientTo: gradient.to, icons, names, rankNames, rankCount, achColumns, ...pageTheme })
+  const emit = () => callback({ gradientFrom: gradient.from, gradientTo: gradient.to, icons, names, rankNames, rankCount, achColumns, pausedAchievements, removedAchievements, ...pageTheme })
 
   void (async () => {
     waitForConfig()
@@ -149,6 +170,8 @@ export function subscribeSettings(callback: (s: GamificationSettings) => void): 
       }
       rankCount = clampRankCount(d?.rankCount)
       achColumns = clampAchColumns(d?.achColumns)
+      pausedAchievements = readStrArray(d?.pausedAchievements)
+      removedAchievements = readStrArray(d?.removedAchievements)
       emit()
     })
     unsubIcons = onSnapshot(await iconsCol(), (snap) => {
@@ -283,6 +306,51 @@ export async function saveAchievementsColumns(columns: number): Promise<void> {
   if (!isFirebaseConfigured()) return
   waitForConfig()
   await setDoc(await settingsRef(), { achColumns: clean }, { merge: true })
+}
+
+/** Salva a lista de conquistas pausadas (não contam no mês atual). */
+export async function savePausedAchievements(ids: string[]): Promise<void> {
+  const clean = [...new Set(ids)]
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('mkt-g-paused-ach', JSON.stringify(clean))
+  }
+  if (!isFirebaseConfigured()) return
+  waitForConfig()
+  await setDoc(await settingsRef(), { pausedAchievements: clean }, { merge: true })
+}
+
+/** Salva a lista de conquistas removidas (fora do jogo). */
+export async function saveRemovedAchievements(ids: string[]): Promise<void> {
+  const clean = [...new Set(ids)]
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('mkt-g-removed-ach', JSON.stringify(clean))
+  }
+  if (!isFirebaseConfigured()) return
+  waitForConfig()
+  await setDoc(await settingsRef(), { removedAchievements: clean }, { merge: true })
+}
+
+/**
+ * Ids de conquistas pausadas + removidas (não contam na temporada atual).
+ * Usado pelo motor de avaliação fora do React (conclusões/reconciliação).
+ * Sem Firebase configurado, lê o localStorage (modo local).
+ */
+export async function fetchInactiveAchievementIds(): Promise<Set<string>> {
+  if (!isFirebaseConfigured()) {
+    const out = new Set<string>()
+    const paused = readStrArray(safeJson(typeof window !== 'undefined' ? localStorage.getItem('mkt-g-paused-ach') : null))
+    const removed = readStrArray(safeJson(typeof window !== 'undefined' ? localStorage.getItem('mkt-g-removed-ach') : null))
+    paused.forEach((id) => out.add(id))
+    removed.forEach((id) => out.add(id))
+    return out
+  }
+  waitForConfig()
+  const snap = await getDoc(await settingsRef())
+  const d = snap.exists() ? snap.data() : null
+  const out = new Set<string>()
+  readStrArray(d?.pausedAchievements).forEach((id) => out.add(id))
+  readStrArray(d?.removedAchievements).forEach((id) => out.add(id))
+  return out
 }
 
 /** Nome exibido da patente (customizado nas configurações, senão o padrão). */

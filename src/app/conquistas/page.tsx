@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGamification } from '@/context/GamificationContext'
+import { useUser } from '@/context/UserContext'
 import { useTheme } from '@/context/ThemeContext'
 import { ACHIEVEMENTS } from '@/lib/gamification/achievements'
-import { achievementProgress } from '@/lib/gamification/engine'
+import { achievementProgress, effectiveRequirementValue } from '@/lib/gamification/engine'
 import { achievementName, iconKeys } from '@/lib/gamification/settings'
 import type { AchCategory, Rarity } from '@/lib/gamification/types'
 import { uploadWallpaper } from '@/lib/storage'
@@ -13,7 +14,7 @@ import SeasonPopup from '@/components/gamification/SeasonPopup'
 import WallpaperCrop from '@/components/gamification/WallpaperCrop'
 import { buildSeasonSummaries, currentSeason } from '@/lib/gamification/seasons'
 import { levelTheme, seasonAccent } from '@/lib/gamification/theme'
-import { Loader2, Moon, Pencil, Sun, Trophy, Upload, Trash2, Filter, Calendar, Gem, Lock, Palette, ZoomIn, Crop } from 'lucide-react'
+import { Loader2, Moon, Pencil, Pause, Sun, Trophy, Upload, Trash2, Filter, Calendar, Gem, Lock, Palette, ZoomIn, Crop } from 'lucide-react'
 
 type StatusFilter = 'todas' | 'desbloqueadas' | 'pendentes'
 
@@ -50,7 +51,8 @@ const CATEGORY_LABELS: { id: AchCategory | 'todas'; label: string }[] = [
 ]
 
 export default function ConquistasPage() {
-  const { progress, unlocks, allUnlocks, events, counters, unlockedCount, totalAchievements, loading, level, seasonXp, resetNew, settings, saveCover, saveAccent, saveBgZoom } = useGamification()
+  const { progress, unlocks, allUnlocks, events, counters, unlockedCount, totalAchievements, inactiveIds, loading, level, seasonXp, resetNew, settings, saveCover, saveAccent, saveBgZoom } = useGamification()
+  const { user } = useUser()
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('todas')
   const [catFilter, setCatFilter] = useState<AchCategory | 'todas'>('todas')
   const [catMenu, setCatMenu] = useState(false)
@@ -154,6 +156,7 @@ export default function ConquistasPage() {
 
   const filtered = useMemo(() => {
     return ACHIEVEMENTS.filter((a) => {
+      if (settings.removedAchievements.includes(a.id)) return false // removida sai do grid
       const unlocked = Boolean(unlocks[a.id])
       if (statusFilter === 'desbloqueadas' && !unlocked) return false
       if (statusFilter === 'pendentes' && unlocked) return false
@@ -161,9 +164,12 @@ export default function ConquistasPage() {
       if (rarFilter !== 'todas' && a.rarity !== rarFilter) return false
       return true
     })
-  }, [unlocks, statusFilter, catFilter, rarFilter])
+  }, [unlocks, settings.removedAchievements, statusFilter, catFilter, rarFilter])
 
-  const seasonSummaries = useMemo(() => buildSeasonSummaries(events, allUnlocks), [events, allUnlocks])
+  const seasonSummaries = useMemo(
+    () => buildSeasonSummaries(events, allUnlocks, { uid: user?.id, inactiveIds }),
+    [events, allUnlocks, user?.id, inactiveIds]
+  )
   const seasonNumberNow = seasonSummaries[seasonSummaries.length - 1]?.info.number ?? currentSeason().number
 
   if (loading) {
@@ -657,11 +663,13 @@ export default function ConquistasPage() {
           }`}
         >
           {filtered.map((a) => {
-            const unlocked = Boolean(unlocks[a.id])
+            const paused = inactiveIds.has(a.id)
+            const unlocked = Boolean(unlocks[a.id]) && !paused
             const rarity = RARITY_META[a.rarity]
-            const progressValue = achievementProgress(a, counters, Object.keys(unlocks))
-            const showProgress = a.requirement.value > 1 && a.requirement.type !== 'rapid'
-            const percent = Math.min(100, Math.round((progressValue / a.requirement.value) * 100))
+            const progressValue = achievementProgress(a, counters, Object.keys(unlocks), inactiveIds)
+            const reqValue = effectiveRequirementValue(a, inactiveIds)
+            const showProgress = reqValue > 1 && a.requirement.type !== 'rapid'
+            const percent = Math.min(100, Math.round((progressValue / Math.max(1, reqValue)) * 100))
             const unlockedAt = unlocks[a.id]?.unlockedAt
             const customIcon = settings.icons[iconKeys.achievement(a.id)]
             const customRarity = settings.icons[iconKeys.rarity(a.rarity)]
@@ -709,10 +717,12 @@ export default function ConquistasPage() {
                   </>
                 ) : (
                   <span
-                    className="absolute top-3 left-3 z-10 w-7 h-7 rounded-full bg-slate-500 text-white flex items-center justify-center shadow"
-                    title="Ainda não desbloqueada"
+                    className={`absolute top-3 left-3 z-10 w-7 h-7 rounded-full text-white flex items-center justify-center shadow ${
+                      paused ? 'bg-amber-500' : 'bg-slate-500'
+                    }`}
+                    title={paused ? 'Pausada — não conta como conquista neste mês' : 'Ainda não desbloqueada'}
                   >
-                    <Lock className="w-3.5 h-3.5" />
+                    {paused ? <Pause className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
                   </span>
                 )}
                 <div className="flex items-center gap-4">
@@ -737,7 +747,11 @@ export default function ConquistasPage() {
                       >
                         {achievementName(a, settings.names)}
                       </h3>
-                      {customRarity ? (
+                      {paused ? (
+                        <span className="shrink-0 px-3 py-1.5 rounded-full text-[12px] font-bold uppercase border bg-amber-500/15 border-amber-500/50 text-amber-500">
+                          Pausada
+                        </span>
+                      ) : customRarity ? (
                         <img src={customRarity} alt={rarity.label} className="shrink-0 w-9 h-9 rounded-full object-cover border border-black/10 dark:border-white/10" />
                       ) : (
                         <span className={`shrink-0 px-3 py-1.5 rounded-full text-[12px] font-bold uppercase border ${rarity.pill}`}>
@@ -753,7 +767,7 @@ export default function ConquistasPage() {
                       <div className="mt-3">
                         <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 mb-1">
                           <span>
-                            {Math.min(progressValue, a.requirement.value)}/{a.requirement.value}
+                            {Math.min(progressValue, reqValue)}/{reqValue}
                           </span>
                           <span>{percent}%</span>
                         </div>
